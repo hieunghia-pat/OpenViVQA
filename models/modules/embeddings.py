@@ -50,6 +50,7 @@ class VisualEmbedding(nn.Module):
         v = v.view(n, c, w*h).permute(0, 2, 1)
 
         v = self.proj(v)
+        v = self.dropout(v)
 
         return v
 

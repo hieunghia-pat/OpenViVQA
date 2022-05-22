@@ -3,7 +3,6 @@ from torch import nn
 from torch.nn import functional as F
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.attentions import MultiHeadAttention
-from models.utils import generate_padding_mask, generate_sequential_mask
 
 class EncoderLayer(nn.Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
@@ -16,11 +15,8 @@ class EncoderLayer(nn.Module):
                                         attention_module_kwargs=attention_module_kwargs)
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
 
-    def forward(self, queries, keys, values, boxes=None, grid_size=None, positional_emb=None, attention_mask=None, attention_weights=None):
-        if positional_emb is not None:
-            queries += positional_emb
-            keys += positional_emb
-        att = self.mhatt(queries, keys, values, boxes=boxes, grid_size=grid_size, attention_mask=attention_mask, attention_weights=attention_weights)
+    def forward(self, queries, keys, values, boxes=None, attention_mask=None):
+        att = self.mhatt(queries, keys, values, boxes=boxes, attention_mask=attention_mask)
         ff = self.pwff(att)
         return ff
 
@@ -39,19 +35,16 @@ class GuidedEncoderLayer(nn.Module):
                                         attention_module_kwargs=attention_module_kwargs)
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
 
-    def forward(self, queries, keys, values, boxes=None, grid_size=None, positional_emb=None, 
-                    mask_pad=None, self_attention_mask=None, guided_attention_mask=None, 
-                    self_attention_weights=None, guided_attention_weights=None):
-        if positional_emb is not None:
-            queries += positional_emb
+    def forward(self, queries, keys, values, boxes=None,
+                self_attention_mask=None, guided_attention_mask=None):
 
-        queries = self.self_mhatt(queries, queries, queries, boxes=boxes, grid_size=grid_size, 
-                                    attention_mask=self_attention_mask, attention_weights=self_attention_weights)
-        queries = queries.masked_fill(mask_pad, value=0)
+        queries = self.self_mhatt(queries, queries, queries, boxes=boxes,
+                                    attention_mask=self_attention_mask)
+        queries = queries.masked_fill(self_attention_mask, value=0)
 
-        guided_att = self.guided_mhatt(queries, keys, values, boxes=boxes, grid_size=grid_size, 
-                                    attention_mask=guided_attention_mask, attention_weights=guided_attention_weights)
-        guided_att = guided_att.mask_fill(mask_pad, value=0)
+        guided_att = self.guided_mhatt(queries, keys, values, boxes=boxes,
+                                    attention_mask=guided_attention_mask)
+        guided_att = guided_att.mask_fill(self_attention_mask, value=0)
 
         ff = self.pwff(guided_att)
         return ff
@@ -73,16 +66,20 @@ class Encoder(nn.Module):
                                      for _ in range(N)])
         self.padding_idx = padding_idx
 
-    def forward(self, input, boxes=None, grid_size=None, positional_emb=None, attention_weights=None):
-        # input (b_s, seq_len, d_in)
-        attention_mask = (torch.sum(input, -1) == self.padding_idx).unsqueeze(1).unsqueeze(1)  # (b_s, 1, 1, seq_len)
-        out = F.relu(self.fc(input))
+    def forward(self, visuals):
+        features = visuals.features
+        padding_mask = visuals.feature_padding_masks
+        pos_embeddings = visuals.feature_pos_embeddings
+        boxes = visuals.boxes
+        
+        out = F.relu(self.fc(features))
         out = self.dropout(out)
         out = self.layer_norm(out)
         for layer in self.layers:
-            out = layer(out, out, out, boxes, grid_size, positional_emb, attention_mask, attention_weights)
+            out = out + pos_embeddings
+            out = layer(out, out, out, boxes, padding_mask)
 
-        return out, attention_mask
+        return out, padding_mask
 
 class MultiLevelEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
@@ -99,30 +96,30 @@ class MultiLevelEncoder(nn.Module):
                                                   attention_module=attention_module,
                                                   attention_module_kwargs=attention_module_kwargs)
                                      for _ in range(N)])
-        self.padding_idx = padding_idx
 
-    def forward(self, input, boxes=None, grid_size=None, positional_emb=None, attention_weights=None):
-        # input (b_s, seq_len, d_in)
-        # blank features are added by zero tensors
-        attention_mask = (torch.sum(input, -1) == self.padding_idx).unsqueeze(1).unsqueeze(1)  # (b_s, 1, 1, seq_len)
+    def forward(self, visuals):
+        features = visuals.features
+        padding_mask = visuals.feature_padding_masks
+        pos_embeddings = visuals.feature_pos_embeddings
+        boxes = visuals.boxes
 
         outs = []
-        out = F.relu(self.fc(input))
+        out = F.relu(self.fc(features))
         out = self.dropout(out)
         out = self.layer_norm(out)
         for layer in self.layers:
-            out = layer(out, out, out, boxes, grid_size, positional_emb, attention_mask, attention_weights)
+            out = out + pos_embeddings
+            out = layer(out, out, out, boxes, pos_embeddings, padding_mask)
             outs.append(out.unsqueeze(1))
 
         outs = torch.cat(outs, dim=1)
-        return outs, attention_mask
+        return outs, padding_mask
 
 class GuidedEncoder(nn.Module):
     def __init__(self, N, padding_idx, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
                  identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
         super(MultiLevelEncoder, self).__init__()
 
-        self.dropout = nn.Dropout(p=dropout)
         self.layer_norm = nn.LayerNorm(d_model)
 
         self.d_model = d_model
@@ -134,17 +131,22 @@ class GuidedEncoder(nn.Module):
                                      for _ in range(N)])
         self.padding_idx = padding_idx
 
-    def forward(self, visuals, questions, boxes=None, grid_size=None, positional_emb=None, mask_questions=None):
-        seq_len = visuals.shape[1]
-        mask_visuals = (torch.sum(input, -1) == self.padding_idx).unsqueeze(1).unsqueeze(1)  # (b_s, 1, 1, seq_len)
-        mask_self_attention = generate_sequential_mask(seq_len).to(questions.device)
-        mask_self_attention = mask_self_attention.unsqueeze(0).unsqueeze(0)  # (1, 1, seq_len, seq_len)
-        mask_self_attention = torch.logical_or(mask_self_attention, mask_visuals.unsqueeze(1).unsqueeze(1))
+    def forward(self, visuals, linguistics):
+        
+        features = visuals.features
+        feature_padding_masks = visuals.feature_padding_masks
+        feature_pos_embeddings = visuals.feature_pos_embeddings
+        boxes = visuals.boxes
 
-        visuals = self.layer_norm(visuals)
+        questions = linguistics.questions
+        question_attention_masks = linguistics.question_attention_masks
+        question_pos_embeddings = linguistics.question_pos_embeddings
+        questions = questions + question_pos_embeddings
+
+        features = self.layer_norm(features)
         for layer in self.layers:
-            visuals = layer(visuals, questions, questions, boxes=boxes, grid_size=grid_size, 
-                            positiona_emb=positional_emb, mask_pad=mask_visuals, 
-                            self_attention_mask=mask_self_attention, guided_attention_mask=mask_questions)
+            features = features + feature_pos_embeddings
+            features = layer(features, questions, questions, boxes=boxes,
+                            self_attention_mask=question_attention_masks, guided_attention_mask=feature_padding_masks)
 
-        return visuals, mask_visuals
+        return features, feature_padding_masks

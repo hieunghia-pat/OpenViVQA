@@ -32,17 +32,21 @@ class DecoderLayer(Module):
 
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout)
 
-    def forward(self, input, enc_output, language_signals=None, mask_pad=None, mask_self_att=None, mask_enc_att=None, positional_emb=None):
-        self_att = self.self_attn(input, input, input, attention_mask=mask_self_att)
-        self_att = self_att.masked_fill(mask_pad, value=0)
+    def forward(self, linguistics, enc_output):
+        answers = linguistics.answers
+        language_signals = linguistics.language_signals
+        answer_padding_masks = linguistics.answer_padding_masks
+        answer_sequential_masks = linguistics.answer_sequetial_masks
+        answer_self_attention_mask = torch.logical_or(answer_sequential_masks, answer_padding_masks)
 
-        if positional_emb is not None:
-            key = enc_output + positional_emb
-        else:
-            key = enc_output
-        enc_att = self.enc_attn(self_att, key, enc_output, language_signals=language_signals, 
-                                attention_mask=mask_enc_att).masked_fill(mask_pad, value=0)
-        enc_att = enc_att.masked_fill(mask_pad, value=0)
+        self_att = self.self_attn(answers, answers, answers, attention_mask=answer_self_attention_mask)
+
+        features = enc_output.features
+        feature_padding_masks = enc_output.feature_padding_masks
+        feature_pos_embeddings = enc_output.feature_pos_embeddings
+        features = features + feature_pos_embeddings
+        enc_att = self.enc_attn(self_att, features, features, language_signals=language_signals, 
+                                attention_mask=feature_padding_masks)
 
         ff = self.pwff(enc_att)
         
@@ -175,6 +179,15 @@ class Decoder(Module):
             self.running_seq.add_(1)
             seq = self.running_seq
 
+        # special process for the beam search of inference
+        if encoder_output.shape[0] > positional_emb.shape[0]:
+            assert encoder_output.shape[0] % positional_emb.shape[0] == 0
+            beam_size = int(encoder_output.shape[0] / positional_emb.shape[0])
+            positional_emb = positional_emb.unsqueeze(1)  # (bs, 1, seq_len, d_model)
+            positional_emb = positional_emb.expand(positional_emb.shape[0], positional_emb.shape[1]*beam_size, 
+                                                    positional_emb.shape[2], positional_emb.shape[3])  # (bs, beam_size, seq_len, d_model)
+            positional_emb = positional_emb.contiguous().flatten(0, 1)  # (bs*beam_size, seq_len, d_model)
+
         out = self.word_emb(input) + self.pos_emb(seq)
         for layer in self.layers:
             out = layer(out, encoder_output, mask_pad=mask_queries.unsqueeze(-1), 
@@ -219,6 +232,15 @@ class MeshedDecoder(Module):
             self.running_seq.add_(1)
             seq = self.running_seq
 
+        # special process for the beam search of inference
+        if encoder_output.shape[0] > positional_emb.shape[0]:
+            assert encoder_output.shape[0] % positional_emb.shape[0] == 0
+            beam_size = int(encoder_output.shape[0] / positional_emb.shape[0])
+            positional_emb = positional_emb.unsqueeze(1)  # (bs, 1, seq_len, d_model)
+            positional_emb = positional_emb.expand(positional_emb.shape[0], positional_emb.shape[1]*beam_size, 
+                                                    positional_emb.shape[2], positional_emb.shape[3])  # (bs, beam_size, seq_len, d_model)
+            positional_emb = positional_emb.contiguous().flatten(0, 1)  # (bs*beam_size, seq_len, d_model)
+
         out = self.word_emb(input) + self.pos_emb(seq)
         for layer in self.layers:
             out = layer(out, encoder_output, mask_pad=mask_queries.unsqueeze(-1), 
@@ -259,10 +281,9 @@ class AdaptiveDecoder(Module):
         if os.path.isfile(language_model_path):
             model_file = torch.load(language_model_path)
             self.language_model.load_state_dict(model_file['state_dict'], strict=False)
-        # else fine tuning the BERT-based model in end-to-end way
-        
-        # for p in self.language_model.parameters():
-        #     p.requires_grad = False
+        else: # fine tuning the BERT-based model in end-to-end way
+            for p in self.language_model.parameters():
+                p.requires_grad = False
 
         self.max_len = max_len
         self.padding_idx = padding_idx

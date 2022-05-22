@@ -4,7 +4,7 @@ from torch.nn import functional as F
 import numpy as np
 
 from models.modules.containers import Module
-from models.utils import clones, box_relational_embedding, get_grids_position
+from models.utils import clones, box_relational_embedding
 
 class ScaledDotProductAttention(nn.Module):
     '''
@@ -41,7 +41,7 @@ class ScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, attention_mask=None, **kwargs):
         '''
             Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -58,8 +58,6 @@ class ScaledDotProductAttention(nn.Module):
         v = self.fc_v(values).view(b_s, nk, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
         att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
-        if attention_weights is not None:
-            att = att * attention_weights
         if attention_mask is not None:
             att = att.masked_fill(attention_mask, -np.inf)
         att = torch.softmax(att, dim=-1)
@@ -116,7 +114,7 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         for fc_g in self.fc_gs:
             nn.init.constant_(fc_g.bias, 0)
 
-    def forward(self, queries, keys, values, boxes=None, grid_size=None, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, boxes=None, attention_mask=None, **kwargs):
         '''
             Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -130,12 +128,6 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         '''
         
         # embedding geometric information from boxes coordinates
-        if grid_size is not None:
-            assert boxes is None, "there is no boxe when using grid-based extractor"
-            bs, seq_len = queries.shape[:2]
-            boxes = get_grids_position(bs, seq_len, grid_size)
-        else:
-            assert boxes is not None, "coordinates of objects are requiered for region-based extractor"
         relative_geometry_embeddings = box_relational_embedding(boxes, dim_g=self.d_g, trignometric_embedding=self.trignometric_embedding)
         flatten_relative_geometry_embeddings = relative_geometry_embeddings.view(-1, self.d_g)
         bs, nk, _, _ = relative_geometry_embeddings.shape
@@ -151,8 +143,6 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         v = self.fc_v(values).view(b_s, nk, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
         a = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
-        if attention_weights is not None:
-            a = a * attention_weights
         if attention_mask is not None:
             a = a.masked_fill(attention_mask, -np.inf)
 
@@ -205,7 +195,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, attention_mask=None, **kwargs):
         '''
         Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -226,8 +216,6 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         v = torch.cat([self.fc_v(values), m_v], 1).view(b_s, nk + self.m, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
         att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
-        if attention_weights is not None:
-            att = torch.cat([att[:, :, :, :nk] * attention_weights, att[:, :, :, nk:]], -1)
         if attention_mask is not None:
             att[:, :, :, :nk] = att[:, :, :, :nk].masked_fill(attention_mask, -np.inf)
         att = torch.softmax(att, -1)
@@ -278,7 +266,7 @@ class AdaptiveScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_o.bias, 0)
         nn.init.constant_(self.fc_s.bias, 0)
 
-    def forward(self, queries, keys, values, language_signals, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, language_signals, attention_mask=None, **kwargs):
         '''
         Computes
         :param queries: Queries (b_s, nq, d_model)
@@ -300,8 +288,6 @@ class AdaptiveScaledDotProductAttention(nn.Module):
         v = self.fc_v(values).view(b_s, nk, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
         attn = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
-        if attention_weights is not None:
-            attn = attn * attention_weights
         if attention_mask is not None:
             attn = attn.masked_fill(attention_mask, -np.inf)
 
@@ -351,7 +337,7 @@ class MultiHeadAttention(Module):
             self.register_state('running_keys', torch.zeros((0, d_model)))
             self.register_state('running_values', torch.zeros((0, d_model)))
 
-    def forward(self, queries, keys, values, boxes=None, grid_size=None, language_signals=None, attention_mask=None, attention_weights=None):
+    def forward(self, queries, keys, values, boxes=None, language_signals=None, attention_mask=None, **kwargs):
         if self.can_be_stateful and self._is_stateful:
             self.running_keys = torch.cat([self.running_keys, keys], 1)
             keys = self.running_keys
@@ -364,28 +350,28 @@ class MultiHeadAttention(Module):
             keys = self.layer_norm(keys)
             values = self.layer_norm(values)
 
-            if (boxes is not None) or (grid_size is not None):  
+            if boxes is not None:  
                 # attention with geometry-augmented attention
-                out = self.attention(queries, keys, values, boxes, grid_size, attention_mask, attention_weights)
+                out = self.attention(queries, keys, values, boxes, attention_mask, **kwargs)
             elif language_signals is not None:  
                 # adaptive attention
-                out = self.attention(queries, keys, values, language_signals, attention_mask, attention_weights)
+                out = self.attention(queries, keys, values, language_signals, attention_mask, **kwargs)
             else:                   
                 # original attention or memory augmented attention
-                out = self.attention(queries, keys, values, attention_mask, attention_weights)
+                out = self.attention(queries, keys, values, attention_mask)
             
             # residual connection after normalizing
             out = queries + self.dropout(torch.relu(out))
         else:
-            if (boxes is not None) or (grid_size is not None):  
+            if boxes is not None:  
                 # attention with geometry-augmented attention
-                out = self.attention(queries, keys, values, boxes, grid_size, attention_mask, attention_weights)
+                out = self.attention(queries, keys, values, boxes, attention_mask, **kwargs)
             elif language_signals is not None:  
                 # adaptive attention
-                out = self.attention(queries, keys, values, language_signals, attention_mask, attention_weights)
+                out = self.attention(queries, keys, values, language_signals, attention_mask, **kwargs)
             else:                   
                 # original attention or memory augmented attention
-                out = self.attention(queries, keys, values, attention_mask, attention_weights)
+                out = self.attention(queries, keys, values, attention_mask, **kwargs)
             
             # normalization after residual connection
             out = self.dropout(out)

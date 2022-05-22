@@ -5,7 +5,6 @@ import numpy as np
 
 from models.modules.containers import Module
 from models.utils import clones, box_relational_embedding, get_grids_position
-import configurations.configuration as configuration
 
 class ScaledDotProductAttention(nn.Module):
     '''
@@ -170,7 +169,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         Scaled dot-product attention with memory
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, m=configuration.total_memory):
+    def __init__(self, d_model, d_k, d_v, h, m):
         '''
         :param d_model: Output dimensionality of the model
         :param d_k: Dimensionality of queries and keys

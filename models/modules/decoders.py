@@ -10,7 +10,6 @@ from models.modules.embeddings import Embedding
 from models.modules.containers import Module, ModuleList
 
 import os
-import configurations.configuration as configuration
 
 class DecoderLayer(Module):
     "Decoder is made of self-attn, src-attn, and feed forward (defined below)"
@@ -229,9 +228,9 @@ class MeshedDecoder(Module):
         return F.log_softmax(out, dim=-1)
 
 class AdaptiveDecoder(Module):
-    def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model_name, 
+    def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model_name, checkpoint_path,
                     pretrained_language_model, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
-                    bert_hidden_size=configuration.language_model_hidden_size, dropout=.1, weights=None, 
+                    language_model_hidden_size=768, dropout=.1, weights=None, 
                     self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
         super(AdaptiveDecoder, self).__init__()
         self.d_model = d_model
@@ -251,11 +250,11 @@ class AdaptiveDecoder(Module):
         self.fc = nn.Linear(d_model, vocab_size, bias=False)
 
         # load and froze the language model
-        self.language_model = pretrained_language_model(padding_idx=padding_idx, bert_hidden_size=bert_hidden_size, 
+        self.language_model = pretrained_language_model(padding_idx=padding_idx, language_model_hidden_size=language_model_hidden_size, 
                                             pretrained_language_model_name=pretrained_language_model_name,
                                             vocab_size=vocab_size, max_len=max_len)
         
-        language_model_path = os.path.join(configuration.checkpoint_path, f"{pretrained_language_model_name}.pth")
+        language_model_path = os.path.join(checkpoint_path, f"{pretrained_language_model_name}.pth")
         # BERT-based model has been pretrained
         if os.path.isfile(language_model_path):
             model_file = torch.load(language_model_path)

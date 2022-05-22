@@ -1,9 +1,8 @@
 import torch
-import configurations.configuration as configuration
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 from tqdm import tqdm
 
-from old_data_utils.vocab import Vocab
+from data_utils.vocab import Vocab
 
 class Metrics(object):
     def __init__(self, vocab: Vocab=None):

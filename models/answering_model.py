@@ -6,9 +6,9 @@ from models import utils
 from models.modules.containers import Module
 from models.modules.beam_search import BeamSearch
 
-class CaptioningModel(Module):
+class AnsweringModel(Module):
     def __init__(self):
-        super(CaptioningModel, self).__init__()
+        super(AnsweringModel, self).__init__()
 
     def init_weights(self):
         raise NotImplementedError
@@ -17,19 +17,7 @@ class CaptioningModel(Module):
         raise NotImplementedError
 
     def forward(self, images, seq, *args):
-        device = images.device
-        b_s = images.size(0)
-        seq_len = seq.size(1)
-        state = self.init_state(b_s, device)
-        out = None
-
-        outputs = []
-        for t in range(seq_len):
-            out, state = self.step(t, state, out, images, seq, *args, mode='teacher_forcing')
-            outputs.append(out)
-
-        outputs = torch.cat([o.unsqueeze(1) for o in outputs], 1)
-        return outputs
+        raise NotImplementedError
 
     def test(self, visual: utils.TensorOrSequence, max_len: int, eos_idx: int, **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
         b_s = utils.get_batch_size(visual)
@@ -65,7 +53,7 @@ class CaptioningModel(Module):
 
         return torch.cat(outputs, 1), torch.cat(log_probs, 1)
 
-    def beam_search(self, visual: utils.TensorOrSequence, max_len: int, eos_idx: int, beam_size: int, out_size=1, 
+    def beam_search(self, visual: utils.TensorOrSequence, question: utils.TensorOrSequence, max_len: int, eos_idx: int, beam_size: int, out_size=1, 
                     boxes: utils.TensorOrNone = None, grid_size: utils.TensorOrNone = None, return_probs=False, **kwargs):
         bs = BeamSearch(self, max_len, eos_idx, beam_size)
-        return bs.apply(visual, boxes, grid_size, out_size, return_probs, **kwargs)
+        return bs.apply(visual, question, boxes, grid_size, out_size, return_probs, **kwargs)

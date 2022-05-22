@@ -40,17 +40,15 @@ class GuidedEncoderLayer(nn.Module):
 
         queries = self.self_mhatt(queries, queries, queries, boxes=boxes,
                                     attention_mask=self_attention_mask)
-        queries = queries.masked_fill(self_attention_mask, value=0)
 
         guided_att = self.guided_mhatt(queries, keys, values, boxes=boxes,
                                     attention_mask=guided_attention_mask)
-        guided_att = guided_att.mask_fill(self_attention_mask, value=0)
 
         ff = self.pwff(guided_att)
         return ff
 
 class Encoder(nn.Module):
-    def __init__(self, N, padding_idx, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
+    def __init__(self, N, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
                  identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
         super(Encoder, self).__init__()
         
@@ -64,7 +62,6 @@ class Encoder(nn.Module):
                                                   attention_module=attention_module,
                                                   attention_module_kwargs=attention_module_kwargs)
                                      for _ in range(N)])
-        self.padding_idx = padding_idx
 
     def forward(self, visuals):
         features = visuals.features
@@ -82,7 +79,7 @@ class Encoder(nn.Module):
         return out, padding_mask
 
 class MultiLevelEncoder(nn.Module):
-    def __init__(self, N, padding_idx, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
+    def __init__(self, N, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
                  identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
         super(MultiLevelEncoder, self).__init__()
 
@@ -116,7 +113,7 @@ class MultiLevelEncoder(nn.Module):
         return outs, padding_mask
 
 class GuidedEncoder(nn.Module):
-    def __init__(self, N, padding_idx, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
+    def __init__(self, N, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
                  identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
         super(MultiLevelEncoder, self).__init__()
 
@@ -129,7 +126,6 @@ class GuidedEncoder(nn.Module):
                                                   attention_module=attention_module,
                                                   attention_module_kwargs=attention_module_kwargs)
                                      for _ in range(N)])
-        self.padding_idx = padding_idx
 
     def forward(self, visuals, linguistics):
         

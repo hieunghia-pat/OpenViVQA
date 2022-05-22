@@ -11,7 +11,7 @@ class ScaledDotProductAttention(nn.Module):
     Scaled dot-product attention
     '''
 
-    def __init__(self, d_model, d_k, d_v, h):
+    def __init__(self, d_model, d_k, d_v, h, **kwargs):
         '''
             :param d_model: Output dimensionality of the model
             :param d_k: Dimensionality of queries and keys
@@ -41,7 +41,7 @@ class ScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, **kwargs):
+    def forward(self, queries, keys, values, attention_mask=None):
         '''
             Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -71,7 +71,7 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
     Scaled dot-product attention with box relation
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, trignometric_embedding=True):
+    def __init__(self, d_model, d_k, d_v, h, trignometric_embedding=True, **kwargs):
         '''
             :param d_model: Output dimensionality of the model
             :param d_k: Dimensionality of queries and keys
@@ -114,7 +114,7 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         for fc_g in self.fc_gs:
             nn.init.constant_(fc_g.bias, 0)
 
-    def forward(self, queries, keys, values, boxes=None, attention_mask=None, **kwargs):
+    def forward(self, queries, keys, values, boxes=None, attention_mask=None):
         '''
             Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -159,7 +159,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         Scaled dot-product attention with memory
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, m):
+    def __init__(self, d_model, d_k, d_v, h, m, **kwargs):
         '''
         :param d_model: Output dimensionality of the model
         :param d_k: Dimensionality of queries and keys
@@ -195,7 +195,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None, **kwargs):
+    def forward(self, queries, keys, values, attention_mask=None):
         '''
         Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -229,7 +229,7 @@ class AdaptiveScaledDotProductAttention(nn.Module):
     Scaled dot-product with adaptive attention
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, dropout=.1, comment=None):
+    def __init__(self, d_model, d_k, d_v, h, dropout=.1, comment=None, **kwargs):
         '''
         :param d_model: Output dimensionality of the model
         :param d_k: Dimensionality of queries and keys

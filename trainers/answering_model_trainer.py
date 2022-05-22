@@ -8,8 +8,7 @@ from models.modules.transformer import Transformer
 from data_utils.dataset import *
 import evaluation
 from evaluation import Cider, PTBTokenizer
-
-import config
+from data_utils.feature import Feature
 
 import multiprocessing
 from tqdm import tqdm
@@ -17,6 +16,7 @@ import itertools
 from typing import Tuple, Union
 import random
 from shutil import copyfile
+from yacs.config import CfgNode
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -26,9 +26,11 @@ class Trainer:
                         val_datasets: Tuple[FeatureDataset, DictionaryDataset],
                         test_datasets: Tuple[Union[FeatureDataset, None], Union[DictionaryDataset, None]],
                         vocab: Vocab,
+                        config: CfgNode,
                         collate_fn=collate_fn):
         self.model = model
         self.vocab = vocab
+        self.config = config
 
         self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)
@@ -102,46 +104,45 @@ class Trainer:
         with tqdm(desc='Epoch %d - Validation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             with torch.no_grad():
                 for it, sample in enumerate(dataloader):
-                    # Load region features
-                    region_features = sample["region_features"]
-                    if len(region_features) > 0:
-                        region_features = region_features.to(device)
+                    visual_features = sample["visual"]
 
-                    # Load grid features
-                    grid_features = sample["grid_features"]
-                    if len(grid_features) > 0:
+                    region_features = visual_features["region"]
+                    grid_features = visual_features["grid"]
+
+                    assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
+
+                    if region_features is not None:
+                        region_features = region_features.to(device)
+                    if grid_features is not None:
                         grid_features = grid_features.to(device)
 
-                    # Load boxes
                     boxes = sample["boxes"]
                     if boxes is not None:
                         boxes = boxes.to(device)
 
-                    # Load masks
-                    masks = sample["masks"]
-                    if len(masks) > 0:
-                        masks = masks.to(device)
-
                     grid_sizes = sample["grid_sizes"]
-                    tokens = sample["tokens"].to(device)
-                    shifted_right_tokens = sample["shifted_right_tokens"].to(device)
+
+                    visual = Feature({
+                        "region": region_features,
+                        "grid": grid_features,
+                        "boxes": boxes,
+                        "grid_sizes": grid_sizes
+                    })
+
+                    question_tokens = sample["question_tokens"].to(device)
+                    answer_tokens = sample["answer_tokens"].to(device)
+                    shifted_right_answer_tokens = sample["shifted_right_answer_tokens"].to(device)
+
+                    linguistic = Feature({
+                        "question_tokens": question_tokens,
+                        "answer_tokens": answer_tokens,
+                        "shifted_right_answer_tokens": shifted_right_answer_tokens
+                    })
                     
-                    if (len(region_features) > 0) and (len(grid_features) > 0):
-                        # only for Dual-level Collaborative Encoder.
-                        with torch.no_grad():
-                            out = self.model(region_features, grid_features, masks, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
+                    with torch.no_grad():
+                        out = self.model(visual, linguistic).contiguous()
                     
-                    elif len(grid_features) > 0:
-                        # Maybe RSTNet or some models using grid features.
-                        with torch.no_grad():
-                            out = self.model(grid_features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
-                    
-                    elif len(region_features) > 0:
-                        # Models using region features.
-                        with torch.no_grad():
-                            out = self.model(region_features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
-                    
-                    loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
+                    loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
 
@@ -158,51 +159,45 @@ class Trainer:
         gts = {}
         with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             for it, sample in enumerate(dataloader):
-                # Load region features
-                region_features = sample["region_features"]
-                if len(region_features) > 0:
-                    region_features = region_features.to(device)
+                visual_features = sample["visual"]
 
-                # Load grid features
-                grid_features = sample["grid_features"]
-                if len(grid_features) > 0:
+                region_features = visual_features["region"]
+                grid_features = visual_features["grid"]
+
+                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
+
+                if region_features is not None:
+                    region_features = region_features.to(device)
+                if grid_features is not None:
                     grid_features = grid_features.to(device)
 
-                # Load boxes
                 boxes = sample["boxes"]
                 if boxes is not None:
                     boxes = boxes.to(device)
 
-                # Load masks
-                masks = sample["masks"]
-                if len(masks) > 0:
-                    masks = masks.to(device)
-
                 grid_sizes = sample["grid_sizes"]
-                tokens = sample["tokens"].to(device)
-                shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                caps_gt = sample["captions"]
+
+                visual = Feature({
+                    "region": region_features,
+                    "grid": grid_features,
+                    "boxes": boxes,
+                    "grid_sizes": grid_sizes
+                })
+
+                question_tokens = sample["question_tokens"].to(device)
+                answers_gt = sample["answers"].to(device)
+
+                linguistic = Feature({
+                    "question_tokens": question_tokens
+                })
+
+                with torch.no_grad():
+                    out, _ = self.model.beam_search(visual, linguistic, 
+                                                    max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
+                                                    beam_size=self.config.training.evaluating_beam_size, out_size=1)
                 
-                if (len(region_features) > 0) and (len(grid_features) > 0):
-                    # only for Dual-level Collaborative Encoder.
-                    with torch.no_grad():
-                        out, _ = self.model.beam_search(region_features, grid_features, masks, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                    beam_size=config.evaluating_beam_size, out_size=1)
-                
-                elif len(grid_features) > 0:
-                    # Maybe RSTNet or some models using grid features.
-                    with torch.no_grad():
-                        out, _ = self.model.beam_search(grid_features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                    beam_size=config.evaluating_beam_size, out_size=1)
-                
-                elif len(region_features) > 0:
-                    # Models using region features.
-                    with torch.no_grad():
-                        out, _ = self.model.beam_search(region_features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                    beam_size=config.evaluating_beam_size, out_size=1)
-                
-                caps_gen = self.vocab.decode_caption(out, join_words=False)
-                for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
+                answers_gen = self.vocab.decode_answer(out, join_words=False)
+                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gen['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
@@ -221,48 +216,45 @@ class Trainer:
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dataloader):
+                visual_features = sample["visual"]
 
-                # Load region features
-                region_features = sample["region_features"]
-                if len(region_features) > 0:
+                region_features = visual_features["region"]
+                grid_features = visual_features["grid"]
+
+                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
+
+                if region_features is not None:
                     region_features = region_features.to(device)
-
-                # Load grid features
-                grid_features = sample["grid_features"]
-                if len(grid_features) > 0:
+                if grid_features is not None:
                     grid_features = grid_features.to(device)
 
-                # Load boxes
                 boxes = sample["boxes"]
                 if boxes is not None:
                     boxes = boxes.to(device)
 
-                # Load masks
-                masks = sample["masks"]
-                if len(masks) > 0:
-                    masks = masks.to(device)
-                
-                # Load grid sizes
                 grid_sizes = sample["grid_sizes"]
-                
-                tokens = sample["tokens"].to(device)
-                
-                shifted_right_tokens = sample["shifted_right_tokens"].to(device)
-                
-                if (len(region_features) > 0) and (len(grid_features) > 0):
-                    # only for Dual-level Collaborative Encoder.
-                    out = self.model(region_features, tokens, boxes=boxes, grid_sizes=grid_sizes, grid_features=grid_features, masks=masks).contiguous()
-                
-                elif len(grid_features) > 0:
-                    # Maybe RSTNet or some models using grid features.
-                    out = self.model(grid_features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
-                
-                elif len(region_features) > 0:
-                    # Models using region features.
-                    out = self.model(region_features, tokens, boxes=boxes, grid_sizes=grid_sizes).contiguous()
+
+                visual = Feature({
+                    "region": region_features,
+                    "grid": grid_features,
+                    "boxes": boxes,
+                    "grid_sizes": grid_sizes
+                })
+
+                question_tokens = sample["question_tokens"].to(device)
+                answer_tokens = sample["answer_tokens"].to(device)
+                shifted_right_answer_tokens = sample["shifted_right_answer_tokens"].to(device)
+
+                linguistic = Feature({
+                    "question_tokens": question_tokens,
+                    "answer_tokens": answer_tokens,
+                    "shifted_right_answer_tokens": shifted_right_answer_tokens
+                })
+
+                out = self.model(visual, linguistic).contiguous()
 
                 self.optim.zero_grad()
-                loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_tokens.view(-1))
+                loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
                 loss.backward()
 
                 self.optim.step()
@@ -279,61 +271,60 @@ class Trainer:
         running_reward = .0
         running_reward_baseline = .0
 
-        vocab = self.train_dataset.vocab
+        vocab: Vocab = self.train_dataset.vocab
 
         self.model.train()
 
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dict_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dict_dataloader):
-                # features = sample["features"].to(device)
+                visual_features = sample["visual"]
 
-                # Load region features
-                region_features = sample["region_features"]
-                if len(region_features) > 0:
+                region_features = visual_features["region"]
+                grid_features = visual_features["grid"]
+
+                bs = region_features.shape[0]
+
+                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
+
+                if region_features is not None:
                     region_features = region_features.to(device)
-
-                # Load grid features
-                grid_features = sample["grid_features"]
-                if len(grid_features) > 0:
+                if grid_features is not None:
                     grid_features = grid_features.to(device)
 
-                # Load boxes
                 boxes = sample["boxes"]
                 if boxes is not None:
                     boxes = boxes.to(device)
 
-                # Load masks
-                masks = sample["masks"]
-                if len(masks) > 0:
-                    masks = masks.to(device)
-
                 grid_sizes = sample["grid_sizes"]
-                caps_gt = sample["captions"]
 
-                if (len(region_features) > 0) and (len(grid_features) > 0):
-                    # only for Dual-level Collaborative Encoder.
-                    outs, log_probs = self.model.beam_search(region_features, grid_features, masks, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
-                                                    beam_size=config.training_beam_size, out_size=config.training_beam_size)
-                
-                elif len(grid_features) > 0:
-                    # Maybe RSTNet or some models using grid features.
-                    outs, log_probs = self.model.beam_search(grid_features, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
-                                                    beam_size=config.training_beam_size, out_size=config.training_beam_size)
-                
-                elif len(region_features) > 0:
-                    # Models using region features.
-                    outs, log_probs = self.model.beam_search(region_features, boxes=boxes, grid_sizes=grid_sizes, max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
-                                                    beam_size=config.training_beam_size, out_size=config.training_beam_size)
+                visual = Feature({
+                    "region": region_features,
+                    "grid": grid_features,
+                    "boxes": boxes,
+                    "grid_sizes": grid_sizes
+                })
 
+                question_tokens = sample["question_tokens"].to(device)
+                answers_gt = sample["answers"].to(device)
+
+                linguistic = Feature({
+                    "question_tokens": question_tokens
+                })
+
+                outs, log_probs = self.model.beam_search(visual, linguistic,
+                                                        max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
+                                                        beam_size=self.config.training.training_beam_size, 
+                                                        out_size=self.config.training.training_beam_size)
+                
                 self.optim.zero_grad()
 
                 # Rewards
-                caps_gen = vocab.decode_caption(outs.contiguous().view(-1, vocab.max_caption_length), join_words=True)
-                caps_gt = list(itertools.chain(*([c, ] * config.training_beam_size for c in caps_gt)))
-                caps_gen, caps_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [caps_gen, caps_gt])
-                reward = self.train_cider.compute_score(caps_gt, caps_gen)[1].astype(np.float32)
-                reward = torch.from_numpy(reward).to(device).view(features.shape[0], config.training_beam_size)
+                answers_gen = vocab.decode_answer(outs.contiguous().view(-1, vocab.max_caption_length), join_words=True)
+                answers_gt = list(itertools.chain(*([a, ] * self.config.training.training_beam_size for a in answers_gt)))
+                answers_gen, answers_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [answers_gen, answers_gt])
+                reward = self.train_cider.compute_score(answers_gt, answers_gen)[1].astype(np.float32)
+                reward = torch.from_numpy(reward).to(device).view(bs, self.config.training.training_beam_size)
                 reward_baseline = torch.mean(reward, dim=-1, keepdim=True)
                 loss = -torch.mean(log_probs, -1) * (reward - reward_baseline)
 
@@ -349,7 +340,7 @@ class Trainer:
                 pbar.update()
 
     def lambda_lr(self, step):
-        warm_up = config.warmup
+        warm_up = self.config.training.warmup
         step += 1
         return (self.model.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
 
@@ -393,7 +384,9 @@ class Trainer:
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
 
-        torch.save(dict_for_saving, os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"))
+        torch.save(dict_for_saving, os.path.join(self.config.training.checkpoint_path, 
+                                                    self.config.training.model, 
+                                                    "last_model.pth"))
 
     def train(self, checkpoint_filename: str = None):
         
@@ -453,7 +446,7 @@ class Trainer:
                     exit_train = True
 
             if switch_to_rl and not best:
-                self.load_checkpoint(os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
+                self.load_checkpoint(os.path.join(self.config.training.checkpoint_path, self.config.model.name, "best_model.pth"))
 
             self.save_checkpoint({
                 'val_loss': val_loss,
@@ -465,7 +458,10 @@ class Trainer:
             })
 
             if best:
-                copyfile(os.path.join(config.checkpoint_path, config.model_name, "last_model.pth"), os.path.join(config.checkpoint_path, config.model_name, "best_model.pth"))
+                copyfile(   
+                            os.path.join(self.config.training.checkpoint_path, self.config.model.name, "last_model.pth"), 
+                            os.path.join(self.config.training.checkpoint_path, self.config.training.model_name, "best_model.pth")
+                        )
 
             if exit_train:
                 break
@@ -491,8 +487,9 @@ class Trainer:
                 grid_sizes = [sample["grid_size"]]
                 caps_gt = [sample["captions"]]
                 with torch.no_grad():
-                    out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                beam_size=config.evaluating_beam_size, out_size=1)
+                    out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, 
+                                                        max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
+                                                        beam_size=self.config.training.evaluating_beam_size, out_size=1)
                 caps_gen = self.vocab.decode_caption(out, join_words=False)
                 gts = {}
                 gens = {}
@@ -529,4 +526,7 @@ class Trainer:
                     sample_item["captions"] = generated_captions[0][0]
                     break
 
-        json.dump(sample_json_data, open(os.path.join(config.checkpoint_path, config.model_name, f"{split}_results.json"), "w+"), ensure_ascii=False)
+        json.dump(sample_json_data, open(os.path.join(self.config.training.checkpoint_path, 
+                                                        self.config.model.name, 
+                                                        f"{split}_results.json"), "w+"), 
+                                        ensure_ascii=False)

@@ -82,17 +82,17 @@ class FusionTransformer(AnsweringModel):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, visual, question, tokens, boxes=None, grid_size=None):
-        pos_emb = self.sinusoid_pos_embedding(visual) if self.use_img_pos else None
-        question, mask_question = self.encoder(question)
-        visual, mask_enc = self.guided_encoder(visual, question, boxes=boxes, grid_size=grid_size, positional_emb=pos_emb, mask_questions=mask_question)
+    def forward(self, visuals, questions, answers, boxes=None, grid_size=None):
+        pos_emb = self.sinusoid_pos_embedding(visuals) if self.use_img_pos else None
+        questions, mask_question = self.encoder(questions)
+        visuals, mask_enc = self.guided_encoder(visuals, questions, boxes=boxes, grid_size=grid_size, positional_emb=pos_emb, mask_questions=mask_question)
 
         # Fuse visual features and question features
         question = self.question_fc(question)
         visual = self.visual_fc(visual)
         enc_output = self.layer_norm(visual + question)
 
-        dec_output = self.decoder(tokens, enc_output, mask_encoder=mask_enc, positional_emb=pos_emb)
+        dec_output = self.decoder(answers, enc_output, mask_encoder=mask_enc, positional_emb=pos_emb)
         return dec_output
 
     def init_state(self, b_s, device):

@@ -47,29 +47,29 @@ def get_tokenizer(tokenizer):
                   "See the docs at https://github.com/vncorenlp/VnCoreNLP for more information.")
             raise
 
-def preprocess_sentence(caption, tokenizer: Callable):
-    caption = re.sub(r"[“”]", "\"", caption)
-    caption = re.sub(r"!", " ! ", caption)
-    caption = re.sub(r"\?", " ? ", caption)
-    caption = re.sub(r":", " : ", caption)
-    caption = re.sub(r";", " ; ", caption)
-    caption = re.sub(r",", " , ", caption)
-    caption = re.sub(r"\"", " \" ", caption)
-    caption = re.sub(r"'", " ' ", caption)
-    caption = re.sub(r"\(", " ( ", caption)
-    caption = re.sub(r"\[", " [ ", caption)
-    caption = re.sub(r"\)", " ) ", caption)
-    caption = re.sub(r"\]", " ] ", caption)
-    caption = re.sub(r"/", " / ", caption)
-    caption = re.sub(r"\.", " . ", caption)
-    caption = re.sub(r".\. *\. *\. *", " ... ", caption)
-    caption = re.sub(r"\$", " $ ", caption)
-    caption = re.sub(r"\&", " & ", caption)
-    caption = re.sub(r"\*", " * ", caption)
-    # tokenize the caption
-    caption = tokenizer(caption)
-    caption = " ".join(caption.strip().split()) # remove duplicated spaces
-    tokens = caption.strip().split()
+def preprocess_sentence(sentence, tokenizer: Callable):
+    sentence = re.sub(r"[“”]", "\"", sentence)
+    sentence = re.sub(r"!", " ! ", sentence)
+    sentence = re.sub(r"\?", " ? ", sentence)
+    sentence = re.sub(r":", " : ", sentence)
+    sentence = re.sub(r";", " ; ", sentence)
+    sentence = re.sub(r",", " , ", sentence)
+    sentence = re.sub(r"\"", " \" ", sentence)
+    sentence = re.sub(r"'", " ' ", sentence)
+    sentence = re.sub(r"\(", " ( ", sentence)
+    sentence = re.sub(r"\[", " [ ", sentence)
+    sentence = re.sub(r"\)", " ) ", sentence)
+    sentence = re.sub(r"\]", " ] ", sentence)
+    sentence = re.sub(r"/", " / ", sentence)
+    sentence = re.sub(r"\.", " . ", sentence)
+    sentence = re.sub(r".\. *\. *\. *", " ... ", sentence)
+    sentence = re.sub(r"\$", " $ ", sentence)
+    sentence = re.sub(r"\&", " & ", sentence)
+    sentence = re.sub(r"\*", " * ", sentence)
+    # tokenize the sentence
+    sentence = tokenizer(sentence)
+    sentence = " ".join(sentence.strip().split()) # remove duplicated spaces
+    tokens = sentence.strip().split()
     
     return tokens
 

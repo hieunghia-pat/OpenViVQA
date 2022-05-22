@@ -40,12 +40,14 @@ def clones(module, n):
     "Produce N identical layers."
     return nn.ModuleList([copy.deepcopy(module) for _ in range(n)])
 
-def generate_padding_mask(sequences: torch.IntTensor, padding_idx: int) -> torch.BoolTensor:
+def generate_padding_mask(sequences: TensorOrNone, padding_idx: int) -> torch.BoolTensor:
     '''
         sequences: (bs, seq_len)
     '''
-    mask = (sequences == padding_idx) # (b_s, seq_len)
+    if sequences is None:
+        return None
 
+    mask = (torch.sum(sequences, dim=-1) == padding_idx) # (b_s, seq_len)
     return mask
 
 def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:

@@ -1,10 +1,11 @@
+from torch import nn
 from torch.nn import NLLLoss
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
 
 from data_utils.vocab import Vocab
 from data_utils.utils import *
-from models.modules.transformer import Transformer
+from models.modules.transformer import FusionTransformer
 from data_utils.dataset import *
 import evaluation
 from evaluation import Cider, PTBTokenizer
@@ -21,7 +22,7 @@ from yacs.config import CfgNode
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class Trainer:
-    def __init__(self,  model: Transformer, 
+    def __init__(self,  model: FusionTransformer, 
                         train_datasets: Tuple[FeatureDataset, DictionaryDataset],
                         val_datasets: Tuple[FeatureDataset, DictionaryDataset],
                         test_datasets: Tuple[Union[FeatureDataset, None], Union[DictionaryDataset, None]],
@@ -107,36 +108,32 @@ class Trainer:
                     visual_features = sample["visual"]
 
                     region_features = visual_features["region"]
-                    grid_features = visual_features["grid"]
-
-                    assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
-
                     if region_features is not None:
                         region_features = region_features.to(device)
+
+                    grid_features = visual_features["grid"]
                     if grid_features is not None:
                         grid_features = grid_features.to(device)
+
+                    assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
 
                     boxes = sample["boxes"]
                     if boxes is not None:
                         boxes = boxes.to(device)
-
-                    grid_sizes = sample["grid_sizes"]
+                        boxes = self.box_embedding(boxes)
 
                     visual = Feature({
-                        "region": region_features,
-                        "grid": grid_features,
-                        "boxes": boxes,
-                        "grid_sizes": grid_sizes
-                    })
+                            "region": region_features,
+                            "grid": grid_features,
+                            "features": region_features if region_features is not None else grid_features,
+                            "boxes": boxes
+                        })
 
                     question_tokens = sample["question_tokens"].to(device)
-                    answer_tokens = sample["answer_tokens"].to(device)
                     shifted_right_answer_tokens = sample["shifted_right_answer_tokens"].to(device)
 
                     linguistic = Feature({
                         "question_tokens": question_tokens,
-                        "answer_tokens": answer_tokens,
-                        "shifted_right_answer_tokens": shifted_right_answer_tokens
                     })
                     
                     with torch.no_grad():
@@ -162,26 +159,31 @@ class Trainer:
                 visual_features = sample["visual"]
 
                 region_features = visual_features["region"]
-                grid_features = visual_features["grid"]
-
-                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
-
                 if region_features is not None:
                     region_features = region_features.to(device)
+
+                grid_features = visual_features["grid"]
                 if grid_features is not None:
                     grid_features = grid_features.to(device)
+
+                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
 
                 boxes = sample["boxes"]
                 if boxes is not None:
                     boxes = boxes.to(device)
-
-                grid_sizes = sample["grid_sizes"]
+                    boxes = self.box_embedding(boxes)
 
                 visual = Feature({
-                    "region": region_features,
-                    "grid": grid_features,
-                    "boxes": boxes,
-                    "grid_sizes": grid_sizes
+                        "region": region_features,
+                        "grid": grid_features,
+                        "features": region_features if region_features is not None else grid_features,
+                        "boxes": boxes
+                    })
+
+                question_tokens = sample["question_tokens"].to(device)
+
+                linguistic = Feature({
+                    "question_tokens": question_tokens,
                 })
 
                 question_tokens = sample["question_tokens"].to(device)
@@ -219,38 +221,34 @@ class Trainer:
                 visual_features = sample["visual"]
 
                 region_features = visual_features["region"]
-                grid_features = visual_features["grid"]
-
-                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
-
                 if region_features is not None:
                     region_features = region_features.to(device)
+
+                grid_features = visual_features["grid"]
                 if grid_features is not None:
                     grid_features = grid_features.to(device)
+
+                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
 
                 boxes = sample["boxes"]
                 if boxes is not None:
                     boxes = boxes.to(device)
-
-                grid_sizes = sample["grid_sizes"]
+                    boxes = self.box_embedding(boxes)
 
                 visual = Feature({
-                    "region": region_features,
-                    "grid": grid_features,
-                    "boxes": boxes,
-                    "grid_sizes": grid_sizes
-                })
+                        "region": region_features,
+                        "grid": grid_features,
+                        "features": region_features if region_features is not None else grid_features,
+                        "boxes": boxes
+                    })
 
                 question_tokens = sample["question_tokens"].to(device)
-                answer_tokens = sample["answer_tokens"].to(device)
                 shifted_right_answer_tokens = sample["shifted_right_answer_tokens"].to(device)
 
                 linguistic = Feature({
                     "question_tokens": question_tokens,
-                    "answer_tokens": answer_tokens,
-                    "shifted_right_answer_tokens": shifted_right_answer_tokens
                 })
-
+                
                 out = self.model(visual, linguistic).contiguous()
 
                 self.optim.zero_grad()
@@ -279,37 +277,34 @@ class Trainer:
         with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dict_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dict_dataloader):
                 visual_features = sample["visual"]
+                bs = visual_features.shape[0]
 
                 region_features = visual_features["region"]
-                grid_features = visual_features["grid"]
-
-                bs = region_features.shape[0]
-
-                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
-
                 if region_features is not None:
                     region_features = region_features.to(device)
+
+                grid_features = visual_features["grid"]
                 if grid_features is not None:
                     grid_features = grid_features.to(device)
+
+                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
 
                 boxes = sample["boxes"]
                 if boxes is not None:
                     boxes = boxes.to(device)
-
-                grid_sizes = sample["grid_sizes"]
+                    boxes = self.box_embedding(boxes)
 
                 visual = Feature({
-                    "region": region_features,
-                    "grid": grid_features,
-                    "boxes": boxes,
-                    "grid_sizes": grid_sizes
-                })
+                        "region": region_features,
+                        "grid": grid_features,
+                        "features": region_features if region_features is not None else grid_features,
+                        "boxes": boxes
+                    })
 
                 question_tokens = sample["question_tokens"].to(device)
-                answers_gt = sample["answers"].to(device)
 
                 linguistic = Feature({
-                    "question_tokens": question_tokens
+                    "question_tokens": question_tokens,
                 })
 
                 outs, log_probs = self.model.beam_search(visual, linguistic,
@@ -490,7 +485,7 @@ class Trainer:
                     out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, 
                                                         max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
                                                         beam_size=self.config.training.evaluating_beam_size, out_size=1)
-                caps_gen = self.vocab.decode_caption(out, join_words=False)
+                caps_gen = self.vocab.decode_answer(out, join_words=False)
                 gts = {}
                 gens = {}
                 for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):

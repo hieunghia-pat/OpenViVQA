@@ -4,7 +4,7 @@ from torch.nn import functional as F
 import numpy as np
 
 from models.modules.attentions import AdaptiveScaledDotProductAttention, MultiHeadAttention, ScaledDotProductAttention
-from models.utils import generate_sequential_mask, sinusoid_encoding_table, generate_padding_mask
+from models.utils import sinusoid_encoding_table
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.embeddings import Embedding
 from models.modules.containers import Module, ModuleList
@@ -138,12 +138,12 @@ class Decoder(Module):
 
     def forward(self, linguistics, encoder_outputs):
 
-        answers = linguistics.answers
+        answer_tokens = linguistics.answer_tokens
         answer_self_attention_masks = linguistics.answer_self_attention_masks
         answer_padding_masks = linguistics.answer_padding_masks
         answer_pos_embeddings = linguistics.answer_pos_embeddings
         
-        b_s, seq_len = answers.shape[:2]
+        b_s, seq_len = answer_tokens.shape[:2]
         if self._is_stateful:
             self.running_mask_self_attention = torch.cat([self.running_mask_self_attention, answer_self_attention_masks], -1)
             answer_self_attention_masks = self.running_mask_self_attention
@@ -167,7 +167,7 @@ class Decoder(Module):
                                                     feature_pos_embeddings.shape[2], feature_pos_embeddings.shape[3])  # (bs, beam_size, seq_len, d_model)
             feature_pos_embeddings = feature_pos_embeddings.contiguous().flatten(0, 1)  # (bs*beam_size, seq_len, d_model)
 
-        out = self.word_emb(answers) + self.pos_emb(seq)
+        out = self.word_emb(answer_tokens) + self.pos_emb(seq)
         features = features + feature_pos_embeddings
         for layer in self.layers:
             out = out + answer_pos_embeddings
@@ -197,12 +197,12 @@ class MeshedDecoder(Module):
 
     def forward(self, linguistics, encoder_outputs):
 
-        answers = linguistics.answers
+        answer_tokens = linguistics.answer_tokens
         answer_self_attention_masks = linguistics.answer_self_attention_masks
         answer_padding_masks = linguistics.answer_padding_masks
         answer_pos_embeddings = linguistics.answer_pos_embeddings
         
-        b_s, seq_len = answers.shape[:2]
+        b_s, seq_len = answer_tokens.shape[:2]
         if self._is_stateful:
             self.running_mask_self_attention = torch.cat([self.running_mask_self_attention, answer_self_attention_masks], -1)
             answer_self_attention_masks = self.running_mask_self_attention
@@ -226,7 +226,7 @@ class MeshedDecoder(Module):
                                                     feature_pos_embeddings.shape[2], feature_pos_embeddings.shape[3])  # (bs, beam_size, seq_len, d_model)
             feature_pos_embeddings = feature_pos_embeddings.contiguous().flatten(0, 1)  # (bs*beam_size, seq_len, d_model)
 
-        out = self.word_emb(answers) + self.pos_emb(seq)
+        out = self.word_emb(answer_tokens) + self.pos_emb(seq)
         features = features + feature_pos_embeddings
         for layer in self.layers:
             out = out + answer_pos_embeddings
@@ -279,12 +279,12 @@ class AdaptiveDecoder(Module):
         self.register_state('running_seq', torch.zeros((1,)).long())
 
     def forward(self, linguistics, encoder_outputs):
-        answers = linguistics.answers
+        answer_tokens = linguistics.answer_tokens
         answer_self_attention_masks = linguistics.answer_self_attention_masks
         answer_padding_masks = linguistics.answer_padding_masks
         answer_pos_embeddings = linguistics.answer_pos_embeddings
         
-        b_s, seq_len = answers.shape[:2]
+        b_s, seq_len = answer_tokens.shape[:2]
         if self._is_stateful:
             self.running_mask_self_attention = torch.cat([self.running_mask_self_attention, answer_self_attention_masks], -1)
             answer_self_attention_masks = self.running_mask_self_attention
@@ -309,9 +309,9 @@ class AdaptiveDecoder(Module):
             feature_pos_embeddings = feature_pos_embeddings.contiguous().flatten(0, 1)  # (bs*beam_size, seq_len, d_model)
 
         # get the language_signals
-        _, language_signals = self.language_model(answers)
+        _, language_signals = self.language_model(answer_tokens)
 
-        out = self.word_emb(answers) + self.pos_emb(seq)
+        out = self.word_emb(answer_tokens) + self.pos_emb(seq)
         features = features + feature_pos_embeddings
         for i, layer in enumerate(self.layers):
             out = out + answer_pos_embeddings

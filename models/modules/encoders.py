@@ -3,6 +3,8 @@ from torch import nn
 from torch.nn import functional as F
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.attentions import MultiHeadAttention
+from models.utils import generate_padding_mask, generate_sequential_mask
+from models.modules.embeddings import SinusoidPositionalEmbedding
 
 class EncoderLayer(nn.Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
@@ -51,6 +53,9 @@ class Encoder(nn.Module):
     def __init__(self, N, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
                  identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
         super(Encoder, self).__init__()
+
+        self.pos_embedding = SinusoidPositionalEmbedding(d_model // 2, normalize=True)
+        self.box_embedding = nn.Linear(in_features=4, out_features=d_model)
         
         self.dropout = nn.Dropout(p=dropout)
         self.layer_norm = nn.LayerNorm(d_model)
@@ -65,24 +70,29 @@ class Encoder(nn.Module):
 
     def forward(self, visuals):
         features = visuals.features
-        padding_mask = visuals.feature_padding_masks
-        pos_embeddings = visuals.feature_pos_embeddings
+        pos_embeddings = self.pos_embedding(features)
+        padding_masks = generate_padding_mask(features)
         boxes = visuals.boxes
         
         out = F.relu(self.fc(features))
         out = self.dropout(out)
         out = self.layer_norm(out)
+        if boxes is not None:
+            boxes = self.box_embedding(boxes)
         for layer in self.layers:
             out = out + pos_embeddings
-            out = layer(out, out, out, boxes, padding_mask)
+            out = layer(out, out, out, boxes, padding_masks)
 
-        return out, padding_mask
+        return out, padding_masks
 
 class MultiLevelEncoder(nn.Module):
     def __init__(self, N, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
                  identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
         super(MultiLevelEncoder, self).__init__()
 
+        self.pos_embedding = SinusoidPositionalEmbedding(d_model // 2, normalize=True)
+        self.box_embedding = nn.Linear(in_features=4, out_features=d_model)
+
         self.dropout = nn.Dropout(p=dropout)
         self.layer_norm = nn.LayerNorm(d_model)
 
@@ -96,26 +106,31 @@ class MultiLevelEncoder(nn.Module):
 
     def forward(self, visuals):
         features = visuals.features
-        padding_mask = visuals.feature_padding_masks
-        pos_embeddings = visuals.feature_pos_embeddings
+        padding_masks = generate_padding_mask(features)
+        pos_embeddings = self.pos_embedding(features)
         boxes = visuals.boxes
 
         outs = []
         out = F.relu(self.fc(features))
         out = self.dropout(out)
         out = self.layer_norm(out)
+        if boxes is not None:
+            boxes = self.box_embedding(boxes)
         for layer in self.layers:
             out = out + pos_embeddings
-            out = layer(out, out, out, boxes, pos_embeddings, padding_mask)
+            out = layer(out, out, out, boxes, pos_embeddings, padding_masks)
             outs.append(out.unsqueeze(1))
 
         outs = torch.cat(outs, dim=1)
-        return outs, padding_mask
+        return outs, padding_masks
 
 class GuidedEncoder(nn.Module):
     def __init__(self, N, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
                  identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
         super(MultiLevelEncoder, self).__init__()
+
+        self.pos_embedding = SinusoidPositionalEmbedding(d_model // 2, normalize=True)
+        self.box_embedding = nn.Linear(in_features=4, out_features=d_model)
 
         self.layer_norm = nn.LayerNorm(d_model)
 
@@ -130,16 +145,18 @@ class GuidedEncoder(nn.Module):
     def forward(self, visuals, linguistics):
         
         features = visuals.features
-        feature_padding_masks = visuals.feature_padding_masks
-        feature_pos_embeddings = visuals.feature_pos_embeddings
+        feature_padding_masks = generate_padding_mask(features, padding_idx=0)
+        feature_pos_embeddings = self.pos_embedding(features)
         boxes = visuals.boxes
 
-        questions = linguistics.questions
-        question_attention_masks = linguistics.question_attention_masks
-        question_pos_embeddings = linguistics.question_pos_embeddings
-        questions = questions + question_pos_embeddings
+        question_tokens = linguistics.question_tokens
+        question_attention_masks = generate_sequential_mask(question_tokens)
+        question_pos_embeddings = self.pos_embedding(question_pos_embeddings)
 
         features = self.layer_norm(features)
+        questions = questions + question_pos_embeddings
+        if boxes is not None:
+            boxes = self.box_embedding(boxes)
         for layer in self.layers:
             features = features + feature_pos_embeddings
             features = layer(features, questions, questions, boxes=boxes,

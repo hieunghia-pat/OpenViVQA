@@ -2,27 +2,19 @@ from models.modules.attentions import *
 from models.modules.language_models import *
 from models.modules.encoders import *
 from models.modules.decoders import *
+from models.modules.embeddings import *
 
 attentions = {
     "scaled_dot_product_attention": ScaledDotProductAttention,
     "augmented_geometry_scaled_dot_product_attention": AugmentedGeometryScaledDotProductAttention,
     "augmented_memory_scaled_dot_product_attention": AugmentedMemoryScaledDotProductAttention,
-    "apdative_scaled_dot_product_attention": AdaptiveScaledDotProductAttention
-}
-
-encoder_layers = {
-    "encoder": EncoderLayer
+    "apdative_scaled_dot_product_attention": AdaptiveScaledDotProductAttention,
+    None: None
 }
 
 encoders = {
     "encoder": Encoder,
-    "multilevel_encoder": MultiLevelEncoder
-}
-
-decoder_layers = {
-    "decoder": DecoderLayer,
-    "meshed_decoder": MeshedDecoderLayer,
-    "apdaptive_decoder": AdaptiveDecoderLayer
+    "guided_encoder": GuidedEncoder
 }
 
 decoders = {
@@ -52,4 +44,12 @@ word_embedding = {
     "phow2v_syllable_300": "phow2v.syllable.300d",
     "phow2v_word_100": "phow2v.word.100d",
     "phow2v_word_300": "phow2v.word.300d"
+}
+
+visual_embeding = {
+    "standard_visual_embedding": VisualEmbedding
+}
+
+language_embedding = {
+    "lstm_language_embedding": LSTMTextEmbedding
 }

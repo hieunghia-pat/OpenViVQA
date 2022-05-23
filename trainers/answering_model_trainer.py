@@ -130,10 +130,12 @@ class Trainer:
                         })
 
                     question_tokens = sample["question_tokens"].to(device)
+                    answer_tokens = sample["answer_tokens"].to(device)
                     shifted_right_answer_tokens = sample["shifted_right_answer_tokens"].to(device)
 
                     linguistic = Feature({
                         "question_tokens": question_tokens,
+                        "answer_tokens": answer_tokens
                     })
                     
                     with torch.no_grad():
@@ -218,13 +220,11 @@ class Trainer:
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dataloader):
-                visual_features = sample["visual"]
-
-                region_features = visual_features["region"]
+                region_features = sample["region_features"]
                 if region_features is not None:
                     region_features = region_features.to(device)
 
-                grid_features = visual_features["grid"]
+                grid_features = sample["grid_features"]
                 if grid_features is not None:
                     grid_features = grid_features.to(device)
 

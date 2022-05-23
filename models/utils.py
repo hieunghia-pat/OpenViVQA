@@ -42,22 +42,25 @@ def clones(module, n):
 
 def generate_padding_mask(sequences: TensorOrNone, padding_idx: int) -> torch.BoolTensor:
     '''
-        sequences: (bs, seq_len)
+        sequences: (bs, seq_len, dim)
     '''
     if sequences is None:
         return None
 
+    if len(sequences.shape) == 2: # (bs, seq_len)
+        sequences.unsqueeze_(dim=-1) # (bs, seq_len, 1)
+
     mask = (torch.sum(sequences, dim=-1) == padding_idx) # (b_s, seq_len)
-    return mask
+    return mask.unsqueeze(1).unsqueeze(1) # (bs, 1, 1, seq_len)
 
 def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
     '''
         Mask out subsequent positions
     '''
     attn_shape = (seq_len, seq_len)
-    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).to(torch.bool)
+    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).to(torch.bool) # (eq_len, seq_len)
 
-    return subsequent_mask
+    return subsequent_mask.unsqueeze(0).unsqueeze(0) # (1, 1, seq_len, seq_len)
 
 def get_relative_pos(x, batch_size, norm_len):
     x = x.view(1, -1, 1).expand(batch_size, -1, -1)

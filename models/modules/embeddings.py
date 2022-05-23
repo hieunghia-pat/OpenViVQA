@@ -1,5 +1,8 @@
 import torch
 from torch import nn
+from data_utils.vocab import Vocab
+
+from models.utils import generate_sequential_mask, generate_padding_mask
 
 import math
 
@@ -18,26 +21,6 @@ class Embedding(nn.Module):
     def forward(self, tokens):
         return self.components(tokens)
 
-class LSTMTextEmbedding(nn.Module):
-    def __init__(self, vocab, embedding_dim, d_model, dropout=0.5):
-        super(LSTMTextEmbedding, self).__init__()
-
-        self.embedding = nn.Embedding(len(vocab.stoi), embedding_dim, padding_idx=vocab.padding_idx)
-        if vocab.vectors is not None:
-            self.embedding.from_pretrained(vocab.vectors)
-        self.proj = nn.Linear(embedding_dim, d_model)
-        self.dropout = nn.Dropout(dropout)
-
-        self.lstm = nn.LSTM(input_size=d_model, hidden_size=d_model, batch_first=True)
-
-    def forward(self, x):
-        x = self.proj(self.embedding(x))
-        x = self.dropout(x)
-
-        x, _ = self.lstm(x)
-
-        return x
-
 class VisualEmbedding(nn.Module):
     def __init__(self, d_model, dropout=0.5):
         super(VisualEmbedding, self).__init__()
@@ -45,14 +28,39 @@ class VisualEmbedding(nn.Module):
         self.proj = nn.Linear(2048, d_model)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, v):
-        n, c, h, w = v.size()
-        v = v.view(n, c, w*h).permute(0, 2, 1)
+    def forward(self, visual):
+        masks = generate_padding_mask(visual, padding_idx=0)
 
-        v = self.proj(v)
-        v = self.dropout(v)
+        visual = self.proj(visual)
+        visual = self.dropout(visual)
 
-        return v
+        return visual, masks
+
+class LSTMTextEmbedding(nn.Module):
+    def __init__(self, vocab: Vocab, embedding_dim, d_model, dropout=0.5):
+        super(LSTMTextEmbedding, self).__init__()
+
+        self.embedding = nn.Embedding(len(vocab.stoi), embedding_dim, padding_idx=vocab.padding_idx)
+        self.padding_idx = vocab.padding_idx
+        if vocab.vectors is not None:
+            self.embedding.from_pretrained(vocab.vectors)
+        self.proj = nn.Linear(embedding_dim, d_model)
+        self.dropout = nn.Dropout(dropout)
+
+        self.lstm = nn.LSTM(input_size=d_model, hidden_size=d_model, batch_first=True)
+
+    def forward(self, tokens):
+        padding_masks = generate_padding_mask(tokens, padding_idx=self.padding_idx)
+        seq_len = tokens.shape[-1]
+        sequential_masks = generate_sequential_mask(seq_len)
+        masks = torch.logical_or(padding_masks, sequential_masks)
+
+        features = self.proj(self.embedding(tokens))
+        features = self.dropout(features)
+
+        features, _ = self.lstm(features)
+
+        return features, masks
 
 class PositionalEmbedding(nn.Module):
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):

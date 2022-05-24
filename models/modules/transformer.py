@@ -170,7 +170,6 @@ class FusionTransformer(AnsweringModel):
 
         visual_feature_inputs = Feature({
             "features": visual_features,
-            "boxes": visuals.boxes,
             "padding_masks": visual_padding_masks
         })
 
@@ -180,7 +179,7 @@ class FusionTransformer(AnsweringModel):
             "sequential_masks": question_sequential_masks
         })
 
-        question_features = self.encoder(linguistic_feature_inputs)
+        # question_features = self.encoder(linguistic_feature_inputs)
         guided_features = self.guided_encoder(visual_feature_inputs, linguistic_feature_inputs)
 
         # Fuse guided features and question features

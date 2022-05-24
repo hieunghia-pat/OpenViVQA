@@ -50,7 +50,6 @@ class DictionaryDataset(data.Dataset):
         for ann in json_data["annotations"]:
             question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
             answer = preprocess_sentence(ann["answer"], self.vocab.tokenizer)
-            question = " ".join(question)
             answer = " ".join(answer)
             annotations.append({
                 "image_id": ann["image_id"],
@@ -91,7 +90,7 @@ class DictionaryDataset(data.Dataset):
         image_id = item["image_id"]
         filename = item["filename"]
         region_features, grid_features, region_boxes, grid_boxes = self.load_feature(image_id)
-        question = item["question"]
+        question = self.vocab.encode_question(item["question"])
         answer = item["answer"]
 
         result_dict = {
@@ -101,7 +100,7 @@ class DictionaryDataset(data.Dataset):
             "grid_features": grid_features,
             "region_boxes": region_boxes,
             "grid_boxes": grid_boxes, 
-            "question": question,
+            "question_tokens": question,
             "answer": answer
         }
 

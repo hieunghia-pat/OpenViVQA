@@ -117,16 +117,14 @@ class Trainer:
 
                     assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
 
-                    boxes = sample["boxes"]
-                    if boxes is not None:
-                        boxes = boxes.to(device)
-                        boxes = self.box_embedding(boxes)
+                    region_boxes = sample["region_boxes"]
+                    grid_boxes = sample["grid_boxes"]
 
                     visual = Feature({
-                            "region": region_features,
-                            "grid": grid_features,
+                            "region_features": region_features,
+                            "grid_features": grid_features,
                             "features": region_features if region_features is not None else grid_features,
-                            "boxes": boxes
+                            "boxes": region_boxes if region_boxes is not None else grid_boxes
                         })
 
                     question_tokens = sample["question_tokens"].to(device)
@@ -158,49 +156,42 @@ class Trainer:
         gts = {}
         with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             for it, sample in enumerate(dataloader):
-                visual_features = sample["visual"]
-
-                region_features = visual_features["region"]
+                region_features = sample["region_features"]
                 if region_features is not None:
                     region_features = region_features.to(device)
 
-                grid_features = visual_features["grid"]
+                grid_features = sample["grid_features"]
                 if grid_features is not None:
                     grid_features = grid_features.to(device)
 
                 assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
 
-                boxes = sample["boxes"]
-                if boxes is not None:
-                    boxes = boxes.to(device)
-                    boxes = self.box_embedding(boxes)
+                region_boxes = sample["region_boxes"]
+                grid_boxes = sample["grid_boxes"]
 
                 visual = Feature({
-                        "region": region_features,
-                        "grid": grid_features,
+                        "region_features": region_features,
+                        "grid_features": grid_features,
+                        "region_boxes": region_boxes,
+                        "grid_boxes": grid_boxes,
                         "features": region_features if region_features is not None else grid_features,
-                        "boxes": boxes
+                        "boxes": region_boxes if region_boxes is not None else grid_boxes
                     })
 
                 question_tokens = sample["question_tokens"].to(device)
-
-                linguistic = Feature({
-                    "question_tokens": question_tokens,
-                })
-
-                question_tokens = sample["question_tokens"].to(device)
-                answers_gt = sample["answers"].to(device)
 
                 linguistic = Feature({
                     "question_tokens": question_tokens
                 })
 
                 with torch.no_grad():
-                    out, _ = self.model.beam_search(visual, linguistic, 
-                                                    max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
+                    outs, _ = self.model.beam_search(visual, linguistic, 
+                                                    max_len=self.vocab.max_answer_length, eos_idx=self.vocab.eos_idx, 
                                                     beam_size=self.config.training.evaluating_beam_size, out_size=1)
-                
-                answers_gen = self.vocab.decode_answer(out, join_words=False)
+
+                answers_gt = sample["answers"]
+                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
+                answers_gt = list(itertools.chain(*([a, ] * self.config.training.training_beam_size for a in answers_gt)))
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gen['%d_%d' % (it, i)] = [gen_i, ]
@@ -230,23 +221,23 @@ class Trainer:
 
                 assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
 
-                boxes = sample["boxes"]
-                if boxes is not None:
-                    boxes = boxes.to(device)
-                    boxes = self.box_embedding(boxes)
+                region_boxes = sample["region_boxes"]
+                grid_boxes = sample["grid_boxes"]
 
                 visual = Feature({
-                        "region": region_features,
-                        "grid": grid_features,
+                        "region_features": region_features,
+                        "grid_features": grid_features,
                         "features": region_features if region_features is not None else grid_features,
-                        "boxes": boxes
+                        "boxes": region_boxes if region_boxes is not None else grid_boxes
                     })
 
                 question_tokens = sample["question_tokens"].to(device)
+                answer_tokens = sample["answer_tokens"].to(device)
                 shifted_right_answer_tokens = sample["shifted_right_answer_tokens"].to(device)
 
                 linguistic = Feature({
                     "question_tokens": question_tokens,
+                    "answer_tokens": answer_tokens
                 })
                 
                 out = self.model(visual, linguistic).contiguous()
@@ -276,46 +267,45 @@ class Trainer:
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dict_dataloader)) as pbar:
             for it, sample in enumerate(self.train_dict_dataloader):
-                visual_features = sample["visual"]
-                bs = visual_features.shape[0]
-
-                region_features = visual_features["region"]
+                region_features = sample["region_features"]
                 if region_features is not None:
                     region_features = region_features.to(device)
 
-                grid_features = visual_features["grid"]
+                grid_features = sample["grid_features"]
                 if grid_features is not None:
                     grid_features = grid_features.to(device)
 
                 assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
 
-                boxes = sample["boxes"]
-                if boxes is not None:
-                    boxes = boxes.to(device)
-                    boxes = self.box_embedding(boxes)
+                region_boxes = sample["region_boxes"]
+                grid_boxes = sample["grid_boxes"]
 
                 visual = Feature({
-                        "region": region_features,
-                        "grid": grid_features,
+                        "region_features": region_features,
+                        "grid_features": grid_features,
+                        "region_boxes": region_boxes,
+                        "grid_boxes": grid_boxes,
                         "features": region_features if region_features is not None else grid_features,
-                        "boxes": boxes
+                        "boxes": region_boxes if region_boxes is not None else grid_boxes
                     })
 
                 question_tokens = sample["question_tokens"].to(device)
 
                 linguistic = Feature({
-                    "question_tokens": question_tokens,
+                    "question_tokens": question_tokens
                 })
 
                 outs, log_probs = self.model.beam_search(visual, linguistic,
-                                                        max_len=vocab.max_caption_length, eos_idx=vocab.eos_idx,
+                                                        max_len=vocab.max_answer_length, eos_idx=vocab.eos_idx,
                                                         beam_size=self.config.training.training_beam_size, 
                                                         out_size=self.config.training.training_beam_size)
                 
                 self.optim.zero_grad()
 
                 # Rewards
-                answers_gen = vocab.decode_answer(outs.contiguous().view(-1, vocab.max_caption_length), join_words=True)
+                bs = question_tokens.shape[0]
+                answers_gt = sample["answers"]
+                answers_gen = vocab.decode_answer(outs.contiguous().view(-1, vocab.max_answer_length), join_words=True)
                 answers_gt = list(itertools.chain(*([a, ] * self.config.training.training_beam_size for a in answers_gt)))
                 answers_gen, answers_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [answers_gen, answers_gt])
                 reward = self.train_cider.compute_score(answers_gt, answers_gen)[1].astype(np.float32)

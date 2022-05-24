@@ -1,6 +1,4 @@
 from torch import nn
-import torch
-from torch.nn import functional as F
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.attentions import MultiHeadAttention
 from models.modules.embeddings import SinusoidPositionalEmbedding
@@ -19,6 +17,8 @@ class EncoderLayer(nn.Module):
     def forward(self, queries, keys, values, attention_mask=None):
         att = self.mhatt(queries, keys, values, attention_mask=attention_mask)
         ff = self.pwff(att)
+        ff = ff.masked_fill(attention_mask.squeeze().unsqueeze(-1), value=0)
+
         return ff
 
 class GeometricEncoderLayer(nn.Module):
@@ -35,6 +35,8 @@ class GeometricEncoderLayer(nn.Module):
     def forward(self, queries, keys, values, boxes=None, attention_mask=None):
         att = self.mhatt(queries, keys, values, boxes=boxes, attention_mask=attention_mask)
         ff = self.pwff(att)
+        ff = ff.masked_fill(attention_mask.squeeze().unsqueeze(-1), value=0)
+
         return ff
 
 class GuidedEncoderLayer(nn.Module):
@@ -56,13 +58,14 @@ class GuidedEncoderLayer(nn.Module):
     def forward(self, queries, keys, values, boxes=None,
                 self_attention_mask=None, guided_attention_mask=None):
 
-        queries = self.self_mhatt(queries, queries, queries, boxes=boxes,
+        self_att = self.self_mhatt(queries, queries, queries, boxes=boxes,
                                     attention_mask=self_attention_mask)
-
-        guided_att = self.guided_mhatt(queries, keys, values, boxes=boxes,
+        guided_att = self.guided_mhatt(self_att, keys, values, boxes=boxes,
                                     attention_mask=guided_attention_mask)
 
         ff = self.pwff(guided_att)
+        ff = ff.masked_fill(self_attention_mask.squeeze().unsqueeze(-1), value=0)
+
         return ff
 
 class Encoder(nn.Module):
@@ -158,15 +161,11 @@ class GuidedEncoder(nn.Module):
         linguistic_feature_padding_masks = linguistics.padding_masks
         linguistic_feature_pos_embeddings = self.pos_embedding(linguistic_features)
 
-        # praparing masks for guided attention
-        visual_feature_padding_masks = visual_feature_padding_masks.squeeze(1).unsqueeze(-1) # (bs, 1, seq, 1)
-        guided_attention_masks = torch.logical_or(visual_feature_padding_masks, linguistic_feature_padding_masks)
-
         visual_features = self.layer_norm(visual_features)
         linguistic_features = linguistic_features + linguistic_feature_pos_embeddings
         for layer in self.layers:
             visual_features = visual_features + visual_feature_pos_embeddings
             visual_features = layer(visual_features, linguistic_features, linguistic_features,
-                            self_attention_mask=visual_feature_padding_masks, guided_attention_mask=guided_attention_masks)
+                            self_attention_mask=visual_feature_padding_masks, guided_attention_mask=linguistic_feature_padding_masks)
 
         return visual_features

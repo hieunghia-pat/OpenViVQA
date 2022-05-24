@@ -1,6 +1,7 @@
 import torch
-from old_data_utils.types import *
+from data_utils.types import *
 from models.utils import get_batch_size, get_device
+from data_utils.feature import Feature
 
 class BeamSearch(object):
     def __init__(self, model, max_len: int, eos_idx: int, beam_size: int):
@@ -18,47 +19,52 @@ class BeamSearch(object):
         self.all_log_probs = None
 
     def _expand_state(self, selected_beam, cur_beam_size):
+        
         def fn(s):
             shape = [int(sh) for sh in s.shape]
             beam = selected_beam
             for _ in shape[1:]:
                 beam = beam.unsqueeze(-1)
-            s = torch.gather(s.view(*([self.b_s, cur_beam_size] + shape[1:])), 1,
-                             beam.expand(*([self.b_s, self.beam_size] + shape[1:])))
-            s = s.view(*([-1, ] + shape[1:]))
+            s = torch.gather(
+                                input=s.view(*( [self.b_s, cur_beam_size] + shape[1:] )), 
+                                dim=1,
+                                index=beam.expand(*( [self.b_s, self.beam_size] + shape[1:] ))
+                            )
+            s = s.view(*( [-1, ] + shape[1:] ))
             return s
 
         return fn
 
-    def _expand_visual(self, visual: TensorOrSequence, cur_beam_size: int, selected_beam: torch.Tensor):
-        if isinstance(visual, torch.Tensor):
-            visual_shape = visual.shape
-            visual_exp_shape = (self.b_s, cur_beam_size) + visual_shape[1:]
-            visual_red_shape = (self.b_s * self.beam_size,) + visual_shape[1:]
-            selected_beam_red_size = (self.b_s, self.beam_size) + tuple(1 for _ in range(len(visual_exp_shape) - 2))
-            selected_beam_exp_size = (self.b_s, self.beam_size) + visual_exp_shape[2:]
-            visual_exp = visual.view(visual_exp_shape)
+    def _expand_feature(self, features: TensorOrSequence, cur_beam_size: int, selected_beam: torch.Tensor):
+        if isinstance(features, torch.Tensor):
+            feature_shape = features.shape
+            feature_exp_shape = (self.b_s, cur_beam_size) + feature_shape[1:]
+            feature_red_shape = (self.b_s * self.beam_size,) + feature_shape[1:]
+            selected_beam_red_size = (self.b_s, self.beam_size) + tuple(1 for _ in range(len(feature_exp_shape) - 2))
+            selected_beam_exp_size = (self.b_s, self.beam_size) + feature_exp_shape[2:]
+            feature_exp = features.view(feature_exp_shape)
             selected_beam_exp = selected_beam.view(selected_beam_red_size).expand(selected_beam_exp_size)
-            visual = torch.gather(visual_exp, 1, selected_beam_exp).view(visual_red_shape)
+            features = torch.gather(feature_exp, dim=1, index=selected_beam_exp).view(feature_red_shape)
         else:
-            new_visual = []
-            for im in visual:
-                visual_shape = im.shape
-                visual_exp_shape = (self.b_s, cur_beam_size) + visual_shape[1:]
-                visual_red_shape = (self.b_s * self.beam_size,) + visual_shape[1:]
-                selected_beam_red_size = (self.b_s, self.beam_size) + tuple(1 for _ in range(len(visual_exp_shape) - 2))
-                selected_beam_exp_size = (self.b_s, self.beam_size) + visual_exp_shape[2:]
-                visual_exp = im.view(visual_exp_shape)
+            new_features = []
+            for feature in features:
+                feature_shape = feature.shape
+                feature_exp_shape = (self.b_s, cur_beam_size) + feature_shape[1:]
+                feature_red_shape = (self.b_s * self.beam_size,) + feature_shape[1:]
+                selected_beam_red_size = (self.b_s, self.beam_size) + tuple(1 for _ in range(len(feature_exp_shape) - 2))
+                selected_beam_exp_size = (self.b_s, self.beam_size) + feature_exp_shape[2:]
+                feature_exp = feature.view(feature_exp_shape)
                 selected_beam_exp = selected_beam.view(selected_beam_red_size).expand(selected_beam_exp_size)
-                new_im = torch.gather(visual_exp, 1, selected_beam_exp).view(visual_red_shape)
-                new_visual.append(new_im)
-            visual = tuple(new_visual)
-        return visual
+                new_feature = torch.gather(feature_exp, dim=1, index=selected_beam_exp).view(feature_red_shape)
+                new_features.append(new_feature)
+            features = tuple(new_features)
 
-    def apply(self, visual: TensorOrSequence, boxes: TensorOrNone = None, grid_size: TensorOrNone = None,
-                out_size=1, return_probs=False, **kwargs):
-        self.b_s = get_batch_size(visual)
-        self.device = get_device(visual)
+        return features
+
+    def apply(self, visual: Feature, linguistic: Feature, out_size=1, return_probs=False, **kwargs):
+        visual_features = visual.features
+        self.b_s = get_batch_size(visual_features)
+        self.device = get_device(visual_features)
         self.seq_mask = torch.ones((self.b_s, self.beam_size, 1), device=self.device)
         self.seq_logprob = torch.zeros((self.b_s, 1, 1), device=self.device)
         self.log_probs = []
@@ -69,7 +75,7 @@ class BeamSearch(object):
         outputs = []
         with self.model.statefulness(self.b_s):
             for t in range(self.max_len):
-                visual, outputs = self.iter(t, visual, boxes, grid_size, outputs, return_probs, **kwargs)
+                visual, linguistic, outputs = self.iter(t, visual, linguistic, outputs, return_probs, **kwargs)
 
         # Sort result
         seq_logprob, sort_idxs = torch.sort(self.seq_logprob, 1, descending=True)
@@ -99,10 +105,10 @@ class BeamSearch(object):
         selected_logprob, selected_idx = selected_logprob[:, :self.beam_size], selected_idx[:, :self.beam_size]
         return selected_idx, selected_logprob
 
-    def iter(self, t: int, visual: TensorOrSequence, boxes: TensorOrNone, grid_size: TensorOrNone, outputs, return_probs, **kwargs):
+    def iter(self, t: int, visual: Feature, linguistic: Feature, outputs, return_probs, **kwargs):
         cur_beam_size = 1 if t == 0 else self.beam_size
 
-        word_logprob = self.model.step(t, self.selected_words, visual, boxes, grid_size, mode='feedback', **kwargs)
+        word_logprob = self.model.step(t, self.selected_words, visual, linguistic, mode='feedback', **kwargs)
         word_logprob = word_logprob.view(self.b_s, cur_beam_size, -1)
         candidate_logprob = self.seq_logprob + word_logprob
 
@@ -120,11 +126,14 @@ class BeamSearch(object):
         selected_words = selected_idx - selected_beam * candidate_logprob.shape[-1]
 
         self.model.apply_to_states(self._expand_state(selected_beam, cur_beam_size))
-        visual = self._expand_visual(visual, cur_beam_size, selected_beam)
+        visual.features = self._expand_feature(visual.features, cur_beam_size, selected_beam)
+        linguistic.question_tokens = self._expand_feature(linguistic.question_tokens, cur_beam_size, selected_beam)
 
         self.seq_logprob = selected_logprob.unsqueeze(-1)
         self.seq_mask = torch.gather(self.seq_mask, 1, selected_beam.unsqueeze(-1))
-        outputs = list(torch.gather(o, 1, selected_beam.unsqueeze(-1)) for o in outputs)
+        outputs = list(
+                        torch.gather(o, 1, selected_beam.unsqueeze(-1)) 
+                    for o in outputs)
         outputs.append(selected_words.unsqueeze(-1))
 
         if return_probs:
@@ -142,4 +151,4 @@ class BeamSearch(object):
         self.log_probs.append(this_word_logprob)
         self.selected_words = selected_words.view(-1, 1)
 
-        return visual, outputs
+        return visual, linguistic, outputs

@@ -48,9 +48,11 @@ def generate_padding_mask(sequences: TensorOrNone, padding_idx: int) -> torch.Bo
         return None
 
     if len(sequences.shape) == 2: # (bs, seq_len)
-        sequences.unsqueeze_(dim=-1) # (bs, seq_len, 1)
+        __seq = sequences.unsqueeze(dim=-1) # (bs, seq_len, 1)
+    else:
+        __seq = sequences
 
-    mask = (torch.sum(sequences, dim=-1) == padding_idx) # (b_s, seq_len)
+    mask = (torch.sum(__seq, dim=-1) == padding_idx) # (b_s, seq_len)
     return mask.unsqueeze(1).unsqueeze(1) # (bs, 1, 1, seq_len)
 
 def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
@@ -58,35 +60,41 @@ def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
         Mask out subsequent positions
     '''
     attn_shape = (seq_len, seq_len)
-    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).to(torch.bool) # (eq_len, seq_len)
+    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).to(torch.bool) # (seq_len, seq_len)
 
     return subsequent_mask.unsqueeze(0).unsqueeze(0) # (1, 1, seq_len, seq_len)
 
-def get_relative_pos(x, batch_size, norm_len):
-    x = x.view(1, -1, 1).expand(batch_size, -1, -1)
+def generate_self_attention_masks(padding_masks: torch.Tensor, sequential_masks: torch.Tensor):
+    return torch.logical_or(padding_masks, sequential_masks)
+
+def generate_cross_attention_masks(trg_masks: torch.Tensor, src_masks: torch.Tensor):
+    trg_masks = trg_masks.squeeze(-2).unsqueeze(-1)
+    return torch.logical_or(trg_masks, src_masks)
+
+def get_relative_pos(x, norm_len):
+    x = x.view(-1, 1)
     return  x / norm_len
 
-def get_grids_position(batch_size, seq_len, grid_size):
-    assert seq_len == grid_size[0] * grid_size[1]
-
+def get_grids_position(grid_size):
+    w, h = grid_size
     # record the pos of each grid according to the form of region box
-    x = torch.arange(0, grid_size[0]).float().cuda()
-    y = torch.arange(0, grid_size[1]).float().cuda()
+    x = torch.arange(0, w).float().cuda()
+    y = torch.arange(0, h).float().cuda()
 
-    px_min = x.view(-1, 1).expand(-1, grid_size[0]).contiguous().view(-1)
-    py_min = y.view(1, -1).expand(grid_size[1], -1).contiguous().view(-1)
+    px_min = x.view(-1, 1).expand(-1, w).contiguous().view(-1)
+    py_min = y.view(1, -1).expand(h, -1).contiguous().view(-1)
 
     px_max = px_min + 1
     py_max = py_min + 1
 
     # scale pos into the range (0 ~ 1)
-    rpx_min = get_relative_pos(px_min, batch_size, grid_size[0])
-    rpy_min = get_relative_pos(py_min, batch_size, grid_size[1])
+    rpx_min = get_relative_pos(px_min, w)
+    rpy_min = get_relative_pos(py_min, h)
 
-    rpx_max = get_relative_pos(px_max, batch_size, grid_size[0])
-    rpy_max = get_relative_pos(py_max, batch_size, grid_size[1])
+    rpx_max = get_relative_pos(px_max, w)
+    rpy_max = get_relative_pos(py_max, h)
 
-    boxes = torch.cat([rpx_min, rpy_min, rpx_max, rpy_max], dim=-1) # (bs, n, 4)
+    boxes = torch.cat([rpx_min, rpy_min, rpx_max, rpy_max], dim=-1) # (n, 4)
 
     return boxes
 

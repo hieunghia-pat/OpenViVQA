@@ -127,8 +127,8 @@ def collate_fn(samples):
     filenames = []
     region_features = []
     grid_features = []
-    boxes = []
-    grid_sizes = []
+    region_boxes = []
+    grid_boxes = []
     questions = []
     question_tokens = []
     answers = []
@@ -140,8 +140,8 @@ def collate_fn(samples):
         filename = sample["filename"]
         region_feature = sample["region_features"]
         grid_feature = sample["grid_features"]
-        box = sample["boxes"]
-        grid_size = sample["grid_size"]
+        region_box = sample["region_boxes"]
+        grid_box = sample["grid_boxes"]
         question = sample["question"]
         question_token = sample["question_tokens"]
         answer = sample["answer"]
@@ -160,10 +160,10 @@ def collate_fn(samples):
             image_ids.append(image_id)
         if filename is not None:
             filenames.append(filename)
-        if box is not None:
-            boxes.append(torch.tensor(box))
-        if grid_size is not None:
-            grid_sizes.append(grid_size)
+        if region_box is not None:
+            region_boxes.append(torch.tensor(region_box))
+        if grid_box is not None:
+            grid_boxes.append(grid_box)
         if question is not None:
             questions.append(question)
         if answer is not None:
@@ -185,19 +185,21 @@ def collate_fn(samples):
         zero_region_feature = torch.zeros_like(region_features[-1][-1]).unsqueeze(0) # padding tensor for region features (1, dim)
     if len(grid_features) > 0:
         zero_grid_feature = torch.zeros_like(grid_features[-1][-1]).unsqueeze(0) # padding tensor for grid features (1, dim)
-    if len(boxes) > 0:
-        zero_box = torch.zeros_like(boxes[-1][-1]).unsqueeze(0) # (1, 4)
+    if len(region_boxes) > 0 or len(grid_boxes) > 0:
+        zero_box = torch.zeros_like(region_boxes[-1][-1]).unsqueeze(0) # (1, 4)
     else:
         zero_box = None
     for batch_ith in range(len(samples)):
         if len(region_features) > 0:
             for ith in range(region_features[batch_ith].shape[0], max_seq_len):
                 region_features[batch_ith] = torch.cat([region_features[batch_ith], zero_region_feature], dim=0)
-                if zero_box is not None:
-                    boxes[batch_ith] = torch.cat([boxes[batch_ith], zero_box], dim=0)
+                if zero_box is not None and len(region_boxes) > 0:
+                    region_boxes[batch_ith] = torch.cat([region_boxes[batch_ith], zero_box], dim=0)
         if len(grid_features) > 0:
             for ith in range(grid_features[batch_ith].shape[0], max_seq_len):
                 grid_features[batch_ith] = torch.cat([grid_features[batch_ith], zero_grid_feature], dim=0)
+                if zero_box is not None and len(grid_boxes) > 0:
+                    grid_boxes[batch_ith] = torch.cat([grid_boxes[batch_ith], zero_box], dim=0)
 
     if len(region_features) > 0:
         region_features = torch.cat([feature.unsqueeze_(0) for feature in region_features], dim=0)
@@ -215,13 +217,15 @@ def collate_fn(samples):
     if len(filenames) == 0:
         filenames = None
     
-    if len(boxes) > 0:
-        boxes = torch.cat([box.unsqueeze_(0) for box in boxes], dim=0)
+    if len(region_boxes) > 0:
+        region_boxes = torch.cat([box.unsqueeze_(0) for box in region_boxes], dim=0)
     else:
-        boxes = None
+        region_boxes = None
 
-    if len(grid_sizes) == 0:
-        grid_sizes = None
+    if len(grid_boxes) > 0:
+        grid_boxes = torch.cat([box.unsqueeze_(0) for box in grid_boxes], dim=0)
+    else:
+        grid_boxes = None
     
     if len(questions) == 0:
         questions = None
@@ -249,8 +253,8 @@ def collate_fn(samples):
         "filenames": filenames,
         "region_features": region_features, 
         "grid_features": grid_features,
-        "boxes": boxes,
-        "grid_sizes": grid_sizes,
+        "region_boxes": region_boxes,
+        "grid_boxes": grid_boxes,
         "questions": questions,
         "answers": answers,
         "question_tokens": question_tokens, 

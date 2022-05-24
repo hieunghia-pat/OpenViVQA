@@ -1,4 +1,5 @@
 from torch import nn
+import torch
 from torch.nn import functional as F
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.attentions import MultiHeadAttention
@@ -69,9 +70,8 @@ class Encoder(nn.Module):
                  identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
         super(Encoder, self).__init__()
 
-        self.pos_embedding = SinusoidPositionalEmbedding(d_model // 2, normalize=True)
+        self.pos_embedding = SinusoidPositionalEmbedding(d_model, normalize=True)
         
-        self.dropout = nn.Dropout(p=dropout)
         self.layer_norm = nn.LayerNorm(d_model)
 
         self.d_model = d_model
@@ -84,12 +84,10 @@ class Encoder(nn.Module):
 
     def forward(self, general_features):
         features = general_features.features
-        padding_masks = general_features.masks
+        padding_masks = general_features.padding_masks
         pos_embeddings = self.pos_embedding(features)
         
-        out = F.relu(self.fc(features))
-        out = self.dropout(out)
-        out = self.layer_norm(out)
+        out = self.layer_norm(features)
         for layer in self.layers:
             out = out + pos_embeddings
             out = layer(out, out, out, padding_masks)
@@ -104,7 +102,6 @@ class GeometricEncoder(nn.Module):
         self.pos_embedding = SinusoidPositionalEmbedding(d_model // 2, normalize=True)
         self.box_embedding = nn.Linear(in_features=4, out_features=d_model)
         
-        self.dropout = nn.Dropout(p=dropout)
         self.layer_norm = nn.LayerNorm(d_model)
 
         self.d_model = d_model
@@ -117,13 +114,11 @@ class GeometricEncoder(nn.Module):
 
     def forward(self, visuals):
         features = visuals.features
-        padding_masks = visuals.masks
+        padding_masks = visuals.padding_masks
         pos_embeddings = self.pos_embedding(features)
         boxes = visuals.boxes
         
-        out = F.relu(self.fc(features))
-        out = self.dropout(out)
-        out = self.layer_norm(out)
+        out = self.layer_norm(features)
         boxes = self.box_embedding(boxes)
         for layer in self.layers:
             out = out + pos_embeddings
@@ -138,7 +133,7 @@ class GuidedEncoder(nn.Module):
                     guided_attention_module=None, guided_attention_module_kwargs=None):
         super(GuidedEncoder, self).__init__()
 
-        self.pos_embedding = SinusoidPositionalEmbedding(d_model // 2, normalize=True)
+        self.pos_embedding = SinusoidPositionalEmbedding(d_model, normalize=True)
         self.box_embedding = nn.Linear(in_features=4, out_features=d_model)
 
         self.layer_norm = nn.LayerNorm(d_model)
@@ -156,18 +151,22 @@ class GuidedEncoder(nn.Module):
     def forward(self, visuals, linguistics):
         
         visual_features = visuals.features
-        visual_feature_padding_masks = visuals.masks
+        visual_feature_padding_masks = visuals.padding_masks
         visual_feature_pos_embeddings = self.pos_embedding(visual_features)
 
         linguistic_features = linguistics.features
-        linguistic_feature_attention_masks = linguistics.masks
+        linguistic_feature_padding_masks = linguistics.padding_masks
         linguistic_feature_pos_embeddings = self.pos_embedding(linguistic_features)
+
+        # praparing masks for guided attention
+        visual_feature_padding_masks = visual_feature_padding_masks.squeeze(1).unsqueeze(-1) # (bs, 1, seq, 1)
+        guided_attention_masks = torch.logical_or(visual_feature_padding_masks, linguistic_feature_padding_masks)
 
         visual_features = self.layer_norm(visual_features)
         linguistic_features = linguistic_features + linguistic_feature_pos_embeddings
         for layer in self.layers:
             visual_features = visual_features + visual_feature_pos_embeddings
             visual_features = layer(visual_features, linguistic_features, linguistic_features,
-                            self_attention_mask=linguistic_feature_attention_masks, guided_attention_mask=visual_feature_padding_masks)
+                            self_attention_mask=visual_feature_padding_masks, guided_attention_mask=guided_attention_masks)
 
         return visual_features

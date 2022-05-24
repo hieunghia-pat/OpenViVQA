@@ -35,16 +35,13 @@ config.model.embedding_dim = 300
 
 ## pretrained language model components
 
-# phobert_base
-# phobert_large
-# bartpho_syllable
-# bartpho_word
-config.model.pretrained_language_model_name = None
-
-# PhoBERTModel
-# BARTPhoModel
-# GPT2Model       
-config.model.pretrained_language_model = None
+config.model.pretrained_language_model_name = None  # phobert_base
+                                                    # phobert_large
+                                                    # bartpho_syllable
+                                                    # bartpho_word      
+config.model.pretrained_language_model = None # PhoBERTModel
+                                              # BARTPhoModel
+                                              # GPT2Model
 
 config.model.language_model_hidden_size = 768
 
@@ -83,9 +80,9 @@ config.model.fusion.guided_encoder.self_attention.args = CfgNode()
 
 config.model.fusion.guided_encoder.guided_attention = CfgNode()
 config.model.fusion.guided_encoder.guided_attention.module = None  # scaled_dot_product_attention
-                                                                # augmented_geometry_scaled_dot_product_attention
-                                                                # augmented_memory_scaled_dot_product_attention
-                                                                # apdative_scaled_dot_product_attention
+                                                                  # augmented_geometry_scaled_dot_product_attention
+                                                                  # augmented_memory_scaled_dot_product_attention
+                                                                  # apdative_scaled_dot_product_attention
 config.model.fusion.guided_encoder.guided_attention.args = CfgNode()
 
 ### decoder module
@@ -113,17 +110,15 @@ config.dataset = CfgNode()
 config.dataset.batch_size = 32
 config.dataset.workers = 2
 
-# vncorenlp
-# pyvi
-# spacy
-config.dataset.tokenizer = None
+config.dataset.tokenizer = None # vncorenlp
+                                # pyvi
+                                # spacy
 
-# fasttext.vi.300d
-# phow2v.syllable.100d
-# phow2v.syllable.300d
-# phow2v.word.100d
-# phow2v.word.300d
-config.dataset.word_embedding = None
+config.dataset.word_embedding = None  # fasttext.vi.300d
+                                      # phow2v.syllable.100d
+                                      # phow2v.syllable.300d
+                                      # phow2v.word.100d
+                                      # phow2v.word.300d
 
 config.dataset.min_freq = 1
 

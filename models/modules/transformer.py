@@ -158,42 +158,45 @@ class FusionTransformer(AnsweringModel):
         # fusion modules
         self.encoder = self.get_encoder()
         self.guided_encoder = self.get_guided_encoder()
-        self.visual_fc = nn.Linear(self.d_model, self.d_model)
-        self.question_fc = nn.Linear(self.d_model, self.d_model)
+        self.fuse_fc = nn.Linear(self.d_model, self.d_model)
         self.layer_norm = nn.LayerNorm(self.d_model)
 
         # generative modules
         self.decoder = self.get_decoder()
 
     def forward(self, visuals, linguistics):
-        visual_features, visual_masks = self.visual_embedding(visuals.features)
-        question_features, question_masks = self.language_embedding(linguistics.question_tokens)
+        visual_features, visual_padding_masks = self.visual_embedding(visuals.features)
+        question_features, (question_padding_masks, question_sequential_masks) = self.language_embedding(linguistics.question_tokens)
 
-        visual_inputs = Feature({
+        visual_feature_inputs = Feature({
             "features": visual_features,
             "boxes": visuals.boxes,
-            "masks": visual_masks
+            "padding_masks": visual_padding_masks
         })
 
-        linguistic_inputs = Feature({
+        linguistic_feature_inputs = Feature({
             "features": question_features,
-            "masks": question_masks
+            "padding_masks": question_padding_masks,
+            "sequential_masks": question_sequential_masks
         })
 
-        question_features = self.encoder(linguistic_inputs)
-        guided_features = self.guided_encoder(visual_inputs, linguistic_inputs)
+        question_features = self.encoder(linguistic_feature_inputs)
+        guided_features = self.guided_encoder(visual_feature_inputs, linguistic_feature_inputs)
 
         # Fuse guided features and question features
-        question_features = self.question_fc(question_features)
-        guided_features = self.visual_fc(guided_features)
-        fused_features = self.layer_norm(guided_features + question_features)
+        fused_features = torch.cat([question_features, guided_features], dim=1)
+        fused_features = self.fuse_fc(fused_features)
+        fused_features = self.layer_norm(fused_features)
+        fused_padding_masks = torch.cat([visual_padding_masks, question_padding_masks], dim=-1)
 
-        answer_tokens = linguistics.answer_tokens
-        fused_inputs = Feature({
+        fused_feature_inputs = Feature({
             "features": fused_features,
-            "masks": visual_masks
+            "padding_masks": fused_padding_masks
         })
-        dec_output = self.decoder(answer_tokens, fused_inputs)
+        linguistic_token_inputs = Feature({
+            "answer_tokens": linguistics.answer_tokens
+        })
+        dec_output = self.decoder(linguistic_token_inputs, fused_feature_inputs)
         return dec_output
 
     def init_state(self, b_s, device):
@@ -206,40 +209,45 @@ class FusionTransformer(AnsweringModel):
             raise NotImplementedError
         elif mode == 'feedback':
             if t == 0:
-                visual_features, visual_masks = self.visual_embedding(visuals.features)
-                question_features, question_masks = self.language_embedding(linguistics.question_tokens)
+                visual_features, visual_padding_masks = self.visual_embedding(visuals.features)
+                question_features, (question_padding_masks, question_sequential_masks) = self.language_embedding(linguistics.question_tokens)
 
-                visual_inputs = Feature({
+                visual_feature_inputs = Feature({
                     "features": visual_features,
                     "boxes": visuals.boxes,
-                    "masks": visual_masks
+                    "padding_masks": visual_padding_masks
                 })
 
-                linguistic_inputs = Feature({
+                linguistic_feature_inputs = Feature({
                     "features": question_features,
-                    "masks": question_masks
+                    "padding_masks": question_padding_masks,
+                    "sequential_masks": question_sequential_masks
                 })
 
-                question_features = self.encoder(linguistic_inputs)
-                guided_features = self.guided_encoder(visual_inputs, linguistic_inputs)
+                question_features = self.encoder(linguistic_feature_inputs)
+                guided_features = self.guided_encoder(visual_feature_inputs, linguistic_feature_inputs)
 
                 # Fuse guided features and question features
-                question_features = self.question_fc(question_features)
-                guided_features = self.visual_fc(guided_features)
-                fused_features = self.layer_norm(guided_features + question_features)
+                fused_features = torch.cat([question_features, guided_features], dim=1)
+                fused_features = self.fuse_fc(fused_features)
+                fused_features = self.layer_norm(fused_features)
+                fused_padding_masks = torch.cat([visual_padding_masks, question_padding_masks], dim=-1)
 
-                fused_inputs = Feature({
-                    "features": fused_features,
-                    "masks": visual_masks
-                })
-
-                self.enc_out = fused_features,
-                self.mask_enc = visual_masks
+                self.enc_output = fused_features
+                self.mask_enc = fused_padding_masks
                 
                 bs = visual_features.shape[0]
-                it = torch.zeros((bs, 1)).long().fill_(self.bos_idx)
+                it = torch.zeros((bs, 1)).long().fill_(self.vocab.bos_idx).to(visual_features.device)
             else:
                 it = prev_output
 
-        dec_output = self.decoder(it, fused_inputs)
+        fused_feature_inputs = Feature({
+            "features": self.enc_output,
+            "padding_masks": self.mask_enc
+        })
+        linguistic_token_inputs = Feature({
+            "answer_tokens": it
+        })
+
+        dec_output = self.decoder(linguistic_token_inputs, fused_feature_inputs)
         return dec_output

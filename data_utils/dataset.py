@@ -3,6 +3,7 @@ from torch.utils import data
 
 from data_utils.utils import preprocess_sentence, default_value
 from data_utils.vocab import ClassificationVocab, Vocab
+from models.utils import get_grids_position
 
 import json
 import os
@@ -70,21 +71,26 @@ class DictionaryDataset(data.Dataset):
 
     def load_feature(self, image_id: int) -> Tuple[np.ndarray]:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
-        feature = np.load(feature_file, allow_pickle=True)[()]
+        feature_from_file = np.load(feature_file, allow_pickle=True)[()]
+        feature = defaultdict(default_value)
+        feature.update(feature_from_file)
 
         region_features = feature["region_features"]
         grid_feature = feature["grid_features"]
-        boxes = feature["boxes"]
-        # grid_size = feature["grid_size"]
-        grid_size = None
+        region_boxes = feature["boxes"]
+        grid_size = feature["grid_size"]
+        if grid_size is not None:
+            grid_boxes = get_grids_position(grid_size)
+        else:
+            grid_boxes = None
 
-        return region_features, grid_feature, boxes, grid_size
+        return region_features, grid_feature, region_boxes, grid_boxes
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
         image_id = item["image_id"]
         filename = item["filename"]
-        region_features, grid_features, boxes, grid_size = self.load_feature(image_id)
+        region_features, grid_features, region_boxes, grid_boxes = self.load_feature(image_id)
         question = item["question"]
         answer = item["answer"]
 
@@ -93,8 +99,8 @@ class DictionaryDataset(data.Dataset):
             "filename": filename, 
             "region_features": region_features, 
             "grid_features": grid_features,
-            "boxes": boxes,
-            "grid_size": grid_size, 
+            "region_boxes": region_boxes,
+            "grid_boxes": grid_boxes, 
             "question": question,
             "answer": answer
         }
@@ -126,6 +132,7 @@ class ImageDataset(DictionaryDataset):
     def load_feature(self, image_id: int) -> Tuple[np.ndarray]:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         feature = np.load(feature_file, allow_pickle=True)[()]
+        feature = defaultdict(default_value).update(feature)
 
         region_features = feature["region_features"]
         grid_feature = feature["grid_features"]
@@ -219,15 +226,20 @@ class FeatureDataset(data.Dataset):
 
     def load_feature(self, image_id: int) -> Tuple[np.ndarray]:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
-        feature = np.load(feature_file, allow_pickle=True)[()]
+        feature_from_file = np.load(feature_file, allow_pickle=True)[()]
+        feature = defaultdict(default_value)
+        feature.update(feature_from_file)
 
         region_features = feature["region_features"]
         grid_feature = feature["grid_features"]
-        boxes = feature["boxes"]
-        # grid_size = feature["grid_size"]
-        grid_size = None
+        region_boxes = feature["boxes"]
+        grid_size = feature["grid_size"]
+        if grid_size is not None:
+            grid_boxes = get_grids_position(grid_size)
+        else:
+            grid_boxes = None
 
-        return region_features, grid_feature, boxes, grid_size
+        return region_features, grid_feature, region_boxes, grid_boxes
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
@@ -237,13 +249,13 @@ class FeatureDataset(data.Dataset):
         shifted_right_answer = torch.zeros_like(answer).fill_(self.vocab.padding_idx)
         shifted_right_answer[:-1] = answer[1:]
         answer = torch.where(answer == self.vocab.eos_idx, self.vocab.padding_idx, answer) # remove eos_token in answer
-        region_features, grid_features, boxes, grid_size = self.load_feature(self.annotations[idx]["image_id"])
+        region_features, grid_features, region_boxes, grid_boxes = self.load_feature(self.annotations[idx]["image_id"])
 
         result_dict = {
             "region_features": region_features,
             "grid_features": grid_features,
-            "boxes": boxes,
-            "grid_size": grid_size,
+            "region_boxes": region_boxes,
+            "grid_boxes": grid_boxes,
             "question_tokens": question,
             "answer_tokens": answer,
             "shifted_right_answer_tokens": shifted_right_answer

@@ -18,16 +18,19 @@ torch.manual_seed(13)
 np.random.seed(13)
 
 config = get_default_config()
+config.merge_from_file("configs/generative_mcan_faster_rcnn.yaml")
 
 if not os.path.isdir(os.path.join(config.training.checkpoint_path, config.model.name)):
     os.makedirs(os.path.join(config.training.checkpoint_path, config.model.name))
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+print("Checking checkpoint directory...")
 # creating checkpoint directory
 if not os.path.isdir(os.path.join(config.training.checkpoint_path, config.model.name)):
     os.makedirs(os.path.join(config.training.checkpoint_path, config.model.name))
 
+print("Creating vocab...")
 # Creating vocabulary and dataset
 if not os.path.isfile(os.path.join(config.training.checkpoint_path, config.model.name, "vocab.pkl")):
     vocab = Vocab(
@@ -44,6 +47,7 @@ if not os.path.isfile(os.path.join(config.training.checkpoint_path, config.model
 else:
     vocab = pickle.load(open(os.path.join(config.training.checkpoint_path, config.model.name, "vocab.pkl"), "rb"))
 
+print("Creating dataset")
 # creating iterable dataset
 train_dataset = FeatureDataset(
                                 json_path = config.path.train_json_path,
@@ -88,8 +92,10 @@ test_dict_dataset = DictionaryDataset(
                                         tokenizer_name = config.dataset.tokenizer
                                     )
 
+print("Initializing model...")
 model = FusionTransformer(vocab, config).to(device)
 
+print("Defining the trainer")
 # Define Trainer
 trainer = Trainer(model=model, train_datasets=(train_dataset, train_dict_dataset), val_datasets=(val_dataset, val_dict_dataset),
                     test_datasets=(test_dataset, test_dict_dataset), vocab=vocab, collate_fn=collate_fn)

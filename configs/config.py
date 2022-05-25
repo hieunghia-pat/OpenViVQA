@@ -57,6 +57,8 @@ config.model.fusion.module = "standard_fusion_module"
 ### fusion encoder module
 config.model.fusion.encoder = CfgNode()
 config.model.fusion.encoder.args = CfgNode()
+config.model.fusion.encoder.args.total_memory = None
+config.model.fusion.encoder.args.use_aoa = False
 config.model.fusion.encoder.module = "encoder"  # encoder
                                                 # guided_encoder
 config.model.fusion.encoder.self_attention = CfgNode()
@@ -69,6 +71,7 @@ config.model.fusion.encoder.self_attention.args = CfgNode()
 ### fusion guided-encoder module
 config.model.fusion.guided_encoder = CfgNode()
 config.model.fusion.guided_encoder.args = CfgNode()
+config.model.fusion.guided_encoder.args.use_aoa = False
 config.model.fusion.guided_encoder.module = "guided_encoder"  # encoder
                                                               # guided_encoder
 config.model.fusion.guided_encoder.self_attention = CfgNode()
@@ -88,6 +91,7 @@ config.model.fusion.guided_encoder.guided_attention.args = CfgNode()
 ### decoder module
 config.model.decoder = CfgNode()
 config.model.decoder.args = CfgNode()
+config.model.decoder.args.use_aoa = False
 config.model.decoder.module = "decoder" # decoder
                                         # meshed_decoder
                                         # adaptive_decoder

@@ -13,7 +13,8 @@ import os
 
 class DecoderLayer(Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, self_att_module=None,
-                 use_aoa=False, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+                 use_aoa=False, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None,
+                 **kwargs):
         super(DecoderLayer, self).__init__()
         if self_att_module is None:
             self_att_module = ScaledDotProductAttention
@@ -44,7 +45,8 @@ class DecoderLayer(Module):
 
 class MeshedDecoderLayer(Module):
     def __init__(self, N_enc, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, self_att_module=None,
-                 use_aoa=False, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+                 use_aoa=False, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None,
+                 **kwargs):
         super(MeshedDecoderLayer, self).__init__()
         self.self_att = MultiHeadAttention(d_model, d_k, d_v, h, dropout, can_be_stateful=True,
                                             use_aoa=use_aoa,
@@ -95,7 +97,8 @@ class MeshedDecoderLayer(Module):
 
 class AdaptiveDecoderLayer(Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, self_att_module=None,
-                 enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+                 enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None,
+                 **kwargs):
         super(AdaptiveDecoderLayer, self).__init__()
         if self_att_module is None:
             self_att_module = ScaledDotProductAttention
@@ -125,7 +128,8 @@ class AdaptiveDecoderLayer(Module):
 class Decoder(Module):
     "Generic N layer decoder with masking."
     def __init__(self, vocab_size, max_len, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
-                 use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+                 use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None,
+                 **kwargs):
         super(Decoder, self).__init__()
         
         self.d_model = d_model
@@ -186,7 +190,8 @@ class Decoder(Module):
 
 class MeshedDecoder(Module):
     def __init__(self, vocab_size, max_len, N_enc, N_dec, padding_idx, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, weights=None,
-                 use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+                 use_aoa=False, self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None,
+                 **kwargs):
         super(MeshedDecoder, self).__init__()
         self.d_model = d_model
         self.word_emb = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)
@@ -249,7 +254,8 @@ class AdaptiveDecoder(Module):
     def __init__(self, vocab_size, max_len, N_dec, padding_idx, pretrained_language_model_name, checkpoint_path,
                     pretrained_language_model, d_model=512, d_emb=None, d_k=64, d_v=64, h=8, d_ff=2048,
                     language_model_hidden_size=768, dropout=.1, weights=None, 
-                    self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None):
+                    self_att_module=None, enc_att_module=None, self_att_module_kwargs=None, enc_att_module_kwargs=None,
+                    **kwargs):
         super(AdaptiveDecoder, self).__init__()
         self.d_model = d_model
         self.word_emb = Embedding(vocab_size, d_model=d_model, d_emb=d_emb, weights=weights, padding_idx=padding_idx)

@@ -5,7 +5,7 @@ from models.modules.embeddings import SinusoidPositionalEmbedding
 
 class EncoderLayer(nn.Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
-                 use_aoa=False, attention_module=None, attention_module_kwargs=None):
+                 use_aoa=False, attention_module=None, attention_module_kwargs=None, **kwargs):
         super(EncoderLayer, self).__init__()
         self.identity_map_reordering = identity_map_reordering
         self.mhatt = MultiHeadAttention(d_model, d_k, d_v, h, dropout, identity_map_reordering=identity_map_reordering,
@@ -23,7 +23,7 @@ class EncoderLayer(nn.Module):
 
 class GeometricEncoderLayer(nn.Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
-                 use_aoa=False, attention_module=None, attention_module_kwargs=None):
+                 use_aoa=False, attention_module=None, attention_module_kwargs=None, **kwargs):
         super(GeometricEncoderLayer, self).__init__()
         self.identity_map_reordering = identity_map_reordering
         self.mhatt = MultiHeadAttention(d_model, d_k, d_v, h, dropout, identity_map_reordering=identity_map_reordering,
@@ -42,7 +42,7 @@ class GeometricEncoderLayer(nn.Module):
 class GuidedEncoderLayer(nn.Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
                  use_aoa=False, self_attention_module=None, self_attention_module_kwargs=None,
-                 guided_attention_module=None, guided_attention_module_kwargs=None):
+                 guided_attention_module=None, guided_attention_module_kwargs=None, **kwargs):
         super(GuidedEncoderLayer, self).__init__()
         self.identity_map_reordering = identity_map_reordering
         self.self_mhatt = MultiHeadAttention(d_model, d_k, d_v, h, dropout, identity_map_reordering=identity_map_reordering,
@@ -70,7 +70,8 @@ class GuidedEncoderLayer(nn.Module):
 
 class Encoder(nn.Module):
     def __init__(self, N, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
-                 identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
+                 identity_map_reordering=False, use_aoa=False, attention_module=None, 
+                 attention_module_kwargs=None, **kwargs):
         super(Encoder, self).__init__()
 
         self.pos_embedding = SinusoidPositionalEmbedding(d_model, normalize=True)
@@ -99,7 +100,8 @@ class Encoder(nn.Module):
 
 class GeometricEncoder(nn.Module):
     def __init__(self, N, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
-                 identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
+                 identity_map_reordering=False, use_aoa=False, attention_module=None, 
+                 attention_module_kwargs=None, **kwargs):
         super(GeometricEncoder, self).__init__()
 
         self.pos_embedding = SinusoidPositionalEmbedding(d_model // 2, normalize=True)
@@ -133,7 +135,7 @@ class GuidedEncoder(nn.Module):
     def __init__(self, N, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, 
                     dropout=.1, identity_map_reordering=False, use_aoa=False,
                     self_attention_module=None, self_attention_module_kwargs=None,
-                    guided_attention_module=None, guided_attention_module_kwargs=None):
+                    guided_attention_module=None, guided_attention_module_kwargs=None, **kwargs):
         super(GuidedEncoder, self).__init__()
 
         self.pos_embedding = SinusoidPositionalEmbedding(d_model, normalize=True)

@@ -3,6 +3,7 @@ from .meteor import Meteor
 from .rouge import Rouge
 from .cider import Cider
 from typing import List
+from .tokenizer import PTBTokenizer
 
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 

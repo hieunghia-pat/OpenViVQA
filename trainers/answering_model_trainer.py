@@ -1,4 +1,3 @@
-from torch import nn
 from torch.nn import NLLLoss
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
@@ -46,30 +45,32 @@ class Trainer:
         # creating iterable-dataset data loader
         self.train_dataloader = data.DataLoader(
             dataset=self.train_dataset,
-            batch_size=config.batch_size,
+            batch_size=config.dataset.batch_size,
             shuffle=True,
-            num_workers=config.workers,
+            num_workers=config.dataset.workers,
             collate_fn=collate_fn
         )
         self.val_dataloader = data.DataLoader(
             dataset=self.val_dataset,
-            batch_size=config.batch_size,
+            batch_size=config.dataset.batch_size,
             shuffle=True,
-            num_workers=config.workers,
+            num_workers=config.dataset.workers,
             collate_fn=collate_fn
         )
 
         # creating dictionary iterable-dataset data loader
         self.train_dict_dataloader = data.DataLoader(
             dataset=self.train_dict_dataset,
-            batch_size=config.batch_size // config.training_beam_size,
+            batch_size=config.dataset.batch_size // config.training.training_beam_size,
             shuffle=True,
+            num_workers=config.dataset.workers,
             collate_fn=collate_fn
         )
         self.val_dict_dataloader = data.DataLoader(
             dataset=self.val_dict_dataset,
-            batch_size=config.batch_size // config.training_beam_size,
+            batch_size=config.dataset.batch_size // config.training.training_beam_size,
             shuffle=True,
+            num_workers=config.dataset.workers,
             collate_fn=collate_fn
         )
         
@@ -78,9 +79,9 @@ class Trainer:
         if self.test_dataset is not None:
             self.test_dataloader = data.DataLoader(
                 dataset=self.test_dataset,
-                batch_size=config.batch_size,
+                batch_size=config.dataset.batch_size,
                 shuffle=True,
-                num_workers=config.workers,
+                num_workers=config.dataset.workers,
                 collate_fn=collate_fn
             )
         else:
@@ -89,62 +90,60 @@ class Trainer:
         if self.test_dict_dataset is not None:
             self.test_dict_dataloader = data.DataLoader(
                 dataset=self.test_dict_dataset,
-                batch_size=config.batch_size // config.training_beam_size,
+                batch_size=config.dataset.batch_size // config.training.training_beam_size,
                 shuffle=True,
+                num_workers=config.dataset.workers,
                 collate_fn=collate_fn
             )
         else:
             self.test_dict_dataloader = None
 
-        self.train_cider = Cider(PTBTokenizer.tokenize(self.train_dataset.captions))
+        self.train_cider = Cider(PTBTokenizer.tokenize(self.train_dataset.answers))
 
     def evaluate_loss(self, dataloader: data.DataLoader):
         # Calculating validation loss
         self.model.eval()
         running_loss = .0
         with tqdm(desc='Epoch %d - Validation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
-            with torch.no_grad():
-                for it, sample in enumerate(dataloader):
-                    visual_features = sample["visual"]
+            for it, sample in enumerate(dataloader):
+                region_features = sample["region_features"]
+                if region_features is not None:
+                    region_features = region_features.to(device)
 
-                    region_features = visual_features["region"]
-                    if region_features is not None:
-                        region_features = region_features.to(device)
+                grid_features = sample["grid_features"]
+                if grid_features is not None:
+                    grid_features = grid_features.to(device)
 
-                    grid_features = visual_features["grid"]
-                    if grid_features is not None:
-                        grid_features = grid_features.to(device)
+                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
 
-                    assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
+                region_boxes = sample["region_boxes"]
+                grid_boxes = sample["grid_boxes"]
 
-                    region_boxes = sample["region_boxes"]
-                    grid_boxes = sample["grid_boxes"]
-
-                    visual = Feature({
-                            "region_features": region_features,
-                            "grid_features": grid_features,
-                            "features": region_features if region_features is not None else grid_features,
-                            "boxes": region_boxes if region_boxes is not None else grid_boxes
-                        })
-
-                    question_tokens = sample["question_tokens"].to(device)
-                    answer_tokens = sample["answer_tokens"].to(device)
-                    shifted_right_answer_tokens = sample["shifted_right_answer_tokens"].to(device)
-
-                    linguistic = Feature({
-                        "question_tokens": question_tokens,
-                        "answer_tokens": answer_tokens
+                visual = Feature({
+                        "region_features": region_features,
+                        "grid_features": grid_features,
+                        "features": region_features if region_features is not None else grid_features,
+                        "boxes": region_boxes if region_boxes is not None else grid_boxes
                     })
-                    
-                    with torch.no_grad():
-                        out = self.model(visual, linguistic).contiguous()
-                    
-                    loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
-                    this_loss = loss.item()
-                    running_loss += this_loss
 
-                    pbar.set_postfix(loss=running_loss / (it + 1))
-                    pbar.update()
+                question_tokens = sample["question_tokens"].to(device)
+                answer_tokens = sample["answer_tokens"].to(device)
+                shifted_right_answer_tokens = sample["shifted_right_answer_tokens"].to(device)
+
+                linguistic = Feature({
+                    "question_tokens": question_tokens,
+                    "answer_tokens": answer_tokens
+                })
+                
+                with torch.no_grad():
+                    out = self.model(visual, linguistic).contiguous()
+                
+                loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
+                this_loss = loss.item()
+                running_loss += this_loss
+
+                pbar.set_postfix(loss=running_loss / (it + 1))
+                pbar.update()
 
         val_loss = running_loss / len(dataloader)
 
@@ -190,8 +189,7 @@ class Trainer:
                                                     beam_size=self.config.training.evaluating_beam_size, out_size=1)
 
                 answers_gt = sample["answers"]
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
-                answers_gt = list(itertools.chain(*([a, ] * self.config.training.training_beam_size for a in answers_gt)))
+                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gen['%d_%d' % (it, i)] = [gen_i, ]
@@ -370,7 +368,7 @@ class Trainer:
             dict_for_saving[key] = value
 
         torch.save(dict_for_saving, os.path.join(self.config.training.checkpoint_path, 
-                                                    self.config.training.model, 
+                                                    self.config.model.name, 
                                                     "last_model.pth"))
 
     def train(self, checkpoint_filename: str = None):
@@ -445,7 +443,7 @@ class Trainer:
             if best:
                 copyfile(   
                             os.path.join(self.config.training.checkpoint_path, self.config.model.name, "last_model.pth"), 
-                            os.path.join(self.config.training.checkpoint_path, self.config.training.model_name, "best_model.pth")
+                            os.path.join(self.config.training.checkpoint_path, self.config.model.name, "best_model.pth")
                         )
 
             if exit_train:

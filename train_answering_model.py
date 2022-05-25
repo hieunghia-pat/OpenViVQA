@@ -47,7 +47,7 @@ if not os.path.isfile(os.path.join(config.training.checkpoint_path, config.model
 else:
     vocab = pickle.load(open(os.path.join(config.training.checkpoint_path, config.model.name, "vocab.pkl"), "rb"))
 
-print("Creating dataset")
+print("Creating dataset...")
 # creating iterable dataset
 train_dataset = FeatureDataset(
                                 json_path = config.path.train_json_path,
@@ -57,7 +57,7 @@ train_dataset = FeatureDataset(
                             )
 
 val_dataset = FeatureDataset(
-                                json_path = config.path.test_json_path,
+                                json_path = config.path.dev_json_path,
                                 image_features_path = config.path.image_features_path,
                                 vocab = None,
                                 tokenizer_name = config.dataset.tokenizer
@@ -79,7 +79,7 @@ train_dict_dataset = DictionaryDataset(
                                     )
 
 val_dict_dataset = DictionaryDataset(
-                                        json_path = config.path.val_json_path,
+                                        json_path = config.path.dev_json_path,
                                         image_features_path=config.path.image_features_path,
                                         vocab = vocab,
                                         tokenizer_name = config.dataset.tokenizer
@@ -95,10 +95,10 @@ test_dict_dataset = DictionaryDataset(
 print("Initializing model...")
 model = FusionTransformer(vocab, config).to(device)
 
-print("Defining the trainer")
+print("Defining the trainer...")
 # Define Trainer
 trainer = Trainer(model=model, train_datasets=(train_dataset, train_dict_dataset), val_datasets=(val_dataset, val_dict_dataset),
-                    test_datasets=(test_dataset, test_dict_dataset), vocab=vocab, collate_fn=collate_fn)
+                    test_datasets=(test_dataset, test_dict_dataset), vocab=vocab, collate_fn=collate_fn, config=config)
 
 # Training
 if config.training.start_from:

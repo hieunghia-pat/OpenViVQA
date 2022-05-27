@@ -36,7 +36,8 @@ class DecoderLayer(Module):
         self_att = self.self_attn(queries, queries, queries, attention_mask=self_attention_mask)
         enc_att = self.enc_attn(self_att, keys, values, attention_mask=enc_attention_mask)
 
-        padding_mask = padding_mask.squeeze().unsqueeze(-1)  # (bs, seq_len, 1)
+        bs, seq_len = enc_att.shape[:2]
+        padding_mask = padding_mask.view(bs, seq_len, 1)
         enc_att = enc_att.masked_fill(padding_mask, value=0)
 
         ff = self.pwff(enc_att)
@@ -72,7 +73,8 @@ class MeshedDecoderLayer(Module):
 
     def forward(self, queries, keys, values, padding_mask=None, self_attention_mask=None, enc_attention_mask=None):    
         self_att = self.self_att(queries, queries, queries, attention_mask=self_attention_mask)
-        padding_mask = padding_mask.squeeze().unsqueeze(-1)  # (bs, seq_len, 1)
+        bs, seq_len = self_att.shape[:2]
+        padding_mask = padding_mask.view(bs, seq_len, 1)
 
         enc_atts = []
         for ith in range(self.N_enc):
@@ -116,9 +118,10 @@ class AdaptiveDecoderLayer(Module):
 
     def forward(self, queries, keys, values, language_signals, padding_mask=None, self_attention_mask=None, enc_attention_mask=None):
         self_att = self.self_attn(queries, queries, queries, attention_mask=self_attention_mask)
-        
         enc_att = self.enc_attn(self_att, keys, values, language_signals=language_signals, attention_mask=enc_attention_mask)
-        padding_mask = padding_mask.squeeze().unsqueeze(-1)  # (bs, seq_len, 1)
+        
+        bs, seq_len = enc_att.shape[:2]
+        padding_mask = padding_mask.view(bs, seq_len, 1)
         enc_att = enc_att.masked_fill(padding_mask, value=0)
 
         ff = self.pwff(enc_att)
@@ -222,7 +225,7 @@ class MeshedDecoder(Module):
             answer_self_attention_masks = self.running_mask_self_attention
 
         seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(answer_tokens.device)  # (b_s, seq_len)
-        seq = seq.masked_fill(answer_padding_masks, 0)
+        seq = seq.masked_fill(answer_padding_masks.squeeze(1).squeeze(1), 0)
         if self._is_stateful:
             self.running_seq.add_(1)
             seq = self.running_seq
@@ -309,7 +312,7 @@ class AdaptiveDecoder(Module):
             answer_self_attention_masks = self.running_mask_self_attention
 
         seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(answer_tokens.device)  # (b_s, seq_len)
-        seq = seq.masked_fill(answer_padding_masks, 0)
+        seq = seq.masked_fill(answer_padding_masks.squeeze(1).squeeze(1), 0)
         if self._is_stateful:
             self.running_seq.add_(1)
             seq = self.running_seq

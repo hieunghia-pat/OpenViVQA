@@ -50,7 +50,6 @@ class DictionaryDataset(data.Dataset):
         for ann in json_data["annotations"]:
             question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
             answer = preprocess_sentence(ann["answer"], self.vocab.tokenizer)
-            answer = " ".join(answer)
             annotations.append({
                 "image_id": ann["image_id"],
                 "filename": filenames[ann["image_id"]],

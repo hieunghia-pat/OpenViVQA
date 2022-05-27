@@ -188,7 +188,7 @@ class Trainer:
                                                     max_len=self.vocab.max_answer_length, eos_idx=self.vocab.eos_idx, 
                                                     beam_size=self.config.training.evaluating_beam_size, out_size=1)
 
-                answers_gt = sample["answers"]
+                answers_gt = [" ".join(answer) for answer in sample["answers"]]
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
@@ -302,7 +302,7 @@ class Trainer:
 
                 # Rewards
                 bs = question_tokens.shape[0]
-                answers_gt = sample["answers"]
+                answers_gt = [" ".join(answer) for answer in sample["answers"]]
                 answers_gen = vocab.decode_answer(outs.contiguous().view(-1, vocab.max_answer_length), join_words=True)
                 answers_gt = list(itertools.chain(*([a, ] * self.config.training.training_beam_size for a in answers_gt)))
                 answers_gen, answers_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [answers_gen, answers_gt])

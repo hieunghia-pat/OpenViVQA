@@ -38,9 +38,9 @@ print("Checking checkpoint directory...")
 if not os.path.isdir(os.path.join(config.training.checkpoint_path, config.model.name)):
     os.makedirs(os.path.join(config.training.checkpoint_path, config.model.name))
 
-print("Creating vocab...")
 # Creating vocabulary and dataset
 if not os.path.isfile(os.path.join(config.training.checkpoint_path, config.model.name, "vocab.pkl")):
+    print("Creating vocab...")
     vocab = Vocab(
                     json_dirs = [
                         config.path.train_json_path,
@@ -53,6 +53,7 @@ if not os.path.isfile(os.path.join(config.training.checkpoint_path, config.model
                 )
     pickle.dump(vocab, open(os.path.join(config.training.checkpoint_path, config.model.name, "vocab.pkl"), "wb"))
 else:
+    print("Loading the vocab...")
     vocab = pickle.load(open(os.path.join(config.training.checkpoint_path, config.model.name, "vocab.pkl"), "rb"))
 
 print("Creating dataset...")
@@ -103,7 +104,7 @@ test_dict_dataset = DictionaryDataset(
 print("Initializing model...")
 model = FusionTransformer(vocab, config).to(device)
 
-print("Defining the trainer...")
+print("Defining the trainers...")
 # Define Trainer
 trainer = Trainer(model=model, train_datasets=(train_dataset, train_dict_dataset), val_datasets=(val_dataset, val_dict_dataset),
                     test_datasets=(test_dataset, test_dict_dataset), vocab=vocab, collate_fn=collate_fn, config=config)

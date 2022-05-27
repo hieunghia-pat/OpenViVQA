@@ -119,6 +119,8 @@ class Vocab(object):
 
     def encode_question(self, question: List[str]) -> torch.Tensor:
         """ Turn a question into a vector of indices and a question length """
+        if isinstance(question, str):
+            question = question.split()
         vec = torch.ones(self.max_question_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + question + [self.eos_token]):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
@@ -127,6 +129,8 @@ class Vocab(object):
 
     def encode_answer(self, answer: List[str]) -> torch.Tensor:
         """ Turn a answer into a vector of indices and a question length """
+        if isinstance(answer, str):
+            answer = answer.split()
         vec = torch.ones(self.max_answer_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + answer + [self.eos_token]):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx

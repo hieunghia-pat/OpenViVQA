@@ -13,12 +13,20 @@ from configs.config import get_default_config
 
 from models.modules.transformer import FusionTransformer
 
+import argparse
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("--config-file", type=str, default="configs/base.yaml")
+
+args = parser.parse_args()
+
 random.seed(13)
 torch.manual_seed(13)
 np.random.seed(13)
 
 config = get_default_config()
-config.merge_from_file("configs/generative_mcan_faster_rcnn.yaml")
+config.merge_from_file(args.config_file)
 
 if not os.path.isdir(os.path.join(config.training.checkpoint_path, config.model.name)):
     os.makedirs(os.path.join(config.training.checkpoint_path, config.model.name))
@@ -52,21 +60,21 @@ print("Creating dataset...")
 train_dataset = FeatureDataset(
                                 json_path = config.path.train_json_path,
                                 image_features_path = config.path.image_features_path,
-                                vocab = None,
+                                vocab = vocab,
                                 tokenizer_name = config.dataset.tokenizer
                             )
 
 val_dataset = FeatureDataset(
                                 json_path = config.path.dev_json_path,
                                 image_features_path = config.path.image_features_path,
-                                vocab = None,
+                                vocab = vocab,
                                 tokenizer_name = config.dataset.tokenizer
                             )
 
 test_dataset = FeatureDataset(
                                 json_path = config.path.test_json_path,
                                 image_features_path = config.path.image_features_path,
-                                vocab = None,
+                                vocab = vocab,
                                 tokenizer_name = config.dataset.tokenizer
                             )
 

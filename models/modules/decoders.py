@@ -36,7 +36,7 @@ class DecoderLayer(Module):
         self_att = self.self_attn(queries, queries, queries, attention_mask=self_attention_mask)
         enc_att = self.enc_attn(self_att, keys, values, attention_mask=enc_attention_mask)
 
-        padding_mask = padding_mask.view(enc_att.shape[:2]).unsqueeze(-1)  # (bs, seq_len, 1)
+        padding_mask = padding_mask.squeeze().unsqueeze(-1)  # (bs, seq_len, 1)
         enc_att = enc_att.masked_fill(padding_mask, value=0)
 
         ff = self.pwff(enc_att)
@@ -72,7 +72,7 @@ class MeshedDecoderLayer(Module):
 
     def forward(self, queries, keys, values, padding_mask=None, self_attention_mask=None, enc_attention_mask=None):    
         self_att = self.self_att(queries, queries, queries, attention_mask=self_attention_mask)
-        padding_mask = padding_mask.view(enc_att.shape[:2]).unsqueeze(-1)  # (bs, seq_len, 1)
+        padding_mask = padding_mask.squeeze().unsqueeze(-1)  # (bs, seq_len, 1)
 
         enc_atts = []
         for ith in range(self.N_enc):
@@ -118,7 +118,7 @@ class AdaptiveDecoderLayer(Module):
         self_att = self.self_attn(queries, queries, queries, attention_mask=self_attention_mask)
         
         enc_att = self.enc_attn(self_att, keys, values, language_signals=language_signals, attention_mask=enc_attention_mask)
-        padding_mask = padding_mask.view(enc_att.shape[:2]).unsqueeze(-1)  # (bs, seq_len, 1)
+        padding_mask = padding_mask.squeeze().unsqueeze(-1)  # (bs, seq_len, 1)
         enc_att = enc_att.masked_fill(padding_mask, value=0)
 
         ff = self.pwff(enc_att)

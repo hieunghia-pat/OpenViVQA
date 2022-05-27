@@ -90,8 +90,10 @@ class DictionaryDataset(data.Dataset):
         image_id = item["image_id"]
         filename = item["filename"]
         region_features, grid_features, region_boxes, grid_boxes = self.load_feature(image_id)
-        question = self.vocab.encode_question(item["question"])
+        question = item["question"]
+        question_tokens = self.vocab.encode_question(question)
         answer = item["answer"]
+        answer_tokens = self.vocab.encode_answer(answer)
 
         result_dict = {
             "image_id": image_id, 
@@ -100,7 +102,9 @@ class DictionaryDataset(data.Dataset):
             "grid_features": grid_features,
             "region_boxes": region_boxes,
             "grid_boxes": grid_boxes, 
-            "question_tokens": question,
+            "question_tokens": question_tokens,
+            "answer_tokens": answer_tokens,
+            "question": question,
             "answer": answer
         }
 
@@ -242,12 +246,14 @@ class FeatureDataset(data.Dataset):
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
-        question = self.vocab.encode_question(item["question"])
-        answer = self.vocab.encode_answer(item["answer"])
+        question = item["question"]
+        answer = item["answer"]
+        question_tokens = self.vocab.encode_question(item["question"])
+        answer_tokens = self.vocab.encode_answer(item["answer"])
 
-        shifted_right_answer = torch.zeros_like(answer).fill_(self.vocab.padding_idx)
-        shifted_right_answer[:-1] = answer[1:]
-        answer = torch.where(answer == self.vocab.eos_idx, self.vocab.padding_idx, answer) # remove eos_token in answer
+        shifted_right_answer_tokens = torch.zeros_like(answer_tokens).fill_(self.vocab.padding_idx)
+        shifted_right_answer_tokens[:-1] = answer_tokens[1:]
+        answer_tokens = torch.where(answer_tokens == self.vocab.eos_idx, self.vocab.padding_idx, answer_tokens) # remove eos_token in answer
         region_features, grid_features, region_boxes, grid_boxes = self.load_feature(self.annotations[idx]["image_id"])
 
         result_dict = {
@@ -255,9 +261,11 @@ class FeatureDataset(data.Dataset):
             "grid_features": grid_features,
             "region_boxes": region_boxes,
             "grid_boxes": grid_boxes,
-            "question_tokens": question,
-            "answer_tokens": answer,
-            "shifted_right_answer_tokens": shifted_right_answer
+            "question": question,
+            "answer": answer,
+            "question_tokens": question_tokens,
+            "answer_tokens": answer_tokens,
+            "shifted_right_answer_tokens": shifted_right_answer_tokens
         }
 
         returning_dict = defaultdict(default_value)

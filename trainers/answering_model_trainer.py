@@ -1,3 +1,4 @@
+from cv2 import getRotationMatrix2D
 from torch.nn import NLLLoss
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
@@ -463,24 +464,54 @@ class Trainer:
             for it, sample in enumerate(dataset):
                 image_id = sample["image_id"]
                 filename = sample["filename"]
-                features = torch.tensor(sample["features"]).unsqueeze(0).to(device)
-                boxes = sample["boxes"]
-                if boxes is not None:
-                    boxes = torch.tensor(boxes).unsqueeze(0).to(device)
-                grid_sizes = [sample["grid_size"]]
-                caps_gt = [sample["captions"]]
+
+                region_features = sample["region_features"]
+                if region_features is not None:
+                    region_features = torch.tensor(region_features).unsqueeze(0).to(device)
+
+                grid_features = sample["grid_features"]
+                if grid_features is not None:
+                    grid_features = torch.tensor(grid_features).unsqueeze(0).to(device)
+
+                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
+
+                region_boxes = sample["region_boxes"]
+                if region_boxes is not None:
+                    region_boxes = torch.tensor(region_boxes).unsqueeze(0).to(device)
+
+                grid_boxes = sample["grid_boxes"]
+                if grid_boxes is not None:
+                    grid_boxes = torch.tensor(grid_boxes).unsqueeze(0).to(device)
+
+                visual = Feature({
+                        "region_features": region_features,
+                        "grid_features": grid_features,
+                        "region_boxes": region_boxes,
+                        "grid_boxes": grid_boxes,
+                        "features": region_features if region_features is not None else grid_features,
+                        "boxes": region_boxes if region_boxes is not None else grid_boxes
+                    })
+
+                question_tokens = sample["question_tokens"].unsqueeze(0).to(device)
+
+                linguistic = Feature({
+                    "question_tokens": question_tokens
+                })
+
                 with torch.no_grad():
-                    out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, 
-                                                        max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                        beam_size=self.config.training.evaluating_beam_size, out_size=1)
-                caps_gen = self.vocab.decode_answer(out, join_words=False)
-                gts = {}
+                    outs, _ = self.model.beam_search(visual, linguistic, 
+                                                    max_len=self.vocab.max_answer_length, eos_idx=self.vocab.eos_idx, 
+                                                    beam_size=self.config.training.evaluating_beam_size, out_size=1)
+
+                answers_gt = " ".join(sample["answer"])
+                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
                 gens = {}
-                for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
+                gts = {}
+                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
-                    
+                
                 gts = evaluation.PTBTokenizer.tokenize(gts)
                 gens = evaluation.PTBTokenizer.tokenize(gens)
                 if get_scores:
@@ -495,21 +526,7 @@ class Trainer:
                     "gts": gts,
                     "scores": scores
                 })
-
+                
                 pbar.update()
 
         return results
-
-    def convert_results(self, sample_submisison_json, results, split="public"):
-        sample_json_data = json.load(open(sample_submisison_json))
-        for sample_item in tqdm(sample_json_data, desc="Converting results: "):
-            for item in results:
-                if sample_item["id"] == item["filename"]:
-                    generated_captions = list(item["gens"].values())
-                    sample_item["captions"] = generated_captions[0][0]
-                    break
-
-        json.dump(sample_json_data, open(os.path.join(self.config.training.checkpoint_path, 
-                                                        self.config.model.name, 
-                                                        f"{split}_results.json"), "w+"), 
-                                        ensure_ascii=False)

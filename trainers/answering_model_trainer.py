@@ -194,7 +194,7 @@ class Trainer:
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gen['%d_%d' % (it, i)] = [gen_i, ]
-                    gts['%d_%d' % (it, i)] = gts_i
+                    gts['%d_%d' % (it, i)] = [gts_i, ]
                 pbar.update()
 
         gts = evaluation.PTBTokenizer.tokenize(gts)
@@ -303,7 +303,7 @@ class Trainer:
 
                 # Rewards
                 bs = question_tokens.shape[0]
-                answers_gt = [" ".join(answer) for answer in sample["answers"]]
+                answers_gt = [[" ".join(answer)] for answer in sample["answers"]]
                 answers_gen = vocab.decode_answer(outs.contiguous().view(-1, vocab.max_answer_length), join_words=True)
                 answers_gt = list(itertools.chain(*([a, ] * self.config.training.training_beam_size for a in answers_gt)))
                 answers_gen, answers_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [answers_gen, answers_gt])

@@ -77,8 +77,6 @@ class BeamSearch(object):
             for t in range(self.max_len):
                 visual, linguistic, outputs = self.iter(t, visual, linguistic, outputs, return_probs, **kwargs)
 
-            raise
-
         # Sort result
         seq_logprob, sort_idxs = torch.sort(self.seq_logprob, 1, descending=True)
         outputs = torch.cat(outputs, -1)

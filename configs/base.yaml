@@ -9,7 +9,6 @@ path:
 # configuration for training
 training:
   checkpoint_path: saved_models
-  start_from: None
   learning_rate: 1.
   warmup: 10000
   get_scores: False

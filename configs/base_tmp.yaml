@@ -9,18 +9,17 @@ path:
 # configuration for training
 training:
   checkpoint_path: saved_models
-  start_from: None
   learning_rate: 1.
   warmup: 10000
   get_scores: False
-  training_beam_size: 1
-  evaluating_beam_size: 1
+  training_beam_size: 5
+  evaluating_beam_size: 5
 
 # model configuration
 model:
-  name: modified_mcan_using_region_faster_rcnn
+  name: modified_mcan_using_region_faster_rcnn_2_layers
   nhead: 8
-  nlayers: 3
+  nlayers: 2
   d_model: 512
   d_k: 64
   d_v: 64
@@ -99,8 +98,8 @@ model:
 
 # dataset configuration
 dataset:
-  batch_size: 1
-  workers: 1
+  batch_size: 32
+  workers: 2
 
   # vncorenlp
   # pyvi

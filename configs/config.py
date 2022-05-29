@@ -13,7 +13,6 @@ config.path.images_path = None
 ## configuration for training
 config.training = CfgNode()
 config.training.checkpoint_path = "saved_models"
-config.training.start_from = None
 config.training.learning_rate = 1.
 config.training.warmup = 10000
 config.training.get_scores = False

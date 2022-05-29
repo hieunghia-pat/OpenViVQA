@@ -18,6 +18,7 @@ import argparse
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--config-file", type=str, default="configs/base.yaml")
+parser.add_argument("--start-from", default=None, type=str)
 
 args = parser.parse_args()
 
@@ -110,12 +111,12 @@ trainer = Trainer(model=model, train_datasets=(train_dataset, train_dict_dataset
                     test_datasets=(test_dataset, test_dict_dataset), vocab=vocab, collate_fn=collate_fn, config=config)
 
 # Training
-if config.training.start_from:
-    trainer.train(os.path.join(config.training.checkpoint_path, config.model.name, config.training.start_from))
+if args.start_from:
+    trainer.train(os.path.join(config.training.checkpoint_path, config.model.name, args.start_from))
 else:
     trainer.train()
 
 results = trainer.get_predictions(test_dict_dataset,
-                                    checkpoint_filename=os.path.join(config.training.checkpoint_path, config.model.name, config.training.start_from),
+                                    checkpoint_filename=os.path.join(config.training.checkpoint_path, config.model.name, "best_model.pth"),
                                     get_scores=config.training.get_scores)
-json.dump(results, open(os.path.join(config.checkpoint_path, config.model_name, "test_results.json"), "w+"), ensure_ascii=False)
+json.dump(results, open(os.path.join(config.training.checkpoint_path, config.model.name, "test_results.json"), "w+"), ensure_ascii=False)

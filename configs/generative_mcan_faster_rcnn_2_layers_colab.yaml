@@ -9,7 +9,6 @@ path:
 # configuration for training
 training:
   checkpoint_path: /content/gdrive/MyDrive/OpenViVQA/saved_models
-  start_from: None
   learning_rate: 1.
   warmup: 10000
   get_scores: False
@@ -18,7 +17,7 @@ training:
 
 # model configuration
 model:
-  name: modified_mcan_using_region_faster_rcnn
+  name: modified_mcan_using_region_faster_rcnn_2_layers
   nhead: 8
   nlayers: 2
   d_model: 512

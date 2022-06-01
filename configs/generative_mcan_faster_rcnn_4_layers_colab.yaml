@@ -17,7 +17,7 @@ training:
 
 # model configuration
 model:
-  name: modified_mcan_using_region_faster_rcnn_3_layers
+  name: modified_mcan_using_region_faster_rcnn_4_layers
   nhead: 8
   nlayers: 4
   d_model: 512

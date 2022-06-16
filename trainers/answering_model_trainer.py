@@ -504,7 +504,7 @@ class Trainer:
                                                     max_len=self.vocab.max_answer_length, eos_idx=self.vocab.eos_idx, 
                                                     beam_size=self.config.training.evaluating_beam_size, out_size=1)
 
-                answers_gt = [" ".join(answer) for answer in sample["answer"]]
+                answers_gt = [" ".join(sample["answer"])]
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
                 gts = {}
                 gens = {}

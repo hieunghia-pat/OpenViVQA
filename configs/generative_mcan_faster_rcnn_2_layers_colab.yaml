@@ -1,14 +1,14 @@
 # configuration for paths
 path:
-  train_json_path: features/annotations/OpenViVQA/openvivqa_train.json
-  dev_json_path: features/annotations/OpenViVQA/openvivqa_dev.json
-  test_json_path: features/annotations/OpenViVQA/openvivqa_test.json
-  image_features_path: features/region_features/OpenViVQA/faster_rcnn
+  train_json_path: annotations/openvivqa_train.json
+  dev_json_path: annotations/openvivqa_dev.json
+  test_json_path: annotations/openvivqa_test.json
+  image_features_path: features/faster_rcnn
   images_path: None
 
 # configuration for training
 training:
-  checkpoint_path: saved_models
+  checkpoint_path: /content/gdrive/MyDrive/OpenViVQA/saved_models
   learning_rate: 1.
   warmup: 10000
   get_scores: False

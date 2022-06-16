@@ -1,4 +1,3 @@
-from cv2 import getRotationMatrix2D
 from torch.nn import NLLLoss
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
@@ -457,6 +456,8 @@ class Trainer:
     def get_predictions(self, dataset: DictionaryDataset, checkpoint_filename: str=None, get_scores=True):
         if checkpoint_filename is not None and os.path.isfile(checkpoint_filename):
             self.load_checkpoint(checkpoint_filename)
+        else:
+            raise Exception("Checkpoint file name is not found")
             
         self.model.eval()
         results = []
@@ -503,14 +504,14 @@ class Trainer:
                                                     max_len=self.vocab.max_answer_length, eos_idx=self.vocab.eos_idx, 
                                                     beam_size=self.config.training.evaluating_beam_size, out_size=1)
 
-                answers_gt = " ".join(sample["answer"])
+                answers_gt = [" ".join(answer) for answer in sample["answer"]]
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
-                gens = {}
                 gts = {}
+                gens = {}
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
-                    gts['%d_%d' % (it, i)] = gts_i
+                    gts['%d_%d' % (it, i)] = [gts_i, ]
                 
                 gts = evaluation.PTBTokenizer.tokenize(gts)
                 gens = evaluation.PTBTokenizer.tokenize(gens)

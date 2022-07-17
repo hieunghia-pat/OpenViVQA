@@ -1,9 +1,8 @@
 import torch
-from data_utils.mapping import Mapping
 
 from data_utils.vector import Vectors
 from data_utils.vector import pretrained_aliases
-from data_utils.utils import get_tokenizer, preprocess_sentence, unk_init
+from data_utils.utils import preprocess_sentence, unk_init
 
 from transformers import AutoTokenizer
 
@@ -24,7 +23,7 @@ class Vocab(object):
             numerical identifiers.
         itos: A list of token strings indexed by their numerical identifiers.
     """
-    def __init__(self, json_dirs, max_size=None, min_freq=1, bos_token="<bos>", eos_token="<eos>", padding_token="<pad>", unk_token="<unk>",
+    def __init__(self, json_dirs, max_size=None, min_freq=1,
                  pretrained_language_model_name=None, vectors=None, 
                  unk_init=unk_init, vectors_cache=None, tokenizer_name: Union[str, None]=None):
         """Create a Vocab object from a collections.Counter.
@@ -44,58 +43,74 @@ class Vocab(object):
             vectors_cache: directory for cached vectors. Default: '.vector_cache'
         """
 
-        self.tokenizer = get_tokenizer(tokenizer_name)
-
-        if pretrained_language_model_name is not None: # use special tokens from pretrained language model
-            token_encoder = AutoTokenizer.from_pretrained(pretrained_language_model_name)
-            self.padding_token = token_encoder.pad_token
-            self.bos_token = token_encoder.bos_token
-            self.eos_token = token_encoder.eos_token
-            self.unk_token = token_encoder.unk_token
-        else: # use defined special tokens
-            self.padding_token = padding_token
-            self.bos_token = bos_token
-            self.eos_token = eos_token
-            self.unk_token = unk_token
+        self.tokenizer = tokenizer_name
+        max_size = None if max_size is None else max_size + len(self.itos)
 
         self.make_vocab(json_dirs)
         counter = self.freqs.copy()
     
         min_freq = max(min_freq, 1)
 
-        specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
-        self.itos = specials
-        # frequencies of special tokens are not counted when building vocabulary
-        # in frequency order
-        for tok in specials:
-            del counter[tok]
-
-        max_size = None if max_size is None else max_size + len(self.itos)
-
         # sort by frequency, then alphabetically
         words_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
         words_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
 
-        for word, freq in words_and_frequencies:
-            if freq < min_freq or len(self.itos) == max_size:
-                break
-            self.itos.append(word)
+        if pretrained_language_model_name is not None:
+            # get vocab from the pretrained language model
+            self.itos = defaultdict()
+            token_encoder = AutoTokenizer.from_pretrained(pretrained_language_model_name)
+            
+            # get special tokens
+            self.padding_token = token_encoder.pad_token
+            self.bos_token = token_encoder.bos_token
+            self.eos_token = token_encoder.eos_token
+            self.unk_token = token_encoder.unk_token
+            token_encoder.add_special_tokens({
+                "img_token": "<img>",
+                "box_token": "<box>",
+                "ocr_token": "<ocr>",
+                "question_token": "<question>"
+            })
+            self.stoi = token_encoder.get_vocab()
+            self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token, 
+                                self.box_token, self.ocr_token, self.question_token]
+            # stoi is simply a reverse dict for itos
+            self.itos = {i: tok for tok, i in self.stoi.items()}
+        else:
+            self.padding_token = "<pad>"
+            self.bos_token = "<bos>"
+            self.eos_token = "<eos>"
+            self.unk_token = "<unk>"
+            self.img_token = "<img>"
+            self.box_token = "<box>"
+            self.ocr_token = "<ocr>"
+            self.question_token = "<question>"
+            self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token, 
+                                self.box_token, self.ocr_token, self.question_token]
+            itos = self.specials
+            # frequencies of special tokens are not counted when building vocabulary
+            # in frequency order
+            for tok in self.specials:
+                del counter[tok]
 
-        self.stoi = defaultdict()
-        # stoi is simply a reverse dict for itos
-        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
+            for word, freq in words_and_frequencies:
+                if freq < min_freq or len(itos) == max_size:
+                    break
+                itos.append(word)
+            self.itos = {i: tok for i, tok in enumerate(itos)}
+
+            self.stoi = defaultdict()
+            # stoi is simply a reverse dict for itos
+            self.stoi.update({tok: i for i, tok in self.itos.items()})
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
         self.eos_idx = self.stoi[self.eos_token]
         self.unk_idx = self.stoi[self.unk_token]
-
-        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
-
-        if pretrained_language_model_name is not None:
-            self.mapping = Mapping(pretrained_language_model_name, self.stoi)
-        else:
-            self.mapping = None
+        self.img_idx = self.stoi[self.img_token]
+        self.box_idx = self.stoi[self.box_token]
+        self.ocr_idx = self.stoi[self.ocr_token]
+        self.question_idx = self.stoi[self.question_token]
 
         self.vectors = None
         if vectors is not None:
@@ -153,7 +168,13 @@ class Vocab(object):
         '''
         answers = []
         for vec in answer_vecs:
-            answer = " ".join([self.itos[idx] for idx in vec.tolist() if self.itos[idx] not in self.specials])
+            words = []
+            for idx in vec.tolist():
+                if self.itos[idx] not in self.specials:
+                    words.append(self.itos[idx])
+                if idx == self.eos_idx:
+                    break
+            answer = " ".join(words)
             if join_words:
                 answers.append(answer)
             else:

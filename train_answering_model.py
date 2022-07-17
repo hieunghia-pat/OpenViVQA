@@ -11,7 +11,7 @@ from data_utils.dataset import FeatureDataset, DictionaryDataset
 from data_utils.utils import collate_fn
 from configs.config import get_default_config
 
-from models.modules.transformer import FusionTransformer
+from models.transformers import FusionTransformer
 
 import argparse
 

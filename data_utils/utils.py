@@ -1,12 +1,9 @@
 import torch
 from torchvision import transforms
 import re
-from typing import Callable
 
-def get_tokenizer(tokenizer):
-    if callable(tokenizer):
-        return tokenizer
-    elif tokenizer is None:
+def get_tokenizer(tokenizer: str):
+    if tokenizer is None:
         return lambda s: s 
     elif tokenizer == "pyvi":
         try:
@@ -47,7 +44,7 @@ def get_tokenizer(tokenizer):
                   "See the docs at https://github.com/vncorenlp/VnCoreNLP for more information.")
             raise
 
-def preprocess_sentence(sentence, tokenizer: Callable):
+def preprocess_sentence(sentence, tokenizer: str):
     sentence = re.sub(r"[“”]", "\"", sentence)
     sentence = re.sub(r"!", " ! ", sentence)
     sentence = re.sub(r"\?", " ? ", sentence)
@@ -67,7 +64,7 @@ def preprocess_sentence(sentence, tokenizer: Callable):
     sentence = re.sub(r"\&", " & ", sentence)
     sentence = re.sub(r"\*", " * ", sentence)
     # tokenize the sentence
-    sentence = tokenizer(sentence)
+    sentence = get_tokenizer(tokenizer)(sentence)
     sentence = " ".join(sentence.strip().split()) # remove duplicated spaces
     tokens = sentence.strip().split()
     

@@ -1,5 +1,5 @@
 from models.modules.attentions import *
-from models.modules.language_models import *
+from models.language_models import *
 from models.modules.encoders import *
 from models.modules.decoders import *
 from models.modules.embeddings import *

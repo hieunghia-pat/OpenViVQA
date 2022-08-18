@@ -1,0 +1,77 @@
+# configuration for paths
+path:
+  train_json_path: features/annotations/ViVQA/vivqa_train.json
+  dev_json_path: features/annotations/ViVQA/vivqa_dev.json
+  test_json_path: features/annotations/ViVQA/vivqa_test.json
+  image_features_path: features/ViVQA/vinvl_vinvl
+  images_path: null
+
+# configuration for training
+training:
+  checkpoint_path: saved_models
+  learning_rate: 1.
+  warmup: 10000
+  get_scores: False
+
+# model configuration
+model:
+  name: mcan
+  nhead: 8
+  nlayers: 3
+  d_model: 512
+  d_k: 64
+  d_v: 64
+  d_ff: 2048
+  d_feature: 2048
+  dropout: .1
+
+  pretrained_language_model: null # phobert-base
+                                  # phobert-large
+                                  # bert-base
+                                  # bert-large
+
+  language_model_hidden_size: 768
+
+  visual_embedding:
+    module: visual-embedding
+    args: null
+
+  linguistic_embedding:
+    module: lstm-embedding  # standard-embedding
+                            # lstm-embedding
+                            # pretrained-language-model-embedding
+                            # transfer-embedding
+
+  visual_encoder:
+    module: encoder # encoder
+                    # augmented-memory-encoder
+                    # augmented-geometry-encoder
+                    # dlct-encoder
+    args:
+      use_aoa: False
+
+  linguistic_encoder:
+    module: encoder  # encoder
+                      # augmented-memory-encoder
+                      # augmented-geometry-encoder
+                      # dlct-encoder
+    args:
+      use_aoa: False
+
+# dataset configuration
+dataset:
+  batch_size: 32
+  workers: 2
+
+  tokenizer: null # vncorenlp
+                  # pyvi
+                  # spacy
+                  # null
+
+  word_embedding: null  # fasttext.vi.300d
+                        # phow2v.syllable.100d
+                        # phow2v.syllable.300d
+                        # phow2v.word.100d
+                        # phow2v.word.300d
+                        # null
+  min_freq: 1

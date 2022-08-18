@@ -4,11 +4,9 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from data_utils.vocab import Vocab
 from data_utils.utils import *
-from models.transformers import FusionTransformer
 from data_utils.dataset import *
 import evaluation
 from evaluation import Cider, PTBTokenizer
-from data_utils.feature import Feature
 
 import multiprocessing
 from tqdm import tqdm
@@ -21,13 +19,13 @@ from yacs.config import CfgNode
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class Trainer:
-    def __init__(self,  model: FusionTransformer, 
+    def __init__(self,  model, 
                         train_datasets: Tuple[FeatureDataset, DictionaryDataset],
                         val_datasets: Tuple[FeatureDataset, DictionaryDataset],
                         test_datasets: Tuple[Union[FeatureDataset, None], Union[DictionaryDataset, None]],
                         vocab: Vocab,
                         config: CfgNode,
-                        collate_fn=collate_fn):
+                        collate_fn):
         self.model = model
         self.vocab = vocab
         self.config = config

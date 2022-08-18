@@ -3,7 +3,6 @@ from torch.utils import data
 
 from data_utils.utils import preprocess_sentence, default_value
 from data_utils.vocab import ClassificationVocab, Vocab
-from models.utils import get_grids_position
 
 import json
 import os
@@ -75,12 +74,8 @@ class DictionaryDataset(data.Dataset):
 
         region_features = feature["region_features"]
         grid_feature = feature["grid_features"]
-        region_boxes = feature["boxes"]
-        grid_size = feature["grid_size"]
-        if grid_size is not None:
-            grid_boxes = get_grids_position(grid_size)
-        else:
-            grid_boxes = None
+        region_boxes = feature["region_boxes"]
+        grid_boxes = feature["grid_boxes"]
 
         return region_features, grid_feature, region_boxes, grid_boxes
 
@@ -234,12 +229,8 @@ class FeatureDataset(data.Dataset):
 
         region_features = feature["region_features"]
         grid_feature = feature["grid_features"]
-        region_boxes = feature["boxes"]
-        grid_size = feature["grid_size"]
-        if grid_size is not None:
-            grid_boxes = get_grids_position(grid_size)
-        else:
-            grid_boxes = None
+        region_boxes = feature["region_boxes"]
+        grid_boxes = feature["grid_boxes"]
 
         return region_features, grid_feature, region_boxes, grid_boxes
 
@@ -282,23 +273,38 @@ class FeatureClassificationDataset(FeatureDataset):
     def __init__(self, json_path: str, image_features_path: str, vocab: ClassificationVocab = None, tokenizer_name: Union[str, None] = None) -> None:
         super(FeatureClassificationDataset, self).__init__(json_path, image_features_path, vocab, tokenizer_name)
 
+    def load_json(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    annotation = {
+                        "question": preprocess_sentence(ann["question"], self.vocab.tokenizer),
+                        "answer": "_".join(preprocess_sentence(ann["answer"], self.vocab.tokenizer)),
+                        "image_id": ann["image_id"]
+                    }
+                    break
+
+            annotations.append(annotation)
+
+        return annotations
+
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
         question = self.vocab.encode_question(item["question"])
         answer = self.vocab.encode_answer(item["answer"])
-        shifted_right_answer = torch.zeros_like(answer).fill_(self.vocab.padding_idx)
-        shifted_right_answer[:-1] = answer[1:]
-        answer = torch.where(shifted_right_answer == self.vocab.eos_idx, self.vocab.padding_idx, answer) # remove eos_token in answer
-        region_features, grid_features, boxes, grid_size = self.load_feature(self.annotations[idx]["image_id"])
+        image_id = self.annotations[idx]["image_id"]
+        region_features, grid_features, region_boxes, grid_boxes = self.load_feature(image_id)
 
         result_dict = {
+            "image_id": image_id,
             "region_features": region_features,
             "grid_features": grid_features,
-            "boxes": boxes,
-            "grid_size": grid_size,
-            "question_tokens": question,
-            "answer_tokens": answer,
-            "shifted_right_answer_tokens": shifted_right_answer
+            "region_boxes": region_boxes,
+            "grid_boxes": grid_boxes,
+            "question": question,
+            "answer": answer
         }
 
         returning_dict = defaultdict()

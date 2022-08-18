@@ -1,9 +1,9 @@
 from models.modules.containers import Module
 from models.modules.beam_search import BeamSearch
 
-class AnsweringModel(Module):
+class GenerationModel(Module):
     def __init__(self):
-        super(AnsweringModel, self).__init__()
+        super(GenerationModel, self).__init__()
 
     def init_weights(self):
         raise NotImplementedError

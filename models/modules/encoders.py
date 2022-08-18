@@ -8,11 +8,12 @@ from models.modules.embeddings import SinusoidPositionalEmbedding
 
 class EncoderLayer(nn.Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
-                 use_aoa=False, attention_module=None, **attention_module_kwargs):
+                    can_be_stateful=False, use_aoa=False, attention_module=None, **attention_module_kwargs):
         super(EncoderLayer, self).__init__()
         self.identity_map_reordering = identity_map_reordering
         self.mhatt = MultiHeadAttention(d_model, d_k, d_v, h, dropout, identity_map_reordering=identity_map_reordering,
                                         use_aoa=use_aoa,
+                                        can_be_stateful=can_be_stateful,
                                         attention_module=attention_module,
                                         **attention_module_kwargs)
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
@@ -24,77 +25,6 @@ class EncoderLayer(nn.Module):
             ff = ff.masked_fill(padding_mask, value=0)
 
         return ff
-
-class GuidedEncoderLayer(nn.Module):
-    def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
-                 use_aoa=False, self_attention_module=None, self_attention_module_kwargs=None,
-                 guided_attention_module=None, guided_attention_module_kwargs=None, **kwargs):
-        super(GuidedEncoderLayer, self).__init__()
-        self.identity_map_reordering = identity_map_reordering
-        self.self_mhatt = MultiHeadAttention(d_model, d_k, d_v, h, dropout, identity_map_reordering=identity_map_reordering,
-                                        use_aoa=use_aoa,
-                                        attention_module=self_attention_module,
-                                        attention_module_kwargs=self_attention_module_kwargs)
-        self.guided_mhatt = MultiHeadAttention(d_model, d_k, d_v, h, dropout, identity_map_reordering=identity_map_reordering,
-                                        use_aoa=use_aoa,
-                                        attention_module=guided_attention_module,
-                                        attention_module_kwargs=guided_attention_module_kwargs)
-        self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
-
-    def forward(self, queries, keys, values, boxes=None,
-                self_attention_mask=None, guided_attention_mask=None):
-
-        self_att = self.self_mhatt(queries, queries, queries, boxes=boxes,
-                                    attention_mask=self_attention_mask)
-        guided_att = self.guided_mhatt(self_att, keys, values, boxes=boxes,
-                                    attention_mask=guided_attention_mask)
-
-        ff = self.pwff(guided_att)
-        ff = ff.masked_fill(self_attention_mask.squeeze().unsqueeze(-1), value=0)
-
-        return ff
-
-class GuidedEncoder(nn.Module):
-    def __init__(self, N, padding_idx, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, 
-                    dropout=.1, identity_map_reordering=False, use_aoa=False,
-                    self_attention_module=None, self_attention_module_kwargs=None,
-                    guided_attention_module=None, guided_attention_module_kwargs=None, **kwargs):
-        super(GuidedEncoder, self).__init__()
-
-        self.padding_idx = padding_idx
-
-        self.pos_embedding = SinusoidPositionalEmbedding(d_model, normalize=True)
-        self.box_embedding = nn.Linear(in_features=4, out_features=d_model)
-
-        self.layer_norm = nn.LayerNorm(d_model)
-
-        self.d_model = d_model
-        self.layers = nn.ModuleList([GuidedEncoderLayer(d_model, d_k, d_v, h, d_ff, dropout,
-                                                  identity_map_reordering=identity_map_reordering,
-                                                  use_aoa=use_aoa,
-                                                  self_attention_module=self_attention_module,
-                                                  self_attention_module_kwargs=self_attention_module_kwargs,
-                                                  guided_attention_module=guided_attention_module,
-                                                  guided_attention_module_kwargs=guided_attention_module_kwargs)
-                                     for _ in range(N)])
-
-    def forward(self, visual_features, linguistic_features):
-        visual_feature_padding_masks = generate_padding_mask(visual_features, padding_idx=0)
-        visual_feature_pos_embeddings = self.pos_embedding(visual_features)
-
-        linguistic_feature_padding_masks = generate_padding_mask(linguistic_features, padding_idx=self.padding_idx)
-        linguistic_feature_pos_embeddings = self.pos_embedding(linguistic_features)
-
-        visual_features = self.layer_norm(visual_features)
-        linguistic_features = self.layer_norm(linguistic_features)
-        visual_features = visual_features + visual_feature_pos_embeddings
-        linguistic_features = linguistic_features + linguistic_feature_pos_embeddings
-        for layer in self.layers:
-            visual_features = visual_features + visual_feature_pos_embeddings
-            visual_features = layer(visual_features, linguistic_features, linguistic_features,
-                            self_attention_mask=visual_feature_padding_masks, guided_attention_mask=linguistic_feature_padding_masks)
-
-        return visual_features
 
 class Encoder(nn.Module):
     def __init__(self, N, padding_idx, d_in, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, multi_level_output=False,
@@ -411,7 +341,6 @@ class DualCollaborativeLevelEncoder(nn.Module):
 
 Encoders = {
     "encoder": Encoder,
-    "guided-encoder": GuidedEncoder,
     "augmented-memory-encoder": AugmentedMemoryEncoder,
     "augmented-geometry-encoder": AugmentedGeometryEncoder,
     "dlct-encoder": DualCollaborativeLevelEncoder

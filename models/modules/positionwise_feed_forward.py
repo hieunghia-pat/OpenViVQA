@@ -19,10 +19,10 @@ class PositionWiseFeedForward(nn.Module):
     def forward(self, input) -> torch.Tensor:
         if self.identity_map_reordering:
             out = self.layer_norm(input)
-            out = self.fc2(self.dropout_2(F.relu(self.fc1(out))))
-            out = input + self.dropout(torch.relu(out))
+            out = self.fc2(self.dropout_2(F.gelu(self.fc1(out))))
+            out = input + self.dropout(torch.gelu(out))
         else:
-            out = self.fc2(self.dropout_2(F.relu(self.fc1(input))))
+            out = self.fc2(self.dropout_2(F.gelu(self.fc1(input))))
             out = self.dropout(out)
             out = self.layer_norm(input + out)
         return out

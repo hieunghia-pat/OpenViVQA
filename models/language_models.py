@@ -3,13 +3,12 @@ import torch.nn as nn
 from torch.nn import functional as F
 from transformers import BertModel, RobertaModel
 
-from data_utils.vocab import Vocab
 from models.modules.encoders import EncoderLayer
 from models.utils import generate_sequential_mask, sinusoid_encoding_table, generate_padding_mask
 from models.modules.containers import Module
 
 class BERTModel(Module):
-    def __init__(self, vocab: Vocab, pretrained_language_model_name, language_model_hidden_size=768,
+    def __init__(self, vocab, pretrained_language_model_name, language_model_hidden_size=768,
                     d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, max_len=54, dropout=.1):
         super(BERTModel, self).__init__()
         self.padding_idx = vocab.padding_idx
@@ -61,7 +60,7 @@ class BERTModel(Module):
         return out, language_feature
 
 class PhoBERTModel(Module):
-    def __init__(self, vocab: Vocab, pretrained_language_model_name, language_model_hidden_size=768,
+    def __init__(self, vocab, pretrained_language_model_name, language_model_hidden_size=768,
                     d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, max_len=54, dropout=.1):
         super(PhoBERTModel, self).__init__()
         self.vocab = vocab
@@ -116,18 +115,15 @@ class PhoBERTModel(Module):
         out = F.log_softmax(logits, dim=-1)
         return out, language_feature
 
-Pretrained_language_models = {
+Language_models = {
     "bert-base": BERTModel,
     "bert-large": BERTModel,
     "phobert-base": PhoBERTModel,
     "phobert-large": PhoBERTModel
 }
 
-def get_pretrained_language_model(model: str):
-    return Pretrained_language_models[model]
-
 def get_language_model(vocab, config):
-    language_model = Pretrained_language_models[config.model.transformer.decoder.args.pretrained_language_model]
+    language_model = Language_models[config.model.transformer.decoder.args.pretrained_language_model]
     return language_model(vocab, config.model.transformer.decoder.args.pretrained_language_model_name,
                             language_model_hidden_size=config.model.transformer.decoder.args.language_model_hidden_size,
                             d_model=config.model.d_model, d_k=config.model.d_k, d_v=config.model.d_v, h=config.model.nhead,

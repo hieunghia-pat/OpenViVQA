@@ -7,12 +7,14 @@ from data_utils.utils import preprocess_sentence, unk_init
 from transformers import AutoTokenizer
 
 from collections import defaultdict, Counter
-import logging
 import six
 import json
 from typing import List, Union
 
-logger = logging.getLogger(__name__)
+Pretrained_language_model_names = {
+    "phobert-base": "vinai/phobert-base",
+    "phobert-large": "vinai/phobert-large"
+}
 
 class Vocab(object):
     """Defines a vocabulary object that will be used to numericalize a field.
@@ -24,7 +26,7 @@ class Vocab(object):
         itos: A list of token strings indexed by their numerical identifiers.
     """
     def __init__(self, json_dirs, max_size=None, min_freq=1,
-                 pretrained_language_model_name=None, vectors=None, 
+                 pretrained_language_model=None, vectors=None, 
                  unk_init=unk_init, vectors_cache=None, tokenizer_name: Union[str, None]=None):
         """Create a Vocab object from a collections.Counter.
         Arguments:
@@ -55,9 +57,10 @@ class Vocab(object):
         words_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
         words_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
 
-        if pretrained_language_model_name is not None:
+        if pretrained_language_model is not None:
             # get vocab from the pretrained language model
             self.itos = defaultdict()
+            pretrained_language_model_name = Pretrained_language_model_names[pretrained_language_model]
             token_encoder = AutoTokenizer.from_pretrained(pretrained_language_model_name)
             
             # get special tokens
@@ -69,11 +72,12 @@ class Vocab(object):
                 "img_token": "<img>",
                 "box_token": "<box>",
                 "ocr_token": "<ocr>",
-                "question_token": "<question>"
+                "question_token": "<question>",
+                "answer_token": "<answer>"
             })
             self.stoi = token_encoder.get_vocab()
             self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token, 
-                                self.box_token, self.ocr_token, self.question_token]
+                                self.box_token, self.ocr_token, self.question_token, self.answer_token]
             # stoi is simply a reverse dict for itos
             self.itos = {i: tok for tok, i in self.stoi.items()}
         else:
@@ -85,13 +89,16 @@ class Vocab(object):
             self.box_token = "<box>"
             self.ocr_token = "<ocr>"
             self.question_token = "<question>"
+            self.answer_token = "<answer>"
             self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token, 
-                                self.box_token, self.ocr_token, self.question_token]
-            itos = self.specials
+                                self.box_token, self.ocr_token, self.question_token, self.answer_token]
             # frequencies of special tokens are not counted when building vocabulary
             # in frequency order
             for tok in self.specials:
                 del counter[tok]
+
+            itos = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token, 
+                                self.box_token, self.ocr_token, self.question_token, self.answer_token]
 
             for word, freq in words_and_frequencies:
                 if freq < min_freq or len(itos) == max_size:
@@ -111,6 +118,7 @@ class Vocab(object):
         self.box_idx = self.stoi[self.box_token]
         self.ocr_idx = self.stoi[self.ocr_token]
         self.question_idx = self.stoi[self.question_token]
+        self.answer_idx = self.stoi[self.answer_token]
 
         self.vectors = None
         if vectors is not None:
@@ -269,34 +277,34 @@ class Vocab(object):
 class ClassificationVocab(Vocab):
     # This class is especially designed for ViVQA dataset by treating the VQA as a classification task. 
     # For more information, please visit https://arxiv.org/abs/1708.02711
-
-    def __init__(self, json_dirs, max_size=None, min_freq=1, bos_token="<bos>", eos_token="<eos>", padding_token="<pad>", unk_token="<unk>",
-                 pretrained_language_model_name=None, vectors=None, 
+    def __init__(self, json_dirs, max_size=None, min_freq=1,
+                 pretrained_language_model=None, vectors=None, 
                  unk_init=unk_init, vectors_cache=None, tokenizer_name: Union[str, None]=None):
 
-        super(ClassificationVocab, self).__init__(json_dirs, max_size, min_freq, bos_token, eos_token, padding_token, unk_token,
-                                                    pretrained_language_model_name, vectors, unk_init, vectors_cache, tokenizer_name)
+        super(ClassificationVocab, self).__init__(json_dirs, max_size, min_freq, pretrained_language_model, vectors, 
+                                                    unk_init, vectors_cache, tokenizer_name)
 
     def make_vocab(self, json_dirs):
         self.freqs = Counter()
-        self.itoa = set()
+        itoa = set()
         self.max_question_length = 0
         self.max_answer_length = 0
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
                 question = preprocess_sentence(ann["question"], self.tokenizer)
-                answer = "_".join(answer.split())
+                answer = "_".join(ann["answer"].split())
                 self.freqs.update(question)
-                self.itoa.update(answer)
+                itoa.update([answer])
                 if len(question) + 2 > self.max_question_length:
                         self.max_question_length = len(question) + 2
 
         self.atoi = defaultdict()
-        self.atoi.update({answer: ith for ith, answer in enumerate(self.itoa)})
+        self.itoa = {ith: answer for ith, answer in enumerate(itoa)}
+        self.atoi = {answer: ith for ith, answer in enumerate(itoa)}
 
     def encode_answer(self, answer: str) -> torch.Tensor:
-        return torch.tensor([self.atoi[answer]], dtype=torch.long)
+        return torch.tensor(self.atoi[answer], dtype=torch.long)
 
     def decode_answer(self, answer_vecs: torch.Tensor) -> List[str]:
         answers = []

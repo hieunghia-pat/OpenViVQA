@@ -1,19 +1,15 @@
 import torch
-from data_utils.mapping import Mapping
 
 from data_utils.vector import Vectors
 from data_utils.vector import pretrained_aliases
-from data_utils.utils import get_tokenizer, preprocess_sentence, unk_init
+from data_utils.utils import preprocess_sentence, unk_init
 
 from transformers import AutoTokenizer
 
 from collections import defaultdict, Counter
-import logging
 import six
 import json
 from typing import List, Union
-
-logger = logging.getLogger(__name__)
 
 class Vocab(object):
     """Defines a vocabulary object that will be used to numericalize a field.
@@ -25,28 +21,12 @@ class Vocab(object):
         itos: A list of token strings indexed by their numerical identifiers.
     """
     def __init__(self, json_dirs, max_size=None, min_freq=1, bos_token="<bos>", eos_token="<eos>", padding_token="<pad>", unk_token="<unk>",
-                 pretrained_language_model_name=None, vectors=None, 
-                 unk_init=unk_init, vectors_cache=None, tokenizer_name: Union[str, None]=None):
-        """Create a Vocab object from a collections.Counter.
-        Arguments:
-            counter: collections.Counter object holding the frequencies of
-                each value found in the data.
-            max_size: The maximum size of the vocabulary, or None for no
-                maximum. Default: None.
-            min_freq: The minimum frequency needed to include a token in the
-                vocabulary. Values less than 1 will be set to 1. Default: 1.
-            vectors: One of either the available pretrained vectors
-                or custom pretrained vectors (see Vocab.load_vectors);
-                or a list of aforementioned vectors
-            unk_init (callback): by default, initialize out-of-vocabulary word vectors
-                to zero vectors; can be any function that takes in a Tensor and
-                returns a Tensor of the same size. Default: torch.Tensor.zero_
-            vectors_cache: directory for cached vectors. Default: '.vector_cache'
-        """
+                    pretrained_language_model_name=None, use_mapping=False, vectors=None, unk_init=unk_init, vectors_cache=None, 
+                    tokenizer_name: Union[str, None]=None):
 
-        self.tokenizer = get_tokenizer(tokenizer_name)
+        self.tokenizer = tokenizer_name
 
-        if pretrained_language_model_name is not None: # use special tokens from pretrained language model
+        if pretrained_language_model_name is not None: # use special tokens and vocab from pretrained language model
             token_encoder = AutoTokenizer.from_pretrained(pretrained_language_model_name)
             self.padding_token = token_encoder.pad_token
             self.bos_token = token_encoder.bos_token
@@ -92,8 +72,16 @@ class Vocab(object):
 
         self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
 
-        if pretrained_language_model_name is not None:
-            self.mapping = Mapping(pretrained_language_model_name, self.stoi)
+        if use_mapping:
+            assert pretrained_language_model_name is not None, "Pretrained language model is required if using map for vocab"
+            self.mapping = defaultdict()
+            # map from original vocab to pretrained language models vocab
+            self.mapping.update({ori_idx: self.token_encoder.convert_tokens_to_ids(token) for ori_idx, token in enumerate(self.itos)})
+            # map special tokens
+            self.mapping[self.padding_idx] = token_encoder.encoder[self.padding_token]
+            self.mapping[self.bos_idx] = token_encoder.ecoder[self.bos_token]
+            self.mapping[self.eos_idx] = token_encoder.encoder[self.eos_token]
+            self.mapping[self.unk_idx] = token_encoder.encoder[self.unk_token]
         else:
             self.mapping = None
 
@@ -122,14 +110,14 @@ class Vocab(object):
         vec = torch.ones(self.max_question_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + question + [self.eos_token]):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
-        return vec
+        return vec.unsqueeze(0)
 
     def encode_answer(self, answer: str) -> torch.Tensor:
         """ Turn a answer into a vector of indices and a question length """
         vec = torch.ones(self.max_answer_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + answer + [self.eos_token]):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
-        return vec
+        return vec.unsqueeze(0)
 
     def decode_question(self, question_vecs: torch.Tensor, join_words=True) -> List[str]:
         '''
@@ -247,30 +235,38 @@ class ClassificationVocab(Vocab):
     # This class is especially designed for ViVQA dataset by treating the VQA as a classification task. 
     # For more information, please visit https://arxiv.org/abs/1708.02711
 
-    def __init__(self, json_dirs, max_size=None, min_freq=1, bos_token="<bos>", eos_token="<eos>", padding_token="<pad>", unk_token="<unk>",
-                 pretrained_language_model_name=None, vectors=None, 
-                 unk_init=unk_init, vectors_cache=None, tokenizer_name: Union[str, None]=None):
+    def __init__(self, json_dirs, max_size=None, min_freq=1, bos_token="<bos>", 
+                    eos_token="<eos>", padding_token="<pad>", unk_token="<unk>",
+                    pretrained_language_model_name=None, vectors=None, unk_init=unk_init,
+                    vectors_cache=None, tokenizer_name: Union[str, None]=None):
 
-        super(ClassificationVocab, self).__init__(json_dirs, max_size, min_freq, bos_token, eos_token, padding_token, unk_token,
-                                                    pretrained_language_model_name, vectors, unk_init, vectors_cache, tokenizer_name)
+        super(ClassificationVocab, self).__init__(json_dirs, max_size, min_freq, 
+                                                    bos_token, eos_token, padding_token, unk_token,
+                                                    pretrained_language_model_name=pretrained_language_model_name, 
+                                                    vectors=vectors, 
+                                                    unk_init=unk_init, 
+                                                    vectors_cache=vectors_cache, 
+                                                    tokenizer_name=tokenizer_name)
 
     def make_vocab(self, json_dirs):
         self.freqs = Counter()
-        self.itoa = set()
+        itoa = set()
         self.max_question_length = 0
         self.max_answer_length = 0
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
                 question = preprocess_sentence(ann["question"], self.tokenizer)
+                answer = ann["answer"]
                 answer = "_".join(answer.split())
                 self.freqs.update(question)
-                self.itoa.update(answer)
+                itoa.add(answer)
                 if len(question) + 2 > self.max_question_length:
                         self.max_question_length = len(question) + 2
 
+        self.itoa = {ith: answer for ith, answer in enumerate(itoa)}
         self.atoi = defaultdict()
-        self.atoi.update({answer: ith for ith, answer in enumerate(self.itoa)})
+        self.atoi.update({answer: ith for ith, answer in self.itoa.items()})
 
     def encode_answer(self, answer: str) -> torch.Tensor:
         return torch.tensor([self.atoi[answer]], dtype=torch.long)

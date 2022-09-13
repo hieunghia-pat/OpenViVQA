@@ -3,7 +3,7 @@ from torchvision import transforms
 import re
 from typing import List
 
-from structures.instance import Instances
+from structures.instances import Instances
 
 def get_tokenizer(tokenizer):
     if callable(tokenizer):

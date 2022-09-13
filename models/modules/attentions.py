@@ -2,23 +2,25 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import numpy as np
+from builders.build_attention import build_attention, META_ATTENTION
 
 from models.modules.containers import Module
 from models.utils import clones, box_relational_embedding
 
+@META_ATTENTION.register()
 class ScaledDotProductAttention(nn.Module):
     '''
     Scaled dot-product attention
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, **kwargs):
-        '''
-            :param d_model: Output dimensionality of the model
-            :param d_k: Dimensionality of queries and keys
-            :param d_v: Dimensionality of values
-            :param h: Number of heads
-        '''
+    def __init__(self, config):
         super(ScaledDotProductAttention, self).__init__()
+
+        d_model = config.D_MODEL
+        h = config.HEAD
+        d_k = config.D_KEY
+        d_v = config.D_VALUE
+
         self.fc_q = nn.Linear(d_model, h * d_k)
         self.fc_k = nn.Linear(d_model, h * d_k)
         self.fc_v = nn.Linear(d_model, h * d_v)
@@ -42,15 +44,6 @@ class ScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_o.bias, 0)
 
     def forward(self, queries, keys, values, attention_mask=None, **kwargs):
-        '''
-            Computes
-            :param queries: Queries (b_s, nq, d_model)
-            :param keys: Keys (b_s, nk, d_model)
-            :param values: Values (b_s, nk, d_model)
-            :param attention_mask: Mask over attention values (b_s, h, nq, nk). True indicates masking.
-            :param attention_weights: Multiplicative weights for attention values (b_s, h, nq, nk).
-            :return:
-        '''
         b_s, nq = queries.shape[:2]
         nk = keys.shape[1]
         q = self.fc_q(queries).view(b_s, nq, self.h, self.d_k).permute(0, 2, 1, 3)  # (b_s, h, nq, d_k)
@@ -66,19 +59,20 @@ class ScaledDotProductAttention(nn.Module):
 
         return out
 
+@META_ATTENTION.register()
 class AugmentedGeometryScaledDotProductAttention(nn.Module):
     '''
     Scaled dot-product attention with box relation
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, trignometric_embedding=True, **kwargs):
-        '''
-            :param d_model: Output dimensionality of the model
-            :param d_k: Dimensionality of queries and keys
-            :param d_v: Dimensionality of values
-            :param h: Number of heads
-        '''
+    def __init__(self, config):
         super(AugmentedGeometryScaledDotProductAttention, self).__init__()
+
+        d_model = config.D_MODEL
+        h = config.HEAD
+        d_k = config.D_KEY
+        d_v = config.D_VALUE
+        trignometric_embedding = config.TRIGNOMETRIC_EMBEDDING
 
         self.trignometric_embedding = trignometric_embedding
         if trignometric_embedding:
@@ -115,18 +109,6 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
             nn.init.constant_(fc_g.bias, 0)
 
     def forward(self, queries, keys, values, boxes, attention_mask=None, **kwargs):
-        '''
-            Computes
-            :param queries: Queries (b_s, nq, d_model)
-            :param keys: Keys (b_s, nk, d_model)
-            :param values: Values (b_s, nk, d_model)
-            :param boxes: Boxes (b_s, nk, 4). None indicates image is extracted under region-based methods.
-            :param grid_size: Size of the image features. Default value is None if image features is regional features
-            :param attention_mask: Mask over attention values (b_s, h, nq, nk). True indicates masking.
-            :param attention_weights: Multiplicative weights for attention values (b_s, h, nq, nk).
-            :return:
-        '''
-        
         # embedding geometric information from boxes coordinates
         relative_geometry_embeddings = box_relational_embedding(boxes, dim_g=self.d_g, trignometric_embedding=self.trignometric_embedding)
         flatten_relative_geometry_embeddings = relative_geometry_embeddings.view(-1, self.d_g)
@@ -154,20 +136,21 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
 
         return out
 
+@META_ATTENTION.register()
 class AugmentedMemoryScaledDotProductAttention(nn.Module):
     '''
         Scaled dot-product attention with memory
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, m, **kwargs):
-        '''
-        :param d_model: Output dimensionality of the model
-        :param d_k: Dimensionality of queries and keys
-        :param d_v: Dimensionality of values
-        :param h: Number of heads
-        :param m: Number of memory slots
-        '''
+    def __init__(self, config):
         super(AugmentedMemoryScaledDotProductAttention, self).__init__()
+
+        d_model = config.D_MODEL
+        h = config.HEAD
+        d_k = config.D_KEY
+        d_v = config.D_VALUE
+        m = config.MEMORY
+
         self.fc_q = nn.Linear(d_model, h * d_k)
         self.fc_k = nn.Linear(d_model, h * d_k)
         self.fc_v = nn.Linear(d_model, h * d_v)
@@ -224,19 +207,21 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
 
         return out
 
+@META_ATTENTION.register()
 class AdaptiveScaledDotProductAttention(nn.Module):
     '''
     Scaled dot-product with adaptive attention
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, dropout=.1, comment=None, **kwargs):
-        '''
-        :param d_model: Output dimensionality of the model
-        :param d_k: Dimensionality of queries and keys
-        :param d_v: Dimensionality of values
-        :param h: Number of heads
-        '''
+    def __init__(self, config):
         super(AdaptiveScaledDotProductAttention, self).__init__()
+
+        d_model = config.D_MODEL
+        h = config.HEAD
+        d_k = config.D_KEY
+        d_v = config.D_VALUE
+        dropout = config.DROPOUT
+
         self.fc_q = nn.Linear(d_model, h * d_k)
         self.fc_k = nn.Linear(d_model, h * d_k)
         self.fc_v = nn.Linear(d_model, h * d_v)
@@ -252,8 +237,6 @@ class AdaptiveScaledDotProductAttention(nn.Module):
 
         self.init_weights()
 
-        self.comment = comment
-
     def init_weights(self):
         nn.init.xavier_uniform_(self.fc_q.weight)
         nn.init.xavier_uniform_(self.fc_k.weight)
@@ -266,7 +249,7 @@ class AdaptiveScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_o.bias, 0)
         nn.init.constant_(self.fc_s.bias, 0)
 
-    def forward(self, queries, keys, values, language_signals, attention_mask=None, **kwargs):
+    def forward(self, queries, keys, values, language_signals, attention_mask=None):
         '''
         Computes
         :param queries: Queries (b_s, nq, d_model)
@@ -312,24 +295,23 @@ class MultiHeadAttention(Module):
         Multi-head attention layer with Dropout and Layer Normalization.
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, attention_module=False, dropout=.1,
-                    can_be_stateful=False, use_aoa=False, attention_module_kwargs=None):
+    def __init__(self, config):
         super(MultiHeadAttention, self).__init__()
+        
+        d_model = config.D_MODEL
 
-        self.use_aoa = use_aoa  # whether to use Attention on Attention (AoA) mechanism or not
-        if self.use_aoa:        # define additionally AoA layers
+        self.use_aoa = config.USE_AOA # whether to use Attention on Attention (AoA) mechanism or not
+        
+        if self.use_aoa:    # define additionally AoA layers
             self.informative_attention = nn.Linear(2*d_model, d_model)
             self.gated_attention = nn.Linear(2*d_model, d_model)
 
-        if attention_module_kwargs is not None:
-            self.attention = attention_module(d_model=d_model, d_k=d_k, d_v=d_v, h=h, **attention_module_kwargs)
-        else:
-            self.attention = attention_module(d_model=d_model, d_k=d_k, d_v=d_v, h=h)
+        self.attention_module = build_attention(config)
 
-        self.dropout = nn.Dropout(p=dropout)
+        self.dropout = nn.Dropout(p=config.DROPOUT)
         self.layer_norm = nn.LayerNorm(d_model)
 
-        self.can_be_stateful = can_be_stateful
+        self.can_be_stateful = config.CAN_BE_STATEFUL
         if self.can_be_stateful:
             self.register_state('running_keys', torch.zeros((0, d_model)))
             self.register_state('running_values', torch.zeros((0, d_model)))

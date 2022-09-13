@@ -7,8 +7,12 @@ class PositionWiseFeedForward(nn.Module):
     Position-wise feed forward layer
     '''
 
-    def __init__(self, d_model=512, d_ff=2048, dropout=.1) -> None:
+    def __init__(self, config) -> None:
         super(PositionWiseFeedForward, self).__init__()
+
+        d_model = config.D_MODEL
+        d_ff = config.D_FF
+        dropout = config.DROPOUT
 
         self.fc1 = nn.Linear(d_model, d_ff)
         self.fc2 = nn.Linear(d_ff, d_model)

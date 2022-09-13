@@ -3,7 +3,7 @@ from torch.utils import data
 
 from data_utils.utils import preprocess_sentence
 from data_utils.vocab import ClassificationVocab, Vocab
-from structures.instance import Instances
+from structures.instances import Instances
 
 import json
 import os

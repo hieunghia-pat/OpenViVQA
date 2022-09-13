@@ -6,7 +6,7 @@ import numpy as np
 from models.modules.attentions import AdaptiveScaledDotProductAttention, MultiHeadAttention, ScaledDotProductAttention
 from models.utils import generate_padding_mask, generate_sequential_mask, sinusoid_encoding_table
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
-from models.modules.embeddings import Embedding, SinusoidPositionalEmbedding
+from models.modules.visual_embeddings import Embedding, SinusoidPositionalEmbedding
 from models.modules.containers import Module, ModuleList
 
 import os

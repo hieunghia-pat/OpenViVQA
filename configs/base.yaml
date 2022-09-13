@@ -1,5 +1,4 @@
 config:
-  # configuration for paths
   path:
     train_json_path: features/annotations/OpenViVQA/openvivqa_train.json
     dev_json_path: features/annotations/OpenViVQA/openvivqa_dev.json
@@ -7,7 +6,6 @@ config:
     image_features_path: features/region_features/OpenViVQA/faster_rcnn
     images_path: None
 
-  # configuration for training
   training:
     checkpoint_path: saved_models
     start_from: None
@@ -17,7 +15,6 @@ config:
     training_beam_size: 5
     evaluating_beam_size: 5
 
-  # model configuration
   model:
     name: modified_mcan_using_region
     nhead: 8
@@ -34,7 +31,7 @@ config:
     # bartpho_syllable
     # bartpho_word
     pretrained_language_model_name: None
-                                                        
+
     # PhoBERTModel
     # BARTPhoModel
     # GPT2Model
@@ -122,7 +119,6 @@ config:
         args:
           use_aoa: False
 
-  # dataset configuration
   dataset:
     batch_size: 32
     workers: 2

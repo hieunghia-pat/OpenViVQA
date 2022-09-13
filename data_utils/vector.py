@@ -7,7 +7,8 @@ import tarfile
 from urllib.request import urlretrieve
 from data_utils.utils import reporthook
 import zipfile
-from functools import partial
+
+from builders.build_word_embedding import META_WORD_EMBEDDING
 
 logger = logging.getLogger(__name__)
 
@@ -205,31 +206,50 @@ class Vectors(object):
         return vecs[0] if to_reduce else vecs
 
 class PhoW2V(Vectors):
-    url = {
-        "word2vec_vi_syllables_100dims": "https://public.vinai.io/word2vec_vi_syllables_100dims.zip",
-        "word2vec_vi_syllables_300dims": "https://public.vinai.io/word2vec_vi_syllables_300dims.zip",
-        "word2vec_vi_words_100dims": "https://public.vinai.io/word2vec_vi_words_100dims.zip",
-        "word2vec_vi_words_300dims": "https://public.vinai.io/word2vec_vi_words_300dims.zip",
-    }
-
-    def __init__(self, name, **kwargs):
-        url = self.url[name]
+    def __init__(self, name, url, **kwargs):
         name = '{}.txt'.format(name)
         super(PhoW2V, self).__init__(name, url=url, **kwargs)
 
-class ViFastText(Vectors):
-
-    url_base = 'https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.vi.300.vec.gz'
-
+@META_WORD_EMBEDDING.register()
+class PhoW2VSyllable100(PhoW2V):
     def __init__(self, **kwargs):
-        url = self.url_base
-        name = os.path.basename(url)
-        super(ViFastText, self).__init__(name, url=url, **kwargs)
+        super(PhoW2VSyllable100, self).__init__(name="word2vec_vi_syllables_100dims", 
+                                                url="https://public.vinai.io/word2vec_vi_syllables_100dims.zip",
+                                                **kwargs)
 
-pretrained_aliases = {
-    "fasttext.vi.300d": partial(ViFastText),
-    "phow2v.syllable.100d": partial(PhoW2V, name="word2vec_vi_syllables_100dims"),
-    "phow2v.syllable.300d": partial(PhoW2V, name="word2vec_vi_syllables_300dims"),
-    "phow2v.word.100d": partial(PhoW2V, name="word2vec_vi_words_100dims"),
-    "phow2v.word.300d": partial(PhoW2V, name="word2vec_vi_words_300dims")
-}
+@META_WORD_EMBEDDING.register()
+class PhoW2VSyllable300(PhoW2V):
+    def __init__(self, **kwargs):
+        super(PhoW2VSyllable300, self).__init__(name="word2vec_vi_syllables_300dims", 
+                                                url="https://public.vinai.io/word2vec_vi_syllables_300dims.zip",
+                                                **kwargs)
+
+@META_WORD_EMBEDDING.register()
+class PhoW2VWord100(PhoW2V):
+    def __init__(self, **kwargs):
+        super(PhoW2VWord100, self).__init__(name="word2vec_vi_words_100dims", 
+                                                url="https://public.vinai.io/word2vec_vi_words_100dims.zip",
+                                                **kwargs)
+
+@META_WORD_EMBEDDING.register()
+class PhoW2VWord300(PhoW2V):
+    def __init__(self, **kwargs):
+        super(PhoW2VWord300, self).__init__(name="word2vec_vi_words_300dims", 
+                                                url="https://public.vinai.io/word2vec_vi_words_300dims.zip",
+                                                **kwargs)
+
+@META_WORD_EMBEDDING.register()
+class FastText(Vectors):
+    def __init__(self, url_base, **kwargs):
+        name = os.path.basename(url_base)
+        super(FastText, self).__init__(name, url=url_base, **kwargs)
+
+@META_WORD_EMBEDDING.register()
+class EnFastText(FastText):
+    def __init__(self, **kwargs):
+        super(EnFastText, self).__init__(url_base='https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.vi.300.vec.gz', **kwargs)
+
+@META_WORD_EMBEDDING.register()
+class ViFastText(FastText):
+    def __init__(self, **kwargs):
+        super(ViFastText, self).__init__(url_base='https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.vi.300.vec.gz', **kwargs)

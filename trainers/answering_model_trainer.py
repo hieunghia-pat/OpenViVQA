@@ -9,7 +9,6 @@ from models.modules.transformer import FusionTransformer
 from data_utils.dataset import *
 import evaluation
 from evaluation import Cider, PTBTokenizer
-from data_utils.feature import Feature
 
 import multiprocessing
 from tqdm import tqdm

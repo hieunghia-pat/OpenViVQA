@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from models.answering_model import AnsweringModel
-from models.modules.embeddings import SinusoidPositionalEmbedding
+from models.modules.visual_embeddings import SinusoidPositionalEmbedding
 from configs.constants import *
 from data_utils.vocab import Vocab
 from yacs.config import CfgNode

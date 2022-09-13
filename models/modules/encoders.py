@@ -1,18 +1,26 @@
 from torch import nn
+
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
-from models.modules.attentions import MultiHeadAttention
-from models.modules.embeddings import SinusoidPositionalEmbedding
+from models.modules.attentions import  (MultiHeadAttention, ScaledDotProductAttention,
+                                        AugmentedGeometryScaledDotProductAttention,
+                                        AugmentedMemoryScaledDotProductAttention,
+                                        AdaptiveScaledDotProductAttention)
+from models.modules.pos_embeddings import SinusoidPositionalEmbedding
+from builders.build_encoder import META_ENCODER
 
 class EncoderLayer(nn.Module):
-    def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
-                 use_aoa=False, attention_module=None, attention_module_kwargs=None):
+    def __init__(self, config):
         super(EncoderLayer, self).__init__()
-        self.identity_map_reordering = identity_map_reordering
-        self.mhatt = MultiHeadAttention(d_model, d_k, d_v, h, dropout, identity_map_reordering=identity_map_reordering,
-                                        use_aoa=use_aoa,
-                                        attention_module=attention_module,
-                                        attention_module_kwargs=attention_module_kwargs)
-        self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
+        self.mhatt = MultiHeadAttention(d_model=config.MODEL.D_MODEL, 
+                                        d_k=config.MODEL.D_K, 
+                                        d_v=config.MODEL.D_V, 
+                                        h=config.MODEL.MODEL.HEAD, 
+                                        dropout=config.MODEL.DROPOUT,
+                                        use_aoa=config.MODEL.ENCODER.USE_AOA,
+                                        attention_module=ScaledDotProductAttention)
+        self.pwff = PositionWiseFeedForward(d_model=config.MODEL.D_MODEL, 
+                                            d_ff=config.MODEL.D_FF, 
+                                            dropout=config.MODEL.DROPOUT)
 
     def forward(self, queries, keys, values, attention_mask=None):
         att = self.mhatt(queries, keys, values, attention_mask=attention_mask)
@@ -23,12 +31,12 @@ class EncoderLayer(nn.Module):
 
 class GeometricEncoderLayer(nn.Module):
     def __init__(self, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1, identity_map_reordering=False,
-                 use_aoa=False, attention_module=None, attention_module_kwargs=None):
+                 use_aoa=False, attention_module_kwargs=None):
         super(GeometricEncoderLayer, self).__init__()
         self.identity_map_reordering = identity_map_reordering
         self.mhatt = MultiHeadAttention(d_model, d_k, d_v, h, dropout, identity_map_reordering=identity_map_reordering,
                                         use_aoa=use_aoa,
-                                        attention_module=attention_module,
+                                        attention_module=AugmentedGeometryScaledDotProductAttention,
                                         attention_module_kwargs=attention_module_kwargs)
         self.pwff = PositionWiseFeedForward(d_model, d_ff, dropout, identity_map_reordering=identity_map_reordering)
 
@@ -68,6 +76,7 @@ class GuidedEncoderLayer(nn.Module):
 
         return ff
 
+@META_ENCODER.register()
 class Encoder(nn.Module):
     def __init__(self, N, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
                  identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
@@ -97,6 +106,7 @@ class Encoder(nn.Module):
 
         return out
 
+@META_ENCODER.register()
 class GeometricEncoder(nn.Module):
     def __init__(self, N, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, dropout=.1,
                  identity_map_reordering=False, use_aoa=False, attention_module=None, attention_module_kwargs=None):
@@ -129,6 +139,7 @@ class GeometricEncoder(nn.Module):
 
         return out
 
+@META_ENCODER.register()
 class GuidedEncoder(nn.Module):
     def __init__(self, N, d_model=512, d_k=64, d_v=64, h=8, d_ff=2048, 
                     dropout=.1, identity_map_reordering=False, use_aoa=False,

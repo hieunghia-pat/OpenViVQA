@@ -41,7 +41,7 @@ class ScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None):
+    def forward(self, queries, keys, values, attention_mask=None, **kwargs):
         '''
             Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -114,7 +114,7 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         for fc_g in self.fc_gs:
             nn.init.constant_(fc_g.bias, 0)
 
-    def forward(self, queries, keys, values, boxes=None, attention_mask=None):
+    def forward(self, queries, keys, values, boxes, attention_mask=None, **kwargs):
         '''
             Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -195,7 +195,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         nn.init.constant_(self.fc_v.bias, 0)
         nn.init.constant_(self.fc_o.bias, 0)
 
-    def forward(self, queries, keys, values, attention_mask=None):
+    def forward(self, queries, keys, values, attention_mask=None, **kwargs):
         '''
         Computes
             :param queries: Queries (b_s, nq, d_model)
@@ -312,23 +312,20 @@ class MultiHeadAttention(Module):
         Multi-head attention layer with Dropout and Layer Normalization.
     '''
 
-    def __init__(self, d_model, d_k, d_v, h, dropout=.1, identity_map_reordering=False, can_be_stateful=False,
-                 use_aoa=False, attention_module=None, attention_module_kwargs=None):
+    def __init__(self, d_model, d_k, d_v, h, attention_module=False, dropout=.1,
+                    can_be_stateful=False, use_aoa=False, attention_module_kwargs=None):
         super(MultiHeadAttention, self).__init__()
-        self.identity_map_reordering = identity_map_reordering
 
-        self.use_aoa = use_aoa # whether to use Attention on Attention (AoA) mechanism or not
-        if self.use_aoa:    # define additionally AoA layers
+        self.use_aoa = use_aoa  # whether to use Attention on Attention (AoA) mechanism or not
+        if self.use_aoa:        # define additionally AoA layers
             self.informative_attention = nn.Linear(2*d_model, d_model)
             self.gated_attention = nn.Linear(2*d_model, d_model)
 
-        if attention_module is not None:
-            if attention_module_kwargs is not None:
-                self.attention = attention_module(d_model=d_model, d_k=d_k, d_v=d_v, h=h, **attention_module_kwargs)
-            else:
-                self.attention = attention_module(d_model=d_model, d_k=d_k, d_v=d_v, h=h)
+        if attention_module_kwargs is not None:
+            self.attention = attention_module(d_model=d_model, d_k=d_k, d_v=d_v, h=h, **attention_module_kwargs)
         else:
-            self.attention = ScaledDotProductAttention(d_model=d_model, d_k=d_k, d_v=d_v, h=h)
+            self.attention = attention_module(d_model=d_model, d_k=d_k, d_v=d_v, h=h)
+
         self.dropout = nn.Dropout(p=dropout)
         self.layer_norm = nn.LayerNorm(d_model)
 
@@ -337,7 +334,7 @@ class MultiHeadAttention(Module):
             self.register_state('running_keys', torch.zeros((0, d_model)))
             self.register_state('running_values', torch.zeros((0, d_model)))
 
-    def forward(self, queries, keys, values, boxes=None, language_signals=None, attention_mask=None, **kwargs):
+    def forward(self, queries, keys, values, attention_mask=None, **kwargs):
         if self.can_be_stateful and self._is_stateful:
             self.running_keys = torch.cat([self.running_keys, keys], 1)
             keys = self.running_keys
@@ -345,37 +342,11 @@ class MultiHeadAttention(Module):
             self.running_values = torch.cat([self.running_values, values], 1)
             values = self.running_values
 
-        if self.identity_map_reordering:
-            queries = self.layer_norm(queries)
-            keys = self.layer_norm(keys)
-            values = self.layer_norm(values)
-
-            if boxes is not None:  
-                # attention with geometry-augmented attention
-                out = self.attention(queries, keys, values, boxes, attention_mask, **kwargs)
-            elif language_signals is not None:  
-                # adaptive attention
-                out = self.attention(queries, keys, values, language_signals, attention_mask, **kwargs)
-            else:                   
-                # original attention or memory augmented attention
-                out = self.attention(queries, keys, values, attention_mask)
-            
-            # residual connection after normalizing
-            out = queries + self.dropout(torch.relu(out))
-        else:
-            if boxes is not None:  
-                # attention with geometry-augmented attention
-                out = self.attention(queries, keys, values, boxes, attention_mask, **kwargs)
-            elif language_signals is not None:  
-                # adaptive attention
-                out = self.attention(queries, keys, values, language_signals, attention_mask, **kwargs)
-            else:                   
-                # original attention or memory augmented attention
-                out = self.attention(queries, keys, values, attention_mask, **kwargs)
-            
-            # normalization after residual connection
-            out = self.dropout(out)
-            out = self.layer_norm(queries + out)
+        out = self.attention(queries, keys, values, attention_mask, **kwargs)
+        
+        # normalization after residual connection
+        out = self.dropout(out)
+        out = self.layer_norm(queries + out)
 
         if self.use_aoa:
             aoa_input = torch.cat([queries, out], dim=-1)

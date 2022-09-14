@@ -1,0 +1,74 @@
+CONFIG:
+  PATH:
+    TRAIN_JSON_PATH: features/OpenViVQA/annotations/OpenViVQA_train.json
+    DEV_JSON_PATH: features/OpenViVQA/annotations/OpenViVQA_dev.json
+    TEST_JSON_PATH: features/OpenViVQA/annotations/OpenViVQA_test.json
+    IMAGE_FEATURES_PATH: features/OpenViVQA/features/x152++_faster_rcnn
+    IMAGE_PATH: None
+
+  TRAINING:
+    CHECKPOINT_PATH: saved_models
+    START_FROM: None
+    LEARNING_RATE: 1.
+    WARMUP: 10000
+    GET_SCORES: False
+    TRAINING_BEAM_SIZE: 5
+    EVALUATING_BEAM_SIZE: 3
+
+  MODEL:
+    ARCHITECTURE: EncoderDecoderTransformer
+    DEVICE: cuda
+    ENCODER:
+      ARCHITECTURE: GuidedAttentionEncoder
+      D_MODEL: 512
+      LAYERS: 3
+      SELF_ATTENTION:
+        ARCHITECTURE: ScaleDotProductAttention
+        HEAD: 8
+        D_MODEL: 512
+        D_KEY: 64
+        D_VALUE: 64
+        D_FF: 2048
+        D_FEATURE: 2048
+        USE_AOA: False
+        CAN_BE_STATEFUL: False
+        DROPOUT: .1
+      GUIDED_ATTENTION:
+        ARCHITECTURE: ScaleDotProductAttention
+        HEAD: 8
+        D_MODEL: 512
+        D_KEY: 64
+        D_VALUE: 64
+        D_FF: 2048
+        D_FEATURE: 2048
+        USE_AOA: False
+        CAN_BE_STATEFUL: False
+        DROPOUT: .1
+    
+    DECODER:
+      ARCHITECTURE: Decoder
+      D_MODEL: 512
+      LAYERS: 3
+      ATTENTION:
+        ARCHITECTURE: ScaleDotProductAttention
+        HEAD: 8
+        D_MODEL: 512
+        D_KEY: 64
+        D_VALUE: 64
+        D_FF: 2048
+        D_FEATURE: 2048
+        USE_AOA: False
+        CAN_BE_STATEFUL: False
+        DROPOUT: .1
+      TEXT_EMBEDDING:
+        ARCHITECTURE: UsualEmbedding
+        D_MODEL: 512
+        D_EMBEDDING: 300
+        DROPOUT: 0.1
+
+  DATASET:
+    BATCH_SIZE: 32
+    WORKERS: 2
+    TOKENIZER: None
+    WORD_EMBEDDING: None
+    MIN_FREQ: 1

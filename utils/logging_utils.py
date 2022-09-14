@@ -48,7 +48,7 @@ def setup_logger(output=None, distributed_rank=0, *, color=True, name="OpenViVQA
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
 
-    FORMAT = "[%(asctime)s] %(levelname)s - In \"%(filename)s\", line %(lineno)s: %(message)s"
+    FORMAT = "[%(asctime)s, File \"%(filename)s\", line %(lineno)s] %(levelname)s: %(message)s"
     plain_formatter = logging.Formatter(FORMAT, datefmt="%d/%m/%Y %H:%M:%S")
     # stdout logging: master only
     if distributed_rank == 0:
@@ -69,7 +69,8 @@ def setup_logger(output=None, distributed_rank=0, *, color=True, name="OpenViVQA
             filename = os.path.join(output, "log.txt")
         if distributed_rank > 0:
             filename = filename + ".rank{}".format(distributed_rank)
-        os.makedirs(os.path.dirname(filename))
+        if os.path.isdir(os.path.dirname(filename)):
+            os.makedirs(os.path.dirname(filename))
 
         fh = logging.StreamHandler(_cached_log_stream(filename))
         fh.setLevel(logging.DEBUG)

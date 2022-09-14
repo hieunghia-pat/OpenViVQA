@@ -17,7 +17,18 @@ CONFIG:
 
   MODEL:
     ARCHITECTURE: EncoderDecoderTransformer
+    NAME: extended_mcan_region_x152++
     DEVICE: cuda
+    VISION_EMBEDDING:
+      D_FEATURE: 1024
+      D_MODEL: 512
+      DROPOUT: 0.1
+    LANGUAGE_EMBEDDING:
+      ARCHITECTURE: UsualEmbedding
+      D_MODEL: 512
+      D_EMBEDDING: 300
+      DROPOUT: 0.1
+      WORD_EMBEDDING: None
     ENCODER:
       ARCHITECTURE: GuidedAttentionEncoder
       D_MODEL: 512
@@ -44,7 +55,6 @@ CONFIG:
         USE_AOA: False
         CAN_BE_STATEFUL: False
         DROPOUT: .1
-    
     DECODER:
       ARCHITECTURE: Decoder
       D_MODEL: 512
@@ -58,14 +68,15 @@ CONFIG:
         D_FF: 2048
         D_FEATURE: 2048
         USE_AOA: False
-        CAN_BE_STATEFUL: False
+        CAN_BE_STATEFUL: True
         DROPOUT: .1
       TEXT_EMBEDDING:
         ARCHITECTURE: UsualEmbedding
         D_MODEL: 512
         D_EMBEDDING: 300
+        WORD_EMBEDDING: None
         DROPOUT: 0.1
-
+    
   DATASET:
     BATCH_SIZE: 32
     WORKERS: 2

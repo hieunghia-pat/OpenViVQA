@@ -2,19 +2,21 @@ from torch import nn
 
 from data_utils.vocab import Vocab
 from builders.build_text_embedding import META_TEXT_EMBEDDING
+from builders.build_word_embedding import META_WORD_EMBEDDING
 from models.utils import generate_sequential_mask, generate_padding_mask
 
 @META_TEXT_EMBEDDING.register()
 class UsualEmbedding(nn.Module):
     def __init__(self, config, vocab: Vocab):
         super(UsualEmbedding, self).__init__()
-        if vocab.vectors is None:
+        if config.WORD_EMBEDDING is None:
             self.components = nn.Embedding(len(vocab), config.D_MODEL, vocab.padding_idx)
         else:
+            embedding_weights = META_WORD_EMBEDDING.get(config.WORD_EMBEDDING).vectors
             self.components = nn.Sequential(
                 nn.Linear(config.D_EMBEDDING, config.D_MODEL),
                 nn.Dropout(config.DROPOUT),
-                nn.Embedding.from_pretrained(embeddings=vocab.vectors, freeze=True, padding_idx=vocab.padding_idx)
+                nn.Embedding.from_pretrained(embeddings=embedding_weights, freeze=True, padding_idx=vocab.padding_idx)
             )
 
     def forward(self, tokens):
@@ -27,8 +29,9 @@ class LSTMTextEmbedding(nn.Module):
 
         self.embedding = nn.Embedding(len(vocab), config.D_EMBEDDING, padding_idx=vocab.padding_idx)
         self.padding_idx = vocab.padding_idx
-        if vocab.vectors is not None:
-            self.embedding.from_pretrained(vocab.vectors)
+        if config.WORD_EMBEDDING is not None:
+            embedding_weights = META_WORD_EMBEDDING.get(config.WORD_EMBEDDING).vectors
+            self.embedding.from_pretrained(embedding_weights, freeze=True, padding_idx=vocab.padding_idx)
         self.proj = nn.Linear(config.D_EMBEDDING, config.D_MODEL)
         self.dropout = nn.Dropout(config.DROPOUT)
 

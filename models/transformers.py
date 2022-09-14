@@ -1,11 +1,8 @@
 import torch
 from torch import nn
-from models.answering_model import AnsweringModel
+from models.base_transformer import AnsweringModel
 from models.modules.visual_embeddings import SinusoidPositionalEmbedding
-from configs.constants import *
 from data_utils.vocab import Vocab
-from yacs.config import CfgNode
-from data_utils.feature import Feature
 
 class StandardTransformer(AnsweringModel):
     def __init__(self, bos_idx, encoder, decoder, use_img_pos=False):

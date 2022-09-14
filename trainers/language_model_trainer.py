@@ -4,7 +4,7 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from data_utils.vocab import Vocab
 from data_utils.utils import *
-from models.modules.transformer import StandardTransformer
+from models.transformers import StandardTransformer
 from data_utils.dataset import *
 
 from tqdm import tqdm

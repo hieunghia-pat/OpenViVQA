@@ -123,15 +123,15 @@ class GuidedAttentionEncoder(nn.Module):
 
         self.d_model = config.D_MODEL
 
-        self.self_attn_layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION)] for _ in range(config.LAYERS))
-        self.guided_attn_layers = nn.ModuleList([EncoderLayer(config.GUIDED_ATTENTION)] for _ in range(config.LAYERS))
+        self.self_attn_layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
+        self.guided_attn_layers = nn.ModuleList([EncoderLayer(config.GUIDED_ATTENTION) for _ in range(config.LAYERS)])
 
     def forward(self, input_features: Instances):
         vision_features = input_features.vision_features
         boxes = input_features.boxes
         vision_padding_mask = input_features.vision_padding_mask
 
-        language_features = input_features.language_padding_mask
+        language_features = input_features.language_features
         language_padding_mask = input_features.language_padding_mask
 
         for self_attn_layer, guided_attn_layer in zip(self.self_attn_layers, self.guided_attn_layers):

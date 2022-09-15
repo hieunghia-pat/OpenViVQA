@@ -91,7 +91,7 @@ class Instances:
         Returns:
             Instances: all fields are called with a `to(device)`, if the field has this method.
         """
-        ret = Instances(self._image_size)
+        ret = Instances()
         for k, v in self._fields.items():
             if hasattr(v, "to"):
                 v = v.to(*args, **kwargs)

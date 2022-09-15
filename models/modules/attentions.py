@@ -306,7 +306,7 @@ class MultiHeadAttention(Module):
             self.informative_attention = nn.Linear(2*d_model, d_model)
             self.gated_attention = nn.Linear(2*d_model, d_model)
 
-        self.attention_module = build_attention(config)
+        self.attention = build_attention(config)
 
         self.dropout = nn.Dropout(p=config.DROPOUT)
         self.layer_norm = nn.LayerNorm(d_model)

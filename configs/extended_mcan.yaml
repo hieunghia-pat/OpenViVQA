@@ -31,10 +31,11 @@ TRAINING:
   EVALUATING_BEAM_SIZE: 3
 
 MODEL:
-  ARCHITECTURE: EncoderDecoderTransformer
+  ARCHITECTURE: ExtendedMCAN
   NAME: extended_mcan_region_x152++
   DEVICE: cuda
   VISION_EMBEDDING:
+    ARCHITECTURE: FeatureEmbedding
     D_FEATURE: 1024
     D_MODEL: 512
     DROPOUT: 0.1
@@ -50,7 +51,7 @@ MODEL:
     D_MODEL: 512
     LAYERS: 3
     SELF_ATTENTION:
-      ARCHITECTURE: ScaleDotProductAttention
+      ARCHITECTURE: ScaledDotProductAttention
       HEAD: 8
       D_MODEL: 512
       D_KEY: 64
@@ -61,7 +62,7 @@ MODEL:
       CAN_BE_STATEFUL: False
       DROPOUT: .1
     GUIDED_ATTENTION:
-      ARCHITECTURE: ScaleDotProductAttention
+      ARCHITECTURE: ScaledDotProductAttention
       HEAD: 8
       D_MODEL: 512
       D_KEY: 64
@@ -76,7 +77,7 @@ MODEL:
     D_MODEL: 512
     LAYERS: 3
     ATTENTION:
-      ARCHITECTURE: ScaleDotProductAttention
+      ARCHITECTURE: ScaledDotProductAttention
       HEAD: 8
       D_MODEL: 512
       D_KEY: 64

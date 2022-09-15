@@ -12,8 +12,8 @@ class BaseTransformer(Module):
         self.max_len = vocab.max_answer_length
         self.eos_idx = vocab.eos_idx
 
-        self.register_state('enc_features', None)
-        self.register_state('enc_padding_mask', None)
+        self.register_state('encoder_features', None)
+        self.register_state('encoder_padding_mask', None)
 
     def init_weights(self):
         for p in self.parameters():
@@ -31,7 +31,7 @@ class BaseTransformer(Module):
 
     def beam_search(self, input_features: Instances, beam_size: int, out_size=1, return_probs=False, **kwargs):
         # get features from input
-        self.enc_features, self.enc_padding_mask = self.encoder_forward(input_features)
+        self.encoder_features, self.encoder_padding_mask = self.encoder_forward(input_features)
 
         bs = BeamSearch(self, self.max_len, self.eos_idx, beam_size)
 

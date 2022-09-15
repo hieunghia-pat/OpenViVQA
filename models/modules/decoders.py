@@ -39,7 +39,7 @@ class Decoder(Module):
         self.padding_idx = vocab.padding_idx
         self.N = config.LAYERS
 
-        self.word_emb = build_text_embedding(config.TEXT_EMBEDDING)
+        self.word_emb = build_text_embedding(config.TEXT_EMBEDDING, vocab)
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len=self.max_len+1,
                                                                             d_model=config.D_MODEL, padding_idx=0), freeze=True)
         self.layers = ModuleList([DecoderLayer(config.ATTENTION) for _ in range(config.LAYERS)])
@@ -68,7 +68,8 @@ class Decoder(Module):
         encoder_features = input_features.encoder_features
         encoder_attention_mask = input_features.encoder_attention_mask
 
-        out = self.word_emb(answer_tokens) + self.pos_emb(seq)
+        embedded_answers, _ = self.word_emb(answer_tokens)
+        out = embedded_answers + self.pos_emb(seq)
         for layer in self.layers:
             out = layer(queries=out, 
                         keys=encoder_features,

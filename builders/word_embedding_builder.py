@@ -1,9 +1,8 @@
 from .registry import Registry
-from data_utils.word_embedding import WordEmbedding
 
 META_WORD_EMBEDDING = Registry("WORD_EMBEDDING")
 
-def build_word_embedding(config) -> WordEmbedding:
+def build_word_embedding(config):
     word_embedding_names = config.VOCAB.WORD_EMBEDDING
     if isinstance(word_embedding_names, list):
         word_embedding = []

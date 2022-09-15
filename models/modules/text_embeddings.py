@@ -9,6 +9,9 @@ from models.utils import generate_sequential_mask, generate_padding_mask
 class UsualEmbedding(nn.Module):
     def __init__(self, config, vocab: Vocab):
         super(UsualEmbedding, self).__init__()
+
+        self.padding_idx = vocab.padding_idx
+
         if config.WORD_EMBEDDING is None:
             self.components = nn.Embedding(len(vocab), config.D_MODEL, vocab.padding_idx)
         else:

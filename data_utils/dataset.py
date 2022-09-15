@@ -3,7 +3,7 @@ from torch.utils import data
 
 from data_utils.utils import preprocess_sentence
 from data_utils.vocab import ClassificationVocab, Vocab
-from structures.instances import Instances
+from utils.instances import Instances
 
 import json
 import os
@@ -12,8 +12,8 @@ import cv2 as cv
 from typing import Dict, List, Union, Any
 
 class BaseDataset(data.Dataset):
-    def __init__(self, json_path: str, image_features_path: str, scene_text_feature_path: str, 
-                vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
+    def __init__(self, json_path: str, image_features_path: str, scene_text_features_path: str=None, 
+                    scene_text_threshold=None, vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
         super(BaseDataset, self).__init__()
         with open(json_path, 'r') as file:
             json_data = json.load(file)
@@ -28,7 +28,8 @@ class BaseDataset(data.Dataset):
         self.image_features_path = image_features_path
 
         # scene text features
-        self.scene_text_feature_path = scene_text_feature_path
+        self.scene_text_feature_path = scene_text_features_path
+        self.scene_text_threshold = scene_text_threshold
 
     def load_json(self, json_data: Dict) -> List[Dict]:
         annotations = []
@@ -69,11 +70,14 @@ class BaseDataset(data.Dataset):
 
     def load_features(self, image_id: int) -> Dict[str, Any]:
         image_features = self.load_image_feature(image_id)
-        scene_text_features = self.load_scene_text_features(image_id)
-        features = {
-            **image_features,
-            **scene_text_features
-        }
+        if self.scene_text_feature_path is not None:
+            scene_text_features = self.load_scene_text_features(image_id)
+            features = {
+                **image_features,
+                **scene_text_features
+            }
+        else:
+            features = image_features
 
         return features
 
@@ -84,9 +88,10 @@ class BaseDataset(data.Dataset):
         return len(self.annotations)
 
 class DictionaryDataset(BaseDataset):
-    def __init__(self, json_path: str, image_features_path: str, scene_text_features_path: str,
-                    vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
-        super(DictionaryDataset, self).__init__(json_path, image_features_path, scene_text_features_path, vocab,tokenizer_name)
+    def __init__(self, json_path: str, image_features_path: str, scene_text_features_path: str=None, 
+                    scene_text_threshold=None, vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
+        super(DictionaryDataset, self).__init__(json_path, image_features_path, scene_text_features_path,
+                                                    scene_text_threshold, vocab, tokenizer_name)
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
@@ -105,9 +110,10 @@ class DictionaryDataset(BaseDataset):
 
 class ImageDataset(BaseDataset):
     # This class is designed especially for visualizing purposes
-    def __init__(self, json_path: str, image_features_path: str, scene_text_features_path: str,
-                    vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
-        super(ImageDataset, self).__init__(json_path, image_features_path, scene_text_features_path, vocab,tokenizer_name)
+    def __init__(self, json_path: str, image_features_path: str, scene_text_features_path: str=None, 
+                    scene_text_threshold=None, vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
+        super(ImageDataset, self).__init__(json_path, image_features_path, scene_text_features_path,
+                                                    scene_text_threshold, vocab, tokenizer_name)
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
@@ -127,9 +133,10 @@ class ImageDataset(BaseDataset):
         )
 
 class FeatureDataset(BaseDataset):
-    def __init__(self, json_path: str, image_features_path: str, scene_text_features_path: str,
-                    vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
-        super(FeatureDataset, self).__init__(json_path, image_features_path, scene_text_features_path, vocab,tokenizer_name)
+    def __init__(self, json_path: str, image_features_path: str, scene_text_features_path: str=None, 
+                    scene_text_threshold=None, vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
+        super(FeatureDataset, self).__init__(json_path, image_features_path, scene_text_features_path,
+                                                    scene_text_threshold, vocab, tokenizer_name)
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]

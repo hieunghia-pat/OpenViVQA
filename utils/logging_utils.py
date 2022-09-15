@@ -13,11 +13,9 @@ class ColorfulFormatter(logging.Formatter):
     def formatMessage(self, record):
         created_time = datetime.fromtimestamp(record.created)
         asctime = created_time.strftime(self.datefmt)
-        filename = record.filename
-        lineno = record.lineno
         levelname = record.levelname
         message = record.message
-        log = self._fmt % {"asctime": asctime, "filename": filename, "lineno": lineno, "levelname": levelname, "message": message}
+        log = self._fmt % {"asctime": asctime, "levelname": levelname, "message": message}
 
         if record.levelno == logging.DEBUG:
             log = colored(log, "green")
@@ -48,7 +46,7 @@ def setup_logger(output=None, distributed_rank=0, *, color=True, name="OpenViVQA
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
 
-    FORMAT = "[%(asctime)s, File \"%(filename)s\", line %(lineno)s] %(levelname)s: %(message)s"
+    FORMAT = "[%(asctime)s] %(levelname)s: %(message)s"
     plain_formatter = logging.Formatter(FORMAT, datefmt="%d/%m/%Y %H:%M:%S")
     # stdout logging: master only
     if distributed_rank == 0:

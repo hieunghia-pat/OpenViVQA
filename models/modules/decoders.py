@@ -6,9 +6,9 @@ from models.modules.attentions import MultiHeadAttention
 from models.utils import generate_padding_mask, generate_sequential_mask, sinusoid_encoding_table
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.containers import Module, ModuleList
-from builders.build_decoder import META_DECODER
-from builders.build_text_embedding import build_text_embedding
-from builders.build_pretrained_language_model import build_pretrained_language_model
+from builders.decoder_builder import META_DECODER
+from builders.text_embedding_builder import build_text_embedding
+from builders.pretrained_language_model_builder import build_pretrained_language_model
 from data_utils.vocab import Vocab
 from utils.instances import Instances
 

@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from models.base_transformer import AnsweringModel
-from models.modules.visual_embeddings import SinusoidPositionalEmbedding
+from models.modules.vision_embeddings import SinusoidPositionalEmbedding
 from data_utils.vocab import Vocab
 
 class StandardTransformer(AnsweringModel):

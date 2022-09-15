@@ -1,4 +1,4 @@
-from builders.build_encoder import META_ENCODER
+from builders.encoder_builder import META_ENCODER
 from .registry import Registry
 
 META_DECODER = Registry("DECODER_LAYER")

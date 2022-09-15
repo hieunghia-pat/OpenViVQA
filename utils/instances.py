@@ -2,6 +2,10 @@ import itertools
 from typing import Any, Dict, List, Union
 import torch
 
+from .logging_utils import setup_logger
+
+logger = setup_logger()
+
 # special method for concatenating tensor objects
 def pad_values(values: List[torch.tensor]) -> List[torch.tensor]:
         padded_values = []
@@ -41,7 +45,8 @@ class Instances:
 
     def __getattr__(self, name: str) -> Any:
         if name == "_fields" or name not in self._fields:
-            raise AttributeError("Cannot find field '{}' in the given Instances!".format(name))
+            logger.warning("Cannot find field '{}' in the given Instances!".format(name))
+            return None
         return self._fields[name]
 
     def set(self, name: str, value: Any) -> None:

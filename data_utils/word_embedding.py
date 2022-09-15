@@ -1,16 +1,16 @@
 import torch
 import os
-import logging
 from tqdm import tqdm
 import gzip
 import tarfile
 from urllib.request import urlretrieve
-from data_utils.utils import reporthook
+from data_utils.utils import reporthook, unk_init
 import zipfile
 
-from builders.build_word_embedding import META_WORD_EMBEDDING
+from builders.word_embedding_builder import META_WORD_EMBEDDING
+from utils.logging_utils import setup_logger
 
-logger = logging.getLogger(__name__)
+logger = setup_logger()
 
 def _infer_shape(f):
     num_lines, vector_dim = 0, None
@@ -28,15 +28,14 @@ def _infer_shape(f):
     f.seek(0)
     return num_lines, vector_dim
 
-class Vectors(object):
-    def __init__(self, name, cache=None, url=None, unk_init=None, max_vectors=None):
+class WordEmbedding(object):
+    def __init__(self, name, cache=None, url=None, max_vectors=None):
         """
         Args:
 
             name: name of the file that contains the vectors
             cache: directory for cached vectors
             url: url for download if vectors not found in cache
-            unk_init (callback): by default, initialize out-of-vocabulary word vectors
                 to zero vectors; can be any function that takes in a Tensor and returns a Tensor of the same size
             max_vectors (int): this can be used to limit the number of
                 pre-trained vectors loaded.
@@ -54,7 +53,6 @@ class Vectors(object):
         self.dim = None
         self.unk_init = unk_init
         self.cache(name, cache, url=url, max_vectors=max_vectors)
-
 
     def __getitem__(self, token):
         if token in self.stoi:
@@ -205,7 +203,7 @@ class Vectors(object):
         vecs = torch.stack(indices)
         return vecs[0] if to_reduce else vecs
 
-class PhoW2V(Vectors):
+class PhoW2V(WordEmbedding):
     def __init__(self, name, url, **kwargs):
         name = '{}.txt'.format(name)
         super(PhoW2V, self).__init__(name, url=url, **kwargs)
@@ -238,8 +236,7 @@ class PhoW2VWord300(PhoW2V):
                                                 url="https://public.vinai.io/word2vec_vi_words_300dims.zip",
                                                 **kwargs)
 
-@META_WORD_EMBEDDING.register()
-class FastText(Vectors):
+class FastText(WordEmbedding):
     def __init__(self, url_base, **kwargs):
         name = os.path.basename(url_base)
         super(FastText, self).__init__(name, url=url_base, **kwargs)

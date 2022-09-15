@@ -1,7 +1,9 @@
+from torch import nn
+
 from data_utils.vocab import Vocab
 from models.modules.containers import Module
 from models.modules.beam_search import BeamSearch
-from structures.instances import Instances
+from utils.instances import Instances
 
 class BaseTransformer(Module):
     def __init__(self, vocab: Vocab):
@@ -14,18 +16,20 @@ class BaseTransformer(Module):
         self.register_state('enc_padding_mask', None)
 
     def init_weights(self):
-        raise NotImplementedError
+        for p in self.parameters():
+            if p.dim() > 1:
+                nn.init.xavier_uniform_(p)
 
-    def step(self, t, prev_output, visual, seq, mode='teacher_forcing', **kwargs):
+    def step(self, t, prev_output):
         raise NotImplementedError
 
     def encoder_forward(self, input_features: Instances):
         raise NotImplementedError
 
-    def forward(self, images, seq, *args):
+    def forward(self, input_features: Instances):
         raise NotImplementedError
 
-    def beam_search(self, input_features, beam_size: int, out_size=1, return_probs=False, **kwargs):
+    def beam_search(self, input_features: Instances, beam_size: int, out_size=1, return_probs=False, **kwargs):
         # get features from input
         self.enc_features, self.enc_padding_mask = self.encoder_forward(input_features)
 

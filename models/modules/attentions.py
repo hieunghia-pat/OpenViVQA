@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 import numpy as np
-from builders.build_attention import build_attention, META_ATTENTION
+from builders.attention_builder import build_attention, META_ATTENTION
 
 from models.modules.containers import Module
 from models.utils import clones, box_relational_embedding

@@ -2,7 +2,7 @@ from torch import nn
 
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.attentions import MultiHeadAttention
-from builders.build_encoder import META_ENCODER
+from builders.encoder_builder import META_ENCODER
 from utils.instances import Instances
 
 class EncoderLayer(nn.Module):

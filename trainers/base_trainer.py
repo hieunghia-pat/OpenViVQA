@@ -1,80 +1,73 @@
+import torch
+from torch.utils.data import DataLoader
 from torch.nn import NLLLoss
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
 
-from data_utils.vocab import Vocab
-from data_utils.utils import *
-from models.transformers import FusionTransformer
-from data_utils.dataset import *
-import evaluation
-from evaluation import Cider, PTBTokenizer
+from data_utils.vocab import Vocab, ClassificationVocab
+from data_utils.dataset import FeatureDataset, FeatureClassificationDataset, DictionaryDataset
+from data_utils.utils import collate_fn
+from utils.logging_utils import setup_logger
+from utils.instances import Instances
 
-import multiprocessing
+from builders.model_builder import build_model
+
+import evaluation
+from evaluation import Cider
+
+import os
+import numpy as np
+import pickle
 from tqdm import tqdm
 import itertools
-from typing import Tuple, Union
 import random
 from shutil import copyfile
-from yacs.config import CfgNode
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
+logger = setup_logger()
+
 class BaseTrainer:
-    def __init__(self,  model: FusionTransformer, 
-                        train_datasets: Tuple[FeatureDataset, DictionaryDataset],
-                        val_datasets: Tuple[FeatureDataset, DictionaryDataset],
-                        test_datasets: Tuple[Union[FeatureDataset, None], Union[DictionaryDataset, None]],
-                        vocab: Vocab,
-                        config: CfgNode,
-                        collate_fn=collate_fn):
-        self.model = model
-        self.vocab = vocab
-        self.config = config
+    def __init__(self, config):
 
-        self.optim = Adam(model.parameters(), lr=1, betas=(0.9, 0.98))
-        self.scheduler = LambdaLR(self.optim, self.lambda_lr)
+        self.checkpoint_path = os.path.join(config.TRAINING.CHECKPOINT_PATH, config.MODEL.NAME)
+        if not os.path.isdir(self.checkpoint_path):
+            logger.info("Creating checkpoint path")
+            os.makedirs(self.checkpoint_path)
+
+        if not os.path.isfile(os.path.join(self.checkpoint_path, "vocab.bin")):
+            logger.info("Creating vocab")
+            if config.DATASET.TASK == "open-ended":
+                self.vocab = Vocab(config.DATASET.VOCAB)
+            else:
+                self.vocab = ClassificationVocab(config.DATASET.VOCAB)
+            logger.info("Saving vocab to {}" % os.path.join(self.checkpoint_path, "vocab.bin"))
+            pickle.dump(self.vocab, open(os.path.join(self.checkpoint_path, "vocab.bin"), "wb"))
+        else:
+            logger.info("Loading vocab from {}" % os.path.join(self.checkpoint_path, "vocab.bin"))
+            self.vocab = pickle.load(open(os.path.join(self.checkpoint_path, "vocab.bin"), "rb"))
+
+        logger.info("Loading datasets")
+        self.train_dataset, self.dev_dataset, self.test_dataset = self.load_feature_datasets(config.DATASET)
+        self.train_dict_dataset, self.dev_dict_dataset, self.test_dict_dataset = self.load_dict_datasets(config.DATASET)
         
-        self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
-        
-        self.epoch = 0
-
-        self.train_dataset, self.train_dict_dataset = train_datasets
-        self.val_dataset, self.val_dict_dataset = val_datasets
-
         # creating iterable-dataset data loader
-        self.train_dataloader = data.DataLoader(
+        self.train_dataloader = DataLoader(
             dataset=self.train_dataset,
             batch_size=config.batch_size,
             shuffle=True,
             num_workers=config.workers,
             collate_fn=collate_fn
         )
-        self.val_dataloader = data.DataLoader(
+        self.val_dataloader = DataLoader(
             dataset=self.val_dataset,
             batch_size=config.batch_size,
             shuffle=True,
             num_workers=config.workers,
             collate_fn=collate_fn
         )
-
-        # creating dictionary iterable-dataset data loader
-        self.train_dict_dataloader = data.DataLoader(
-            dataset=self.train_dict_dataset,
-            batch_size=config.batch_size // config.training_beam_size,
-            shuffle=True,
-            collate_fn=collate_fn
-        )
-        self.val_dict_dataloader = data.DataLoader(
-            dataset=self.val_dict_dataset,
-            batch_size=config.batch_size // config.training_beam_size,
-            shuffle=True,
-            collate_fn=collate_fn
-        )
-        
-        self.test_dataset, self.test_dict_dataset = test_datasets
-
         if self.test_dataset is not None:
-            self.test_dataloader = data.DataLoader(
+            self.test_dataloader = DataLoader(
                 dataset=self.test_dataset,
                 batch_size=config.batch_size,
                 shuffle=True,
@@ -84,8 +77,21 @@ class BaseTrainer:
         else:
             self.test_dataloader = None
 
+        # creating dictionary iterable-dataset data loader
+        self.train_dict_dataloader = DataLoader(
+            dataset=self.train_dict_dataset,
+            batch_size=config.batch_size // config.training_beam_size,
+            shuffle=True,
+            collate_fn=collate_fn
+        )
+        self.val_dict_dataloader = DataLoader(
+            dataset=self.val_dict_dataset,
+            batch_size=config.batch_size // config.training_beam_size,
+            shuffle=True,
+            collate_fn=collate_fn
+        )
         if self.test_dict_dataset is not None:
-            self.test_dict_dataloader = data.DataLoader(
+            self.test_dict_dataloader = DataLoader(
                 dataset=self.test_dict_dataset,
                 batch_size=config.batch_size // config.training_beam_size,
                 shuffle=True,
@@ -94,49 +100,56 @@ class BaseTrainer:
         else:
             self.test_dict_dataloader = None
 
-        self.train_cider = Cider(PTBTokenizer.tokenize(self.train_dataset.captions))
+        logger.info("Building model")
+        self.model = build_model(config.MODEL)
+        self.config = config
 
-    def evaluate_loss(self, dataloader: data.DataLoader):
-        # Calculating validation loss
+        logger.info("Defining optimizer and objective function")
+        self.optim = Adam(self.model.parameters(), lr=config.TRAINING.LEARNING_RATE, betas=(0.9, 0.98))
+        self.scheduler = LambdaLR(self.optim, self.lambda_lr)
+        self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
+        
+        # training hyperparameters
+        self.epoch = 0
+        self.warmup = config.TRAINING.WARMUP
+        self.score = config.TRAINING.SCORE
+        self.rl_learning_rate = config.TRAINING.RL_LEARNING_RATE
+        self.get_scores = config.TRAINING.GET_SCORES
+        self.training_beam_size = config.TRAINING.TRAINING_BEAM_SIZE
+        self.evaluating_beam_size = config.TRAINING.EVALUATING_BEAM_SIZE
+        self.patience = config.TRAINING.PATIENCE
+
+        self.train_cider = Cider(self.train_dataset.answers())
+
+    def load_feature_datasets(self, config):
+        if config.TASK == "open-ended":
+            train_dataset = FeatureDataset(config.JSON_PATH.TRAIN, self.vocab, config)
+            dev_dataset = FeatureDataset(config.JSON_PATH.DEV, self.vocab, config)
+            test_dataset = FeatureDataset(config.JSON_PATH.TEST, self.vocab, config)
+        else:
+            train_dataset = FeatureClassificationDataset(config.JSON_PATH.TRAIN, self.vocab, config)
+            dev_dataset = FeatureClassificationDataset(config.JSON_PATH.DEV, self.vocab, config)
+            test_dataset = FeatureClassificationDataset(config.JSON_PATH.TEST, self.vocab, config)
+
+        return train_dataset, dev_dataset, test_dataset
+
+    def load_dict_datasets(self, config):
+        train_dataset = DictionaryDataset(config.JSON_PATH.TRAIN, self.vocab, config)
+        dev_dataset = DictionaryDataset(config.JSON_PATH.DEV, self.vocab, config)
+        test_dataset = DictionaryDataset(config.JSON_PATH.TEST, self.vocab, config)
+
+        return train_dataset, dev_dataset, test_dataset
+
+    def evaluate_loss(self, dataloader: DataLoader):
         self.model.eval()
         running_loss = .0
         with tqdm(desc='Epoch %d - Validation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             with torch.no_grad():
-                for it, sample in enumerate(dataloader):
-                    visual_features = sample["visual"]
-
-                    region_features = visual_features["region"]
-                    if region_features is not None:
-                        region_features = region_features.to(device)
-
-                    grid_features = visual_features["grid"]
-                    if grid_features is not None:
-                        grid_features = grid_features.to(device)
-
-                    assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
-
-                    region_boxes = sample["region_boxes"]
-                    grid_boxes = sample["grid_boxes"]
-
-                    visual = Feature({
-                            "region_features": region_features,
-                            "grid_features": grid_features,
-                            "features": region_features if region_features is not None else grid_features,
-                            "boxes": region_boxes if region_boxes is not None else grid_boxes
-                        })
-
-                    question_tokens = sample["question_tokens"].to(device)
-                    answer_tokens = sample["answer_tokens"].to(device)
-                    shifted_right_answer_tokens = sample["shifted_right_answer_tokens"].to(device)
-
-                    linguistic = Feature({
-                        "question_tokens": question_tokens,
-                        "answer_tokens": answer_tokens
-                    })
-                    
+                for it, items in enumerate(dataloader):
                     with torch.no_grad():
-                        out = self.model(visual, linguistic).contiguous()
+                        out = self.model(items).contiguous()
                     
+                    shifted_right_answer_tokens = items.shifted_right_answer_tokens
                     loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
@@ -148,98 +161,37 @@ class BaseTrainer:
 
         return val_loss
 
-    def evaluate_metrics(self, dataloader: data.DataLoader):
+    def evaluate_metrics(self, dataloader: DataLoader):
         self.model.eval()
-        gen = {}
+        gens = {}
         gts = {}
         with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
-            for it, sample in enumerate(dataloader):
-                region_features = sample["region_features"]
-                if region_features is not None:
-                    region_features = region_features.to(device)
-
-                grid_features = sample["grid_features"]
-                if grid_features is not None:
-                    grid_features = grid_features.to(device)
-
-                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
-
-                region_boxes = sample["region_boxes"]
-                grid_boxes = sample["grid_boxes"]
-
-                visual = Feature({
-                        "region_features": region_features,
-                        "grid_features": grid_features,
-                        "region_boxes": region_boxes,
-                        "grid_boxes": grid_boxes,
-                        "features": region_features if region_features is not None else grid_features,
-                        "boxes": region_boxes if region_boxes is not None else grid_boxes
-                    })
-
-                question_tokens = sample["question_tokens"].to(device)
-
-                linguistic = Feature({
-                    "question_tokens": question_tokens
-                })
-
+            for it, items in enumerate(dataloader):
+                items = items.to(device)
                 with torch.no_grad():
-                    outs, _ = self.model.beam_search(visual, linguistic, 
-                                                    max_len=self.vocab.max_answer_length, eos_idx=self.vocab.eos_idx, 
-                                                    beam_size=self.config.training.evaluating_beam_size, out_size=1)
+                    outs, _ = self.model.beam_search(items, beam_size=self.evaluating_beam_size, out_size=1)
 
-                answers_gt = sample["answers"]
+                answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
-                answers_gt = list(itertools.chain(*([a, ] * self.config.training.training_beam_size for a in answers_gt)))
+                answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
-                    gen['%d_%d' % (it, i)] = [gen_i, ]
+                    gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
                 pbar.update()
 
-        gts = evaluation.PTBTokenizer.tokenize(gts)
-        gen = evaluation.PTBTokenizer.tokenize(gen)
-        scores, _ = evaluation.compute_scores(gts, gen)
+        scores, _ = evaluation.compute_scores(gts, gens)
 
         return scores
 
     def train_xe(self):
-        # Training with cross-entropy loss
         self.model.train()
 
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
-            for it, sample in enumerate(self.train_dataloader):
-                region_features = sample["region_features"]
-                if region_features is not None:
-                    region_features = region_features.to(device)
-
-                grid_features = sample["grid_features"]
-                if grid_features is not None:
-                    grid_features = grid_features.to(device)
-
-                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
-
-                region_boxes = sample["region_boxes"]
-                grid_boxes = sample["grid_boxes"]
-
-                visual = Feature({
-                        "region_features": region_features,
-                        "grid_features": grid_features,
-                        "features": region_features if region_features is not None else grid_features,
-                        "boxes": region_boxes if region_boxes is not None else grid_boxes
-                    })
-
-                question_tokens = sample["question_tokens"].to(device)
-                answer_tokens = sample["answer_tokens"].to(device)
-                shifted_right_answer_tokens = sample["shifted_right_answer_tokens"].to(device)
-
-                linguistic = Feature({
-                    "question_tokens": question_tokens,
-                    "answer_tokens": answer_tokens
-                })
-                
-                out = self.model(visual, linguistic).contiguous()
-
+            for it, items in enumerate(self.train_dataloader):
+                out = self.model(items).contiguous()
+                shifted_right_answer_tokens = items.shifted_right_answer_tokens
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
                 loss.backward()
@@ -253,8 +205,6 @@ class BaseTrainer:
                 self.scheduler.step()
     
     def train_scst(self):
-        # Training with self-critical learning
-        tokenizer_pool = multiprocessing.Pool()
         running_reward = .0
         running_reward_baseline = .0
 
@@ -264,48 +214,17 @@ class BaseTrainer:
 
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dict_dataloader)) as pbar:
-            for it, sample in enumerate(self.train_dict_dataloader):
-                region_features = sample["region_features"]
-                if region_features is not None:
-                    region_features = region_features.to(device)
-
-                grid_features = sample["grid_features"]
-                if grid_features is not None:
-                    grid_features = grid_features.to(device)
-
-                assert region_features is not None or grid_features is not None, "both region-based features and grid-based features are None"
-
-                region_boxes = sample["region_boxes"]
-                grid_boxes = sample["grid_boxes"]
-
-                visual = Feature({
-                        "region_features": region_features,
-                        "grid_features": grid_features,
-                        "region_boxes": region_boxes,
-                        "grid_boxes": grid_boxes,
-                        "features": region_features if region_features is not None else grid_features,
-                        "boxes": region_boxes if region_boxes is not None else grid_boxes
-                    })
-
-                question_tokens = sample["question_tokens"].to(device)
-
-                linguistic = Feature({
-                    "question_tokens": question_tokens
-                })
-
-                outs, log_probs = self.model.beam_search(visual, linguistic,
-                                                        max_len=vocab.max_answer_length, eos_idx=vocab.eos_idx,
-                                                        beam_size=self.config.training.training_beam_size, 
-                                                        out_size=self.config.training.training_beam_size)
+            for it, items in enumerate(self.train_dict_dataloader):
+                outs, log_probs = self.model.beam_search(items, beam_size=self.training_beam_size, 
+                                                        out_size=self.training_beam_size)
                 
                 self.optim.zero_grad()
 
                 # Rewards
-                bs = question_tokens.shape[0]
-                answers_gt = sample["answers"]
+                bs = items.question_tokens.shape[0]
+                answers_gt = items.answers
                 answers_gen = vocab.decode_answer(outs.contiguous().view(-1, vocab.max_answer_length), join_words=True)
-                answers_gt = list(itertools.chain(*([a, ] * self.config.training.training_beam_size for a in answers_gt)))
-                answers_gen, answers_gt = tokenizer_pool.map(evaluation.PTBTokenizer.tokenize, [answers_gen, answers_gt])
+                answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
                 reward = self.train_cider.compute_score(answers_gt, answers_gen)[1].astype(np.float32)
                 reward = torch.from_numpy(reward).to(device).view(bs, self.config.training.training_beam_size)
                 reward_baseline = torch.mean(reward, dim=-1, keepdim=True)
@@ -323,13 +242,15 @@ class BaseTrainer:
                 pbar.update()
 
     def lambda_lr(self, step):
-        warm_up = self.config.training.warmup
+        warm_up = self.warmup
         step += 1
         return (self.model.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
 
     def load_checkpoint(self, fname) -> dict:
         if not os.path.exists(fname):
             return None
+
+        logger.info("Loading checkpoint from {}" % fname)
 
         checkpoint = torch.load(fname)
 
@@ -340,17 +261,18 @@ class BaseTrainer:
 
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
-        print(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - best cider on val {checkpoint['best_val_cider']} - best cider on test {checkpoint['best_test_cider']}")
+        logger.info(f"resuming from epoch {checkpoint['epoch']} - validation loss {checkpoint['val_loss']} - \
+                        best cider on val {checkpoint['best_val_score']} - best cider on test {checkpoint['best_test_score']}")
 
-        return {
-            "use_rl": checkpoint['use_rl'],
-            "best_val_cider": checkpoint['best_val_cider'],
-            "best_test_cider": checkpoint['best_test_cider'],
-            "patience": checkpoint['patience'],
-            "epoch": checkpoint["epoch"],
-            "optimizer": checkpoint["optimizer"],
-            "scheduler": checkpoint["scheduler"]
-        }
+        return Instances(
+            use_rl = checkpoint['use_rl'],
+            best_val_score=checkpoint['best_val_score'],
+            best_test_score=checkpoint['best_test_score'],
+            patience=checkpoint['patience'],
+            epoch=checkpoint["epoch"],
+            optimizer=checkpoint["optimizer"],
+            scheduler=checkpoint["scheduler"]
+        )
 
     def save_checkpoint(self, dict_for_updating: dict) -> None:
         dict_for_saving = {
@@ -367,25 +289,22 @@ class BaseTrainer:
         for key, value in dict_for_updating.items():
             dict_for_saving[key] = value
 
-        torch.save(dict_for_saving, os.path.join(self.config.training.checkpoint_path, 
-                                                    self.config.training.model, 
-                                                    "last_model.pth"))
+        torch.save(dict_for_saving, os.path.join(self.checkpoint_path, "last_model.pth"))
 
-    def train(self, checkpoint_filename: str = None):
-        
-        if checkpoint_filename is not None and os.path.isfile(checkpoint_filename):
-            checkpoint = self.load_checkpoint(checkpoint_filename)
+    def train(self):
+        if not os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
+            checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
             use_rl = checkpoint["use_rl"]
-            best_val_cider = checkpoint["best_val_cider"]
-            best_test_cider = checkpoint["best_test_cider"]
+            best_val_score = checkpoint["best_val_score"]
+            best_test_score = checkpoint["best_test_score"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"]
             self.optim.load_state_dict(checkpoint['optimizer'])
             self.scheduler.load_state_dict(checkpoint['scheduler'])
         else:
             use_rl = False
-            best_val_cider = .0
-            best_test_cider = .0
+            best_val_score = .0
+            best_test_score = .0
             patience = 0
 
         while True:
@@ -399,7 +318,7 @@ class BaseTrainer:
             # val scores
             scores = self.evaluate_metrics(self.val_dict_dataloader)
             print("Validation scores", scores)
-            val_cider = scores['CIDEr']
+            val_score = scores[self.score]
 
             if self.test_dict_dataloader is not None:
                 scores = self.evaluate_metrics(self.test_dict_dataloader)
@@ -407,8 +326,8 @@ class BaseTrainer:
 
             # Prepare for next epoch
             best = False
-            if val_cider >= best_val_cider:
-                best_val_cider = val_cider
+            if val_score >= best_val_score:
+                best_val_score = val_score
                 patience = 0
                 best = True
             else:
@@ -417,80 +336,73 @@ class BaseTrainer:
             switch_to_rl = False
             exit_train = False
 
-            if patience == 5:
+            if patience == self.patience:
                 if not use_rl:
                     use_rl = True
                     switch_to_rl = True
                     patience = 0
-                    self.optim = Adam(self.model.parameters(), lr=5e-6)
+                    self.optim = Adam(self.model.parameters(), lr=self.rl_learning_rate)
                     print("Switching to RL")
                 else:
                     print('patience reached.')
                     exit_train = True
 
             if switch_to_rl and not best:
-                self.load_checkpoint(os.path.join(self.config.training.checkpoint_path, self.config.model.name, "best_model.pth"))
+                self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
 
             self.save_checkpoint({
                 'val_loss': val_loss,
-                'val_cider': val_cider,
+                'val_cider': val_score,
                 'patience': patience,
-                'best_val_cider': best_val_cider,
-                'best_test_cider': best_test_cider,
-                'use_rl': use_rl,
+                'best_val_score': best_val_score,
+                'best_test_score': best_test_score,
+                'use_rl': use_rl
             })
 
             if best:
-                copyfile(   
-                            os.path.join(self.config.training.checkpoint_path, self.config.model.name, "last_model.pth"), 
-                            os.path.join(self.config.training.checkpoint_path, self.config.training.model_name, "best_model.pth")
-                        )
+                copyfile(os.path.join(self.checkpoint_path, "last_model.pth"), 
+                        os.path.join(self.checkpoint_path, "best_model.pth"))
 
             if exit_train:
                 break
 
             self.epoch += 1
-            
-            print("+"*10)
 
-    def get_predictions(self, dataset: DictionaryDataset, checkpoint_filename: str=None, get_scores=True):
-        if checkpoint_filename is not None and os.path.isfile(checkpoint_filename):
-            self.load_checkpoint(checkpoint_filename)
-            
+    def get_predictions(self, dataset: DictionaryDataset, get_scores=True):
+        if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
+            logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
+            raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
+
+        logger.info(f"Loading checkpoint from {os.path.join(self.checkpoint_path, 'best_model.pth')} for predicting")
+        self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
+
         self.model.eval()
         results = []
         with tqdm(desc='Getting predictions: ', unit='it', total=len(dataset)) as pbar:
-            for it, sample in enumerate(dataset):
-                image_id = sample["image_id"]
-                filename = sample["filename"]
-                features = torch.tensor(sample["features"]).unsqueeze(0).to(device)
-                boxes = sample["boxes"]
-                if boxes is not None:
-                    boxes = torch.tensor(boxes).unsqueeze(0).to(device)
-                grid_sizes = [sample["grid_size"]]
-                caps_gt = [sample["captions"]]
+            for it, items in enumerate(dataset):
+                items = items.to(device)
                 with torch.no_grad():
-                    out, _ = self.model.beam_search(features, boxes=boxes, grid_sizes=grid_sizes, 
-                                                        max_len=self.vocab.max_caption_length, eos_idx=self.vocab.eos_idx, 
-                                                        beam_size=self.config.training.evaluating_beam_size, out_size=1)
-                caps_gen = self.vocab.decode_answer(out, join_words=False)
+                    outs, _ = self.model.beam_search(items, beam_size=self.evaluating_beam_size, out_size=1)
+
+                answers_gt = items.answers
+                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
+                answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
                 gts = {}
                 gens = {}
-                for i, (gts_i, gen_i) in enumerate(zip(caps_gt, caps_gen)):
+                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
-                    
-                gts = evaluation.PTBTokenizer.tokenize(gts)
-                gens = evaluation.PTBTokenizer.tokenize(gens)
+                pbar.update()
+                
                 if get_scores:
                     scores, _ = evaluation.compute_scores(gts, gens)
                 else:
                     scores = None
 
                 results.append({
-                    "image_id": image_id,
-                    "filename": filename,
+                    "image_id": items.image_id,
+                    "filename": items.filename,
                     "gens": gens,
                     "gts": gts,
                     "scores": scores
@@ -499,17 +411,3 @@ class BaseTrainer:
                 pbar.update()
 
         return results
-
-    def convert_results(self, sample_submisison_json, results, split="public"):
-        sample_json_data = json.load(open(sample_submisison_json))
-        for sample_item in tqdm(sample_json_data, desc="Converting results: "):
-            for item in results:
-                if sample_item["id"] == item["filename"]:
-                    generated_captions = list(item["gens"].values())
-                    sample_item["captions"] = generated_captions[0][0]
-                    break
-
-        json.dump(sample_json_data, open(os.path.join(self.config.training.checkpoint_path, 
-                                                        self.config.model.name, 
-                                                        f"{split}_results.json"), "w+"), 
-                                        ensure_ascii=False)

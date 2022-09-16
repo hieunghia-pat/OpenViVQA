@@ -1,15 +1,14 @@
 import torch
 from data_utils.types import *
-from models.utils import get_batch_size, get_device
 
 class BeamSearch(object):
-    def __init__(self, model, max_len: int, eos_idx: int, beam_size: int):
+    def __init__(self, model, b_s: int, max_len: int, eos_idx: int, beam_size: int, device):
         self.model = model
         self.max_len = max_len
         self.eos_idx = eos_idx
         self.beam_size = beam_size
-        self.b_s = None
-        self.device = None
+        self.b_s = b_s
+        self.device = device
         self.seq_mask = None
         self.seq_logprob = None
         self.outputs = None
@@ -84,8 +83,6 @@ class BeamSearch(object):
         return outputs
 
     def apply(self, out_size=1, return_probs=False, **kwargs):
-        self.b_s = get_batch_size(self.model.enc_features)
-        self.device = get_device(self.model.enc_features)
         self.seq_mask = torch.ones((self.b_s, self.beam_size, 1), device=self.device)
         self.seq_logprob = torch.zeros((self.b_s, 1, 1), device=self.device)
         self.log_probs = []

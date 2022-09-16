@@ -55,7 +55,21 @@ class Instances:
         The length of `value` must be the number of instances,
         and must agree with other existing fields in this object.
         """
+        if not hasattr(self, "_batch_size"):
+            if isinstance(value, torch.tensor):
+                self._batch_size = value.shape[0]
+            elif isinstance(value, list):
+                self._batch_size = len(value)
+        else:
+            assert self._batch_size == (value.shape[0] if isinstance(value, torch.tensor) else len(value)), f"{name} has different batch size!"
         self._fields[name] = value
+
+    @property
+    def batch_size(self) -> int:
+        if hasattr(self, "_batch_size"):
+            return self._batch_size
+        else:
+            return 0
 
     def has(self, name: str) -> bool:
         """

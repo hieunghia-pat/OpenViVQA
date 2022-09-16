@@ -1,5 +1,4 @@
 import torch
-from torchvision import transforms
 import re
 from typing import List
 

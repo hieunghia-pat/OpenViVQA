@@ -1,5 +1,3 @@
-import torch
-
 from .base_transformer import BaseTransformer
 from data_utils.vocab import Vocab
 from utils.instances import Instances
@@ -48,7 +46,7 @@ class ExtendedMCAN(BaseTransformer):
         vision_features, vision_padding_mask = self.vision_embedding(vision_features)
 
         question_tokens = input_features.question_tokens
-        text_features, text_padding_mask, _ = self.text_embedding(question_tokens)
+        text_features, (text_padding_mask, _) = self.text_embedding(question_tokens)
 
         encoder_features = self.encoder(Instances(
             vision_features=vision_features,
@@ -58,18 +56,3 @@ class ExtendedMCAN(BaseTransformer):
         ))
 
         return encoder_features, vision_padding_mask
-    
-    def step(self, t, prev_output):
-        bs = self.encoder_features.shape[0]
-        if t == 0:
-            it = torch.zeros((bs, 1)).long().fill_(self.vocab.bos_idx).to(self.encoder_features.device)
-        else:
-            it = prev_output
-
-        output = self.decoder(Instances(
-            answer_tokens=it,
-            enc_features=self.encoder_features,
-            encoder_attention_mask=self.encoder_padding_mask
-        ))
-
-        return output

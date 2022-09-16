@@ -2,34 +2,32 @@ import torch
 from torch.utils import data
 
 from data_utils.utils import preprocess_sentence
-from data_utils.vocab import ClassificationVocab, Vocab
 from utils.instances import Instances
 
 import json
 import os
 import numpy as np
 import cv2 as cv
-from typing import Dict, List, Union, Any
+from typing import Dict, List, Any
 
 class BaseDataset(data.Dataset):
-    def __init__(self, json_path: str, image_features_path: str, scene_text_features_path: str=None, 
-                    scene_text_threshold=None, vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
+    def __init__(self, json_path: str, vocab, config) -> None:
         super(BaseDataset, self).__init__()
         with open(json_path, 'r') as file:
             json_data = json.load(file)
 
         # vocab
-        self.vocab = Vocab([json_path], tokenizer_name=tokenizer_name) if vocab is None else vocab
+        self.vocab = vocab
 
         # quesion-answer pairs
         self.annotations = self.load_json(json_data)
 
         # image features
-        self.image_features_path = image_features_path
+        self.image_features_path = config.FEATURE_PATH.FEATURES
 
         # scene text features
-        self.scene_text_feature_path = scene_text_features_path
-        self.scene_text_threshold = scene_text_threshold
+        self.scene_text_feature_path = config.FEATURE_PATH.SCENE_TEXT
+        self.scene_text_threshold = config.SCENE_TEXT_THRESHOLD
 
     def load_json(self, json_data: Dict) -> List[Dict]:
         annotations = []
@@ -88,10 +86,8 @@ class BaseDataset(data.Dataset):
         return len(self.annotations)
 
 class DictionaryDataset(BaseDataset):
-    def __init__(self, json_path: str, image_features_path: str, scene_text_features_path: str=None, 
-                    scene_text_threshold=None, vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
-        super(DictionaryDataset, self).__init__(json_path, image_features_path, scene_text_features_path,
-                                                    scene_text_threshold, vocab, tokenizer_name)
+    def __init__(self, json_path: str, vocab, config) -> None:
+        super(DictionaryDataset, self).__init__(json_path, vocab, config)
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
@@ -102,6 +98,7 @@ class DictionaryDataset(BaseDataset):
         answer = item["answer"]
 
         return Instances(
+            image_id=image_id,
             filename=filename,
             question_tokens=question,
             answer=answer,
@@ -110,10 +107,10 @@ class DictionaryDataset(BaseDataset):
 
 class ImageDataset(BaseDataset):
     # This class is designed especially for visualizing purposes
-    def __init__(self, json_path: str, image_features_path: str, scene_text_features_path: str=None, 
-                    scene_text_threshold=None, vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
-        super(ImageDataset, self).__init__(json_path, image_features_path, scene_text_features_path,
-                                                    scene_text_threshold, vocab, tokenizer_name)
+    def __init__(self, json_path: str, vocab, config) -> None:
+        super(ImageDataset, self).__init__(json_path, vocab, config)
+
+        self.image_path = config.FEATURE_PATH.IMAGE
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
@@ -133,10 +130,8 @@ class ImageDataset(BaseDataset):
         )
 
 class FeatureDataset(BaseDataset):
-    def __init__(self, json_path: str, image_features_path: str, scene_text_features_path: str=None, 
-                    scene_text_threshold=None, vocab: Vocab = None, tokenizer_name: Union[str, None] = None) -> None:
-        super(FeatureDataset, self).__init__(json_path, image_features_path, scene_text_features_path,
-                                                    scene_text_threshold, vocab, tokenizer_name)
+    def __init__(self, json_path: str, vocab, config) -> None:
+        super(FeatureDataset, self).__init__(json_path, vocab, config)
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
@@ -163,8 +158,8 @@ class FeatureClassificationDataset(BaseDataset):
     # This class is especially designed for ViVQA dataset by treating the VQA as a classification task. 
     # For more information, please visit https://arxiv.org/abs/1708.02711
     
-    def __init__(self, json_path: str, image_features_path: str, vocab: ClassificationVocab = None, tokenizer_name: Union[str, None] = None) -> None:
-        super(FeatureClassificationDataset, self).__init__(json_path, image_features_path, vocab, tokenizer_name)
+    def __init__(self, json_path: str, vocab, config) -> None:
+        super(FeatureClassificationDataset, self).__init__(json_path, vocab, config)
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]

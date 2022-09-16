@@ -1,6 +1,5 @@
 import torch
 import os
-import dill as pickle
 import numpy as np
 import random
 import json
@@ -8,8 +7,7 @@ import json
 from trainers.answering_model_trainer import Trainer
 from data_utils.vocab import Vocab
 from data_utils.dataset import FeatureDataset, DictionaryDataset
-from data_utils.utils import collate_fn
-from configs.config import get_default_config
+from configs.utils import get_config
 
 from models.transformers import FusionTransformer
 

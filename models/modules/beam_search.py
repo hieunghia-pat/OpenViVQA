@@ -54,7 +54,7 @@ class BeamSearch(object):
             old_seq_logprob[:, :, 1:] = -999
             candidate_logprob = self.seq_mask * candidate_logprob + old_seq_logprob * (1 - self.seq_mask)
 
-        selected_idx, selected_logprob = self.select(t, candidate_logprob, **kwargs)
+        selected_idx, selected_logprob = self.select(candidate_logprob)
         selected_beam = torch.div(selected_idx, candidate_logprob.shape[-1], rounding_mode="trunc")
         selected_words = selected_idx - selected_beam * candidate_logprob.shape[-1]
 
@@ -91,9 +91,8 @@ class BeamSearch(object):
             self.all_log_probs = []
 
         outputs = []
-        with self.model.statefulness(self.b_s):
-            for t in range(self.max_len):
-                outputs = self.iter(t, outputs, return_probs, **kwargs)
+        for t in range(self.max_len):
+            outputs = self.iter(t, outputs, return_probs, **kwargs)
 
         # Sort result
         seq_logprob, sort_idxs = torch.sort(self.seq_logprob, 1, descending=True)

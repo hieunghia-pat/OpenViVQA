@@ -16,9 +16,9 @@ class DecoderLayer(Module):
     def __init__(self, config):
         super(DecoderLayer, self).__init__()
 
-        self.self_attn = MultiHeadAttention(config)
-        self.enc_attn = MultiHeadAttention(config)
-        self.pwff = PositionWiseFeedForward(config)
+        self.self_attn = MultiHeadAttention(config.SELF_ATTENTION)
+        self.enc_attn = MultiHeadAttention(config.ENC_ATTENTION)
+        self.pwff = PositionWiseFeedForward(config.ENC_ATTENTION)
 
     def forward(self, queries, keys, values, self_attention_mask=None, enc_attention_mask=None, **kwargs):
         self_att = self.self_attn(queries, queries, queries, attention_mask=self_attention_mask, **kwargs)

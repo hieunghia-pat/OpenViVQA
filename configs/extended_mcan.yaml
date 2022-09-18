@@ -1,8 +1,9 @@
+TASK: OpenEndedTask
+
 DATASET:
-  BATCH_SIZE: 32
-  WORKERS: 2
+  BATCH_SIZE: 5
+  WORKERS: 0
   MIN_FREQ: 1
-  TASK: open-ended
   SCENE_TEXT_THRESHOLD: 0.3
   VOCAB:
     TOKENIZER: null
@@ -31,7 +32,7 @@ TRAINING:
   SCORE: CIDEr
   GET_SCORES: False
   TRAINING_BEAM_SIZE: 5
-  EVALUATING_BEAM_SIZE: 
+  EVALUATING_BEAM_SIZE: 3
   PATIENCE: 5
 
 MODEL:
@@ -81,16 +82,28 @@ MODEL:
     D_MODEL: 512
     LAYERS: 3
     ATTENTION:
-      ARCHITECTURE: ScaledDotProductAttention
-      HEAD: 8
-      D_MODEL: 512
-      D_KEY: 64
-      D_VALUE: 64
-      D_FF: 2048
-      D_FEATURE: 2048
-      USE_AOA: False
-      CAN_BE_STATEFUL: True
-      DROPOUT: .1
+      SELF_ATTENTION:
+        ARCHITECTURE: ScaledDotProductAttention
+        HEAD: 8
+        D_MODEL: 512
+        D_KEY: 64
+        D_VALUE: 64
+        D_FF: 2048
+        D_FEATURE: 2048
+        USE_AOA: False
+        CAN_BE_STATEFUL: True
+        DROPOUT: .1
+      ENC_ATTENTION:
+        ARCHITECTURE: ScaledDotProductAttention
+        HEAD: 8
+        D_MODEL: 512
+        D_KEY: 64
+        D_VALUE: 64
+        D_FF: 2048
+        D_FEATURE: 2048
+        USE_AOA: False
+        CAN_BE_STATEFUL: False
+        DROPOUT: .1
     TEXT_EMBEDDING:
       ARCHITECTURE: UsualEmbedding
       D_MODEL: 512

@@ -38,7 +38,8 @@ class BaseDataset(data.Dataset):
                     annotation = {
                         "question": preprocess_sentence(ann["question"], self.vocab.tokenizer),
                         "answer": preprocess_sentence(ann["answer"], self.vocab.tokenizer),
-                        "image_id": ann["image_id"]
+                        "image_id": ann["image_id"],
+                        "filename": image["filename"]
                     }
                     break
 
@@ -95,7 +96,7 @@ class DictionaryDataset(BaseDataset):
         filename = item["filename"]
         features = self.load_features(image_id)
         question = self.vocab.encode_question(item["question"])
-        answer = item["answer"]
+        answer = [item["answer"]]
 
         return Instances(
             image_id=image_id,
@@ -119,8 +120,8 @@ class ImageDataset(BaseDataset):
         image = cv.imread(image_file)
         image = cv.resize(image, (512, 512), interpolation=cv.INTER_AREA)
 
-        question = item["question"]
-        answer = item["answer"]
+        question = [item["question"]]
+        answer = [item["answer"]]
         features = self.load_features(item["image_id"])
 
         return Instances(
@@ -139,7 +140,7 @@ class FeatureDataset(BaseDataset):
         answer = self.vocab.encode_answer(item["answer"])
 
         shifted_right_answer = torch.zeros_like(answer).fill_(self.vocab.padding_idx)
-        shifted_right_answer[:-1] = answer[1:]
+        shifted_right_answer[:, :-1] = answer[:, 1:]
         answer = torch.where(answer == self.vocab.eos_idx, self.vocab.padding_idx, answer) # remove eos_token in answer
         
         features = self.load_features(self.annotations[idx]["image_id"])

@@ -1,3 +1,5 @@
+import torch
+
 from .base_transformer import BaseTransformer
 from data_utils.vocab import Vocab
 from utils.instances import Instances
@@ -11,6 +13,8 @@ from builders.model_builder import META_ARCHITECTURE
 class ExtendedMCAN(BaseTransformer):
     def __init__(self, config, vocab: Vocab):
         super(ExtendedMCAN, self).__init__(vocab)
+
+        self.device = torch.device(config.DEVICE)
 
         self.text_embedding = build_text_embedding(config.TEXT_EMBEDDING, vocab)
         self.vision_embedding = build_vision_embedding(config.VISION_EMBEDDING)

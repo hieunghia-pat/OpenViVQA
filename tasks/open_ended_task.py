@@ -94,8 +94,6 @@ class OpenEndedTask(BaseTask):
 
         scores, _ = evaluation.compute_scores(gts, gens)
 
-        print(scores)
-
         return scores
 
     def train(self):

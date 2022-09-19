@@ -140,7 +140,7 @@ class FeatureDataset(BaseDataset):
         answer = self.vocab.encode_answer(item["answer"])
 
         shifted_right_answer = torch.zeros_like(answer).fill_(self.vocab.padding_idx)
-        shifted_right_answer[:, :-1] = answer[:, 1:]
+        shifted_right_answer[:-1] = answer[1:]
         answer = torch.where(answer == self.vocab.eos_idx, self.vocab.padding_idx, answer) # remove eos_token in answer
         
         features = self.load_features(self.annotations[idx]["image_id"])

@@ -103,14 +103,14 @@ class Vocab(object):
         vec = torch.ones(self.max_question_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + question + [self.eos_token]):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
-        return vec.unsqueeze(0)
+        return vec
 
     def encode_answer(self, answer: str) -> torch.Tensor:
         """ Turn a answer into a vector of indices and a question length """
         vec = torch.ones(self.max_answer_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + answer + [self.eos_token]):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
-        return vec.unsqueeze(0)
+        return vec
 
     def decode_question(self, question_vecs: torch.Tensor, join_words=True) -> List[str]:
         '''

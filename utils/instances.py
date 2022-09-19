@@ -9,21 +9,18 @@ logger = setup_logger()
 # special method for concatenating tensor objects
 def pad_values(values: List[torch.tensor]) -> List[torch.tensor]:
         padded_values = []
-        max_len = max([value.shape[1] for value in values])
+        max_len = max([value.shape[0] for value in values])
         for value in values:
-            additional_len = max_len - value.shape[1]
+            additional_len = max_len - value.shape[0]
             
             if additional_len == 0:
-                padded_values.append(value)
+                padded_values.append(value.unsqueeze(0))
                 continue
 
-            if len(value.shape) > 2:
-                padding_value = torch.zeros((value.shape[0], additional_len, value.shape[-1]))
-            else:
-                padding_value = torch.zeros((value.shape[0], additional_len))
-            value = torch.cat([value, padding_value], dim=1)
+            padding_value = torch.zeros((additional_len, value.shape[-1]))
+            value = torch.cat([value, padding_value], dim=0)
 
-            padded_values.append(value)
+            padded_values.append(value.unsqueeze(0))
         
         return padded_values
 

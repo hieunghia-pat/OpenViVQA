@@ -1,27 +1,25 @@
 import torch
 from torch import nn
-
 from data_utils.types import *
-
-import numpy as np
 import copy
 
-def get_batch_size(x: dict):
-    if "features" in x:
-        return x["features"].shape[0]
+def get_batch_size(x: TensorOrSequence) -> int:
+    if isinstance(x, torch.Tensor):
+        b_s = x.size(0)
     else:
-        return x["region_features"].shape[0]
+        b_s = x[0].size(0)
+    return b_s
 
-def get_device(x: dict):
-    if "features" in x:
-        return x["features"].device
+def get_device(x: TensorOrSequence) -> int:
+    if isinstance(x, torch.Tensor):
+        b_s = x.device
     else:
-        return x["region_features"].device
+        b_s = x[0].device
+    return b_s
 
 def positional_embedding(input, d_model) -> torch.Tensor:
     input = input.view(-1, 1)
-    dim = torch.arange(d_model // 2, dtype=torch.float32,
-                       device=input.device).view(1, -1)
+    dim = torch.arange(d_model // 2, dtype=torch.float32, device=input.device).view(1, -1)
     sin = torch.sin(input / 10000 ** (2 * dim / d_model))
     cos = torch.cos(input / 10000 ** (2 * dim / d_model))
 
@@ -29,7 +27,6 @@ def positional_embedding(input, d_model) -> torch.Tensor:
     out[:, ::2] = sin
     out[:, 1::2] = cos
     return out
-
 
 def sinusoid_encoding_table(max_len, d_model, padding_idx=None) -> torch.Tensor:
     pos = torch.arange(max_len, dtype=torch.float32)
@@ -39,120 +36,67 @@ def sinusoid_encoding_table(max_len, d_model, padding_idx=None) -> torch.Tensor:
         out[padding_idx] = 0
     return out
 
-
 def clones(module, n):
     "Produce N identical layers."
     return nn.ModuleList([copy.deepcopy(module) for _ in range(n)])
 
-
 def generate_padding_mask(sequences: TensorOrNone, padding_idx: int) -> torch.BoolTensor:
     '''
-        sequences: (bs, seq_len) or (bs, seq_len, dim)
+        sequences: (bs, seq_len, dim)
     '''
     if sequences is None:
         return None
 
-    if len(sequences.shape) == 2:  # (bs, seq_len)
-        __seq = sequences.unsqueeze(dim=-1)  # (bs, seq_len, 1)
-    else: # (bs, deq_len, dim)
+    if len(sequences.shape) == 2: # (bs, seq_len)
+        __seq = sequences.unsqueeze(dim=-1) # (bs, seq_len, 1)
+    else:
         __seq = sequences
 
-    mask = (torch.sum(__seq, dim=-1) == padding_idx)  # (b_s, seq_len)
-    return mask
-
+    mask = (torch.sum(__seq, dim=-1) == padding_idx) # (b_s, seq_len)
+    return mask.unsqueeze(1).unsqueeze(1) # (bs, 1, 1, seq_len)
 
 def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
     '''
         Mask out subsequent positions
     '''
     attn_shape = (seq_len, seq_len)
-    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).to(torch.bool)
+    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).to(torch.bool) # (seq_len, seq_len)
 
-    return subsequent_mask
+    return subsequent_mask.unsqueeze(0).unsqueeze(0) # (1, 1, seq_len, seq_len)
 
-def get_relative_pos(x, batch_size, norm_len):
-    x = x.view(1, -1, 1).expand(batch_size, -1, -1)
-    return x / norm_len
+def generate_self_attention_masks(padding_masks: torch.Tensor, sequential_masks: torch.Tensor):
+    return torch.logical_or(padding_masks, sequential_masks)
 
-def get_grids_position(batch_size, seq_len, grid_size):
-    assert seq_len == grid_size[0] * grid_size[1]
+def generate_cross_attention_masks(trg_masks: torch.Tensor, src_masks: torch.Tensor):
+    trg_masks = trg_masks.squeeze(-2).unsqueeze(-1)
+    return torch.logical_or(trg_masks, src_masks)
 
+def get_relative_pos(x, norm_len):
+    x = x.view(-1, 1)
+    return  x / norm_len
+
+def get_grids_position(grid_size):
+    w, h = grid_size
     # record the pos of each grid according to the form of region box
-    x = torch.arange(0, grid_size[0]).float().cuda()
-    y = torch.arange(0, grid_size[1]).float().cuda()
+    x = torch.arange(0, w).float().cuda()
+    y = torch.arange(0, h).float().cuda()
 
-    px_min = x.view(-1, 1).expand(-1, grid_size[0]).contiguous().view(-1)
-    py_min = y.view(1, -1).expand(grid_size[1], -1).contiguous().view(-1)
+    px_min = x.view(-1, 1).expand(-1, w).contiguous().view(-1)
+    py_min = y.view(1, -1).expand(h, -1).contiguous().view(-1)
 
     px_max = px_min + 1
     py_max = py_min + 1
 
     # scale pos into the range (0 ~ 1)
-    rpx_min = get_relative_pos(px_min, batch_size, grid_size[0])
-    rpy_min = get_relative_pos(py_min, batch_size, grid_size[1])
+    rpx_min = get_relative_pos(px_min, w)
+    rpy_min = get_relative_pos(py_min, h)
 
-    rpx_max = get_relative_pos(px_max, batch_size, grid_size[0])
-    rpy_max = get_relative_pos(py_max, batch_size, grid_size[1])
+    rpx_max = get_relative_pos(px_max, w)
+    rpy_max = get_relative_pos(py_max, h)
 
-    boxes = torch.cat([rpx_min, rpy_min, rpx_max, rpy_max], dim=-1)  # (bs, n, 4)
+    boxes = torch.cat([rpx_min, rpy_min, rpx_max, rpy_max], dim=-1) # (n, 4)
 
     return boxes
-
-def lower_bound(nums, target):
-    start = 0
-    end = len(nums) - 1
-    pos = 0
-    while start <= end:
-        mid = int((start+end)/2)
-        if nums[mid] <= target:
-            pos = mid
-            start = mid + 1
-        else:
-            end = mid - 1
-    return pos
-
-def get_grids_by_corner(box, grid_size=7) -> torch.Tensor:
-    '''
-        box: (4, )
-    '''
-    grids = np.arange(grid_size) / grid_size
-
-    x_min, y_min, x_max, y_max = box
-
-    x1 = lower_bound(grids, x_min)
-    y1 = lower_bound(grids, y_min)
-    top_left = y1*grid_size + x1
-
-    x2 = lower_bound(grids,x_max)
-    top_right = y1*grid_size + x2
-
-    y3  = lower_bound(grids, y_max)
-    bot_left = y3*grid_size + x1
-
-    res = np.ones((grid_size*grid_size))
-
-    width = top_right - top_left + 1
-    for i in range(top_left, bot_left+1, grid_size):
-        res[i:i+width] = 0
-    
-    return torch.tensor(res).bool() # (grid_size*grid_size, )
-
-def get_combine_masks(boxes, grid_size=7) -> torch.Tensor:
-    '''
-        boxes: (bs, n, 4)
-    '''
-
-    bs, n, _ = boxes.shape
-    masks = []
-    for batch in range(bs):
-        masks_per_batch = []
-        for ith in range(n):
-            mask = get_grids_by_corner(boxes[batch, ith], grid_size)
-            masks_per_batch.append(mask.unsqueeze(0))
-        masks_per_batch = torch.cat(masks_per_batch, dim=0) # (n, grid_size*grid_size)
-        masks.append(masks_per_batch.unsqueeze(0))
-
-    return torch.cat(masks, dim=0).unsqueeze(1).unsqueeze(1) # (bs, 1, n, grid_size*grid_size)
 
 def box_relational_embedding(f_g, dim_g=64, wave_len=1000, trignometric_embedding=True):
     """

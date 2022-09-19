@@ -1,15 +1,14 @@
 import torch
 from data_utils.types import *
-from models.utils import get_batch_size, get_device
 
 class BeamSearch(object):
-    def __init__(self, model, max_len: int, eos_idx: int, beam_size: int):
+    def __init__(self, model, b_s: int, max_len: int, eos_idx: int, beam_size: int, device):
         self.model = model
         self.max_len = max_len
         self.eos_idx = eos_idx
         self.beam_size = beam_size
-        self.b_s = None
-        self.device = None
+        self.b_s = b_s
+        self.device = device
         self.seq_mask = None
         self.seq_logprob = None
         self.outputs = None
@@ -18,28 +17,31 @@ class BeamSearch(object):
         self.all_log_probs = None
 
     def _expand_state(self, selected_beam, cur_beam_size):
+        
         def fn(s):
             shape = [int(sh) for sh in s.shape]
             beam = selected_beam
             for _ in shape[1:]:
                 beam = beam.unsqueeze(-1)
-            s = torch.gather(s.view(*([self.b_s, cur_beam_size] + shape[1:])), 1,
-                             beam.expand(*([self.b_s, self.beam_size] + shape[1:])))
-            s = s.view(*([-1, ] + shape[1:]))
+            s = torch.gather(
+                                input=s.view(*( [self.b_s, cur_beam_size] + shape[1:] )), 
+                                dim=1,
+                                index=beam.expand(*( [self.b_s, self.beam_size] + shape[1:] ))
+                            )
+            s = s.view(*( [-1, ] + shape[1:] ))
             return s
 
         return fn
 
     def select(self, candidate_logprob):
-        selected_logprob, selected_idx = torch.sort(candidate_logprob.view(self.b_s, -1), -1, descending=True)  # flatten the candicate_lobprob from (bs, beam_size, vocab_size) 
-                                                                                                                # to (bs, beam_size*vocab_size) and decendingly sort it
-        selected_logprob, selected_idx = selected_logprob[:, :self.beam_size], selected_idx[:, :self.beam_size] # then select the top-beam_size highest digits
+        selected_logprob, selected_idx = torch.sort(candidate_logprob.view(self.b_s, -1), -1, descending=True)
+        selected_logprob, selected_idx = selected_logprob[:, :self.beam_size], selected_idx[:, :self.beam_size]
         return selected_idx, selected_logprob
 
-    def iter(self, t: int, outputs, return_probs, **visual_inputs):
+    def iter(self, t: int, outputs, return_probs, **kwargs):
         cur_beam_size = 1 if t == 0 else self.beam_size
 
-        word_logprob = self.model.step(t, self.selected_words, **visual_inputs)
+        word_logprob = self.model.step(t, self.selected_words, **kwargs)
         word_logprob = word_logprob.view(self.b_s, cur_beam_size, -1)
         candidate_logprob = self.seq_logprob + word_logprob
 
@@ -52,9 +54,9 @@ class BeamSearch(object):
             old_seq_logprob[:, :, 1:] = -999
             candidate_logprob = self.seq_mask * candidate_logprob + old_seq_logprob * (1 - self.seq_mask)
 
-        selected_idx, selected_logprob = self.select(candidate_logprob) # get the top-beam_size highest logits
-        selected_beam = torch.div(selected_idx, candidate_logprob.shape[-1], rounding_mode="trunc") # then find its appropriate beam
-        selected_words = selected_idx - selected_beam * candidate_logprob.shape[-1] # and get the index of them in term of vocab size
+        selected_idx, selected_logprob = self.select(candidate_logprob)
+        selected_beam = torch.div(selected_idx, candidate_logprob.shape[-1], rounding_mode="trunc")
+        selected_words = selected_idx - selected_beam * candidate_logprob.shape[-1]
 
         self.model.apply_to_states(self._expand_state(selected_beam, cur_beam_size))
 
@@ -80,24 +82,20 @@ class BeamSearch(object):
 
         return outputs
 
-    def apply(self, out_size=1, return_probs=False, **visual_inputs):
-        self.b_s = get_batch_size(visual_inputs)
-        self.device = get_device(visual_inputs)
+    def apply(self, out_size=1, return_probs=False, **kwargs):
         self.seq_mask = torch.ones((self.b_s, self.beam_size, 1), device=self.device)
-        self.seq_logprob = torch.zeros((self.b_s, 1, 1), device=self.device)    # (bs, beam_size, 1)
-                                                                                # at the beginning the beam search tree has a root of bos_idx
+        self.seq_logprob = torch.zeros((self.b_s, 1, 1), device=self.device)
         self.log_probs = []
         self.selected_words = None
         if return_probs:
             self.all_log_probs = []
 
         outputs = []
-        with self.model.statefulness(self.b_s):
-            for t in range(self.max_len):
-                outputs = self.iter(t, outputs, return_probs, **visual_inputs)
+        for t in range(self.max_len):
+            outputs = self.iter(t, outputs, return_probs, **kwargs)
 
         # Sort result
-        _, sort_idxs = torch.sort(self.seq_logprob, 1, descending=True)
+        seq_logprob, sort_idxs = torch.sort(self.seq_logprob, 1, descending=True)
         outputs = torch.cat(outputs, -1)
         outputs = torch.gather(outputs, 1, sort_idxs.expand(self.b_s, self.beam_size, self.max_len))
         log_probs = torch.cat(self.log_probs, -1)

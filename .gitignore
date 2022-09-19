@@ -1,4 +1,6 @@
+.vector_cache
 features
+saved_models
 
 __pycache__
 
@@ -6,6 +8,4 @@ examine*
 
 statistic.ipynb
 
-saved_models
-
-*_tmp.*
+*.zip

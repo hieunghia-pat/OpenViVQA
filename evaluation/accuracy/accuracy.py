@@ -2,13 +2,12 @@ from sklearn.metrics import accuracy_score
 import numpy as np
 
 class Accuracy:
-    @classmethod
     def compute_score(self, gts, res):
         """
-        Main function to compute CIDEr score
+        Main function to compute Accuracy score
         :param  gts (dict) : dictionary with key <image> and value <tokenized hypothesis / candidate sentence>
                 res (dict)  : dictionary with key <image> and value <tokenized reference sentence>
-        :return: cider (float) : computed CIDEr score for the corpus
+        :return: accuracy (float) : computed Accuracy score for the corpus
         """
         res = {key: value.split() for key, value in res.items()}
         scores = []
@@ -19,3 +18,6 @@ class Accuracy:
         scores = np.array(scores)
 
         return scores, scores.mean()
+
+    def __str__(self) -> str:
+        return "Accuracy"

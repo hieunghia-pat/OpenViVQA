@@ -2,12 +2,11 @@ from .bleu import Bleu
 from .meteor import Meteor
 from .rouge import Rouge
 from .cider import Cider
-from typing import List
-
-from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+from .f1 import F1_micro, F1_macro
+from .accuracy import Accuracy
 
 def compute_scores(gts, gen):
-    metrics = (Bleu(), Meteor(), Rouge(), Cider())
+    metrics = (Bleu(), Meteor(), Rouge(), Cider(), Accuracy(), F1_micro(), F1_macro())
     all_score = {}
     all_scores = {}
     for metric in metrics:
@@ -16,16 +15,3 @@ def compute_scores(gts, gen):
         all_scores[str(metric)] = scores
 
     return all_score, all_scores
-
-def compute_metrics(predicted: List[int], true: List[int]):
-    acc = accuracy_score(true, predicted)
-    pre = precision_score(true, predicted, average="macro", zero_division=0)
-    recall = recall_score(true, predicted, average="macro", zero_division=0)
-    f1 = f1_score(true, predicted, average="macro")
-
-    return {
-        "accuracy": acc,
-        "precision": pre,
-        "recall": recall,
-        "F1": f1
-    }

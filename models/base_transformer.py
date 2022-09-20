@@ -22,9 +22,6 @@ class BaseTransformer(Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def step(self, t, prev_output):
-        raise NotImplementedError
-
     def encoder_forward(self, input_features: Instances):
         raise NotImplementedError
 

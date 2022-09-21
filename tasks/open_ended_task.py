@@ -26,6 +26,7 @@ class OpenEndedTask(BaseTask):
         self.epoch = 0
         self.warmup = config.TRAINING.WARMUP
         self.score = config.TRAINING.SCORE
+        self.learning_rate = config.TRAINING.LEARNING_RATE
         self.rl_learning_rate = config.TRAINING.RL_LEARNING_RATE
         self.get_scores = config.TRAINING.GET_SCORES
         self.training_beam_size = config.TRAINING.TRAINING_BEAM_SIZE
@@ -115,7 +116,7 @@ class OpenEndedTask(BaseTask):
 
                 pbar.set_postfix(loss=running_loss / (it + 1))
                 pbar.update()
-                self.scheduler.step()
+                # self.scheduler.step()
 
     def train_scst(self):
         # design especially for self-critical sequential learning

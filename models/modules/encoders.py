@@ -120,6 +120,7 @@ class GuidedAttentionEncoder(nn.Module):
         super(GuidedAttentionEncoder, self).__init__()
 
         self.layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.layer_norm_language = nn.LayerNorm(config.D_MODEL)
 
         self.d_model = config.D_MODEL
 
@@ -134,6 +135,7 @@ class GuidedAttentionEncoder(nn.Module):
         language_features = input_features.language_features
         language_padding_mask = input_features.language_padding_mask
 
+        vision_features = self.layer_norm(vision_features)
         for self_attn_layer, guided_attn_layer in zip(self.self_attn_layers, self.guided_attn_layers):
             # pass to the self-attention layer
             vision_features = self_attn_layer(

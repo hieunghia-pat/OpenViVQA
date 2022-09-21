@@ -17,9 +17,9 @@ class UsualEmbedding(nn.Module):
         else:
             embedding_weights = build_word_embedding(config).vectors
             self.components = nn.Sequential(
+                nn.Embedding.from_pretrained(embeddings=embedding_weights, freeze=True, padding_idx=vocab.padding_idx),
                 nn.Linear(config.D_EMBEDDING, config.D_MODEL),
-                nn.Dropout(config.DROPOUT),
-                nn.Embedding.from_pretrained(embeddings=embedding_weights, freeze=True, padding_idx=vocab.padding_idx)
+                nn.Dropout(config.DROPOUT)
             )
 
     def forward(self, tokens):

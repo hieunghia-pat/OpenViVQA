@@ -12,9 +12,10 @@ class EncoderLayer(nn.Module):
         self.mhatt = MultiHeadAttention(config)
         self.pwff = PositionWiseFeedForward(config)
 
-    def forward(self, queries, keys, values, attention_mask=None, **kwargs):
+    def forward(self, queries, keys, values, attention_mask, **kwargs):
         att = self.mhatt(queries=queries, keys=keys, values=values, attention_mask=attention_mask, **kwargs)
         ff = self.pwff(att)
+        ff = ff.masked_fill(attention_mask.squeeze().unsqueeze(-1), value=0)
 
         return ff
 
@@ -78,14 +79,15 @@ class GuidedEncoderLayer(nn.Module):
         self.guided_mhatt = MultiHeadAttention(config)
         self.pwff = PositionWiseFeedForward(config)
 
-    def forward(self, queries, keys, values, self_attention_mask=None, guided_attention_mask=None, **kwargs):
+    def forward(self, queries, keys, values, self_attention_mask, guided_attention_mask, **kwargs):
         self_att = self.self_mhatt(
                                     queries=queries,
-                                    keys=keys, 
-                                    values=values,
+                                    keys=queries, 
+                                    values=queries,
                                     attention_mask=self_attention_mask,
                                     **kwargs
                                 )
+        self_att = self_att.masked_fill(self_attention_mask.squeeze().unsqueeze(-1), value=0)
         guided_att = self.guided_mhatt(
                                         queries=self_att, 
                                         keys=keys, 
@@ -95,6 +97,7 @@ class GuidedEncoderLayer(nn.Module):
                                     )
 
         ff = self.pwff(guided_att)
+        ff = ff.masked_fill(self_attention_mask.squeeze().unsqueeze(-1), value=0)
 
         return ff
 
@@ -103,7 +106,7 @@ class Encoder(nn.Module):
     def __init__(self, config):
         super(Encoder, self).__init__()
         
-        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL // 2)
+        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL)
         self.layer_norm = nn.LayerNorm(config.D_MODEL)
 
         self.d_model = config.D_MODEL
@@ -124,7 +127,7 @@ class GeometricEncoder(nn.Module):
     def __init__(self, config):
         super(Encoder, self).__init__()
         
-        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL // 2)
+        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL)
         self.layer_norm = nn.LayerNorm(config.D_MODEL)
 
         self.d_model = config.D_MODEL
@@ -149,7 +152,7 @@ class GuidedAttentionEncoder(nn.Module):
     def __init__(self, config):
         super(GuidedAttentionEncoder, self).__init__()
 
-        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL // 2)
+        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL)
         self.layer_norm = nn.LayerNorm(config.D_MODEL)
 
         self.d_model = config.D_MODEL
@@ -169,7 +172,7 @@ class GuidedAttentionEncoder(nn.Module):
             out = guided_attn_layer(
                 queries=out,
                 keys=language_features,
-                values=vision_padding_mask,
+                values=language_features,
                 boxes=boxes,
                 self_attention_mask=vision_padding_mask,
                 guided_attention_mask=language_padding_mask
@@ -185,7 +188,7 @@ class CoAttentionEncoder(nn.Module):
     def __init__(self, config):
         super(CoAttentionEncoder, self).__init__()
 
-        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL // 2)
+        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL)
         self.vision_layer_norm = nn.LayerNorm(config.D_MODEL)
         self.language_layer_norm = nn.LayerNorm(config.D_MODEL)
 
@@ -250,7 +253,7 @@ class CrossModalityEncoder(nn.Module):
     def __init__(self, config):
         super(CoAttentionEncoder, self).__init__()
 
-        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL // 2)
+        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL)
         self.vision_layer_norm = nn.LayerNorm(config.D_MODEL)
         self.language_layer_norm = nn.LayerNorm(config.D_MODEL)
 

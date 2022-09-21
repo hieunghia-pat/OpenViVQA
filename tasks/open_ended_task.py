@@ -116,7 +116,7 @@ class OpenEndedTask(BaseTask):
 
                 pbar.set_postfix(loss=running_loss / (it + 1))
                 pbar.update()
-                # self.scheduler.step()
+                self.scheduler.step()
 
     def train_scst(self):
         # design especially for self-critical sequential learning

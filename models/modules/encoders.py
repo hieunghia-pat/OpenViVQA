@@ -70,6 +70,33 @@ class CrossModalityEncoderLayer(nn.Module):
 
         return vision_attn, language_attn
 
+class GuidedEncoderLayer(nn.Module):
+    def __init__(self, config):
+        super(GuidedEncoderLayer, self).__init__()
+        self.self_mhatt = MultiHeadAttention(config)
+        self.guided_mhatt = MultiHeadAttention(config)
+        self.pwff = PositionWiseFeedForward(config)
+
+    def forward(self, queries, keys, values, self_attention_mask=None, guided_attention_mask=None, **kwargs):
+        self_att = self.self_mhatt(
+                                    queries=queries,
+                                    keys=keys, 
+                                    values=values,
+                                    attention_mask=self_attention_mask,
+                                    **kwargs
+                                )
+        guided_att = self.guided_mhatt(
+                                        queries=self_att, 
+                                        keys=keys, 
+                                        values=values,
+                                        attention_mask=guided_attention_mask,
+                                        **kwargs
+                                    )
+
+        ff = self.pwff(guided_att)
+
+        return ff
+
 @META_ENCODER.register()
 class Encoder(nn.Module):
     def __init__(self, config):
@@ -120,12 +147,10 @@ class GuidedAttentionEncoder(nn.Module):
         super(GuidedAttentionEncoder, self).__init__()
 
         self.layer_norm = nn.LayerNorm(config.D_MODEL)
-        self.layer_norm_language = nn.LayerNorm(config.D_MODEL)
 
         self.d_model = config.D_MODEL
 
-        self.self_attn_layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
-        self.guided_attn_layers = nn.ModuleList([EncoderLayer(config.GUIDED_ATTENTION) for _ in range(config.LAYERS)])
+        self.guided_attn_layers = nn.ModuleList([GuidedEncoderLayer(config.GUIDED_ATTENTION) for _ in range(config.LAYERS)])
 
     def forward(self, input_features: Instances):
         vision_features = input_features.vision_features
@@ -135,26 +160,18 @@ class GuidedAttentionEncoder(nn.Module):
         language_features = input_features.language_features
         language_padding_mask = input_features.language_padding_mask
 
-        vision_features = self.layer_norm(vision_features)
-        for self_attn_layer, guided_attn_layer in zip(self.self_attn_layers, self.guided_attn_layers):
-            # pass to the self-attention layer
-            vision_features = self_attn_layer(
-                queries=vision_features,
-                keys=vision_features,
-                values=vision_features,
-                boxes=boxes,
-                padding_mask=vision_padding_mask
-            )
-            # then pass to the guided-attention layer
-            vision_features = guided_attn_layer(
-                queries=vision_features,
+        out = self.layer_norm(vision_features)
+        for guided_attn_layer in self.guided_attn_layers:
+            out = guided_attn_layer(
+                queries=out,
                 keys=language_features,
-                values=language_features,
+                values=vision_padding_mask,
                 boxes=boxes,
-                padding_mask=language_padding_mask
+                self_attention_mask=vision_padding_mask,
+                guided_attention_mask=language_padding_mask
             )
 
-        return vision_features
+        return out
 
 @META_ENCODER.register()
 class CoAttentionEncoder(nn.Module):
@@ -181,7 +198,7 @@ class CoAttentionEncoder(nn.Module):
         boxes = input_features.boxes
         vision_padding_mask = input_features.vision_padding_mask
 
-        language_features = input_features.language_padding_mask
+        language_features = input_features.language_features
         language_padding_mask = input_features.language_padding_mask
 
         for layers in zip(self.vision_language_attn_layers, 

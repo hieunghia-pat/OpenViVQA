@@ -77,6 +77,10 @@ MODEL:
       USE_AOA: False
       CAN_BE_STATEFUL: False
       DROPOUT: .1
+    MULTIMODAL_FUSION:
+      D_MODEL: 512
+      D_FF: 2048
+      DROPOUT: .1
   DECODER:
     ARCHITECTURE: Decoder
     D_MODEL: 512

@@ -2,6 +2,7 @@ from torch import nn
 
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.attentions import MultiHeadAttention
+from models.modules.pos_embeddings import SinusoidPositionalEmbedding
 from builders.encoder_builder import META_ENCODER
 from utils.instances import Instances
 
@@ -102,6 +103,7 @@ class Encoder(nn.Module):
     def __init__(self, config):
         super(Encoder, self).__init__()
         
+        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL // 2)
         self.layer_norm = nn.LayerNorm(config.D_MODEL)
 
         self.d_model = config.D_MODEL
@@ -111,7 +113,7 @@ class Encoder(nn.Module):
         features = input_features.features
         padding_mask = input_features.features_padding_mask
         
-        out = self.layer_norm(features)
+        out = self.layer_norm(features) + self.pos_embedding(features)
         for layer in self.layers:
             out = layer(queries=out, keys=out, values=out, attention_mask=padding_mask)
 
@@ -122,6 +124,7 @@ class GeometricEncoder(nn.Module):
     def __init__(self, config):
         super(Encoder, self).__init__()
         
+        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL // 2)
         self.layer_norm = nn.LayerNorm(config.D_MODEL)
 
         self.d_model = config.D_MODEL
@@ -132,7 +135,7 @@ class GeometricEncoder(nn.Module):
         boxes = input_features.boxes
         padding_mask = input_features.features_padding_mask
         
-        out = self.layer_norm(features)
+        out = self.layer_norm(features) + self.pos_embedding(features)
         for layer in self.layers:
             out = layer(queries=out, keys=out, values=out, boxes=boxes, attention_mask=padding_mask)
 
@@ -146,6 +149,7 @@ class GuidedAttentionEncoder(nn.Module):
     def __init__(self, config):
         super(GuidedAttentionEncoder, self).__init__()
 
+        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL // 2)
         self.layer_norm = nn.LayerNorm(config.D_MODEL)
 
         self.d_model = config.D_MODEL
@@ -160,7 +164,7 @@ class GuidedAttentionEncoder(nn.Module):
         language_features = input_features.language_features
         language_padding_mask = input_features.language_padding_mask
 
-        out = self.layer_norm(vision_features)
+        out = self.layer_norm(vision_features) + self.pos_embedding(vision_features)
         for guided_attn_layer in self.guided_attn_layers:
             out = guided_attn_layer(
                 queries=out,
@@ -181,7 +185,9 @@ class CoAttentionEncoder(nn.Module):
     def __init__(self, config):
         super(CoAttentionEncoder, self).__init__()
 
-        self.layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL // 2)
+        self.vision_layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.language_layer_norm = nn.LayerNorm(config.D_MODEL)
 
         self.d_model = config.D_MODEL
 
@@ -201,6 +207,8 @@ class CoAttentionEncoder(nn.Module):
         language_features = input_features.language_features
         language_padding_mask = input_features.language_padding_mask
 
+        vision_features = self.vision_layer_norm(vision_features) + self.pos_embedding(vision_features)
+        language_features = self.language_layer_norm(language_features) + self.pos_embedding(language_features)
         for layers in zip(self.vision_language_attn_layers, 
                             self.language_vision_attn_layers, 
                             self.vision_self_attn_layers, 
@@ -242,7 +250,9 @@ class CrossModalityEncoder(nn.Module):
     def __init__(self, config):
         super(CoAttentionEncoder, self).__init__()
 
-        self.layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL // 2)
+        self.vision_layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.language_layer_norm = nn.LayerNorm(config.D_MODEL)
 
         self.d_model = config.D_MODEL
         self.layers = nn.ModuleList([CrossModalityEncoderLayer(config) for _ in range(config.LAYERS)])
@@ -255,6 +265,8 @@ class CrossModalityEncoder(nn.Module):
         language_features = input_features.language_padding_mask
         language_padding_mask = input_features.language_padding_mask
 
+        vision_features = self.vision_layer_norm(vision_features) + self.pos_embedding(vision_features)
+        language_features = self.language_layer_norm(language_features) + self.pos_embedding(language_features)
         for layer in self.layers:
             vision_features, language_features = layer(
                 vision_features=vision_features,

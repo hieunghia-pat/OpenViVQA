@@ -20,7 +20,7 @@ DATASET:
     DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
     TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
   FEATURE_PATH:
-    FEATURES: features/OpenViVQA/features/vinvl_vinvl
+    FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
     SCENE_TEXT: null
     IMAGE: null
 

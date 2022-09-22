@@ -1,7 +1,7 @@
 TASK: OpenEndedTask
 
 DATASET:
-  BATCH_SIZE: 20
+  BATCH_SIZE: 30
   WORKERS: 0
   MIN_FREQ: 1
   SCENE_TEXT_THRESHOLD: 0.3
@@ -51,7 +51,22 @@ MODEL:
     DROPOUT: 0.1
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
-  ENCODER:
+  SELF_ENCODER:
+    ARCHITECTURE: Encoder
+    D_MODEL: 512
+    LAYERS: 3
+    SELF_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+  GUIDED_ENCODER:
     ARCHITECTURE: GuidedAttentionEncoder
     D_MODEL: 512
     LAYERS: 3
@@ -77,6 +92,10 @@ MODEL:
       USE_AOA: False
       CAN_BE_STATEFUL: False
       DROPOUT: .1
+  MULTIMODAL_FUSION:
+    D_MODEL: 512
+    D_FF: 2048
+    DROPOUT: .1
   DECODER:
     ARCHITECTURE: Decoder
     D_MODEL: 512

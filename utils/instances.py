@@ -1,6 +1,7 @@
 import itertools
 from typing import Any, Dict, List, Union
 import torch
+import numpy as np
 
 from .logging_utils import setup_logger
 
@@ -138,6 +139,10 @@ class Instances:
         for key in instance_lists[0]._fields.keys():
             values = [instance.get(key) for instance in instance_lists]
             v0 = values[0]
+            if isinstance(v0, np.ndarray):
+                values = [torch.tensor(value) for value in values]
+                values = pad_values(values)
+                values = torch.cat(values, dim=0)
             if isinstance(v0, torch.Tensor):
                 values = pad_values(values)
                 values = torch.cat(values, dim=0)

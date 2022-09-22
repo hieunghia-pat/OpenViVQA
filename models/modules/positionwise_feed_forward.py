@@ -16,13 +16,13 @@ class PositionWiseFeedForward(nn.Module):
 
         self.fc1 = nn.Linear(d_model, d_ff)
         self.fc2 = nn.Linear(d_ff, d_model)
-        self.dropout = nn.Dropout(p=dropout)
+        self.dropout_1 = nn.Dropout(p=dropout)
         self.dropout_2 = nn.Dropout(p=dropout)
         self.layer_norm = nn.LayerNorm(d_model)
 
     def forward(self, input) -> torch.Tensor:
-        out = self.fc2(self.dropout_2(F.relu(self.fc1(input))))
-        out = self.dropout(out)
+        out = self.dropout_1(F.gelu(self.fc1(input)))
+        out = self.dropout_2(self.fc2(out))
         out = self.layer_norm(input + out)
 
         return out

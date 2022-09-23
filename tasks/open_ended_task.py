@@ -229,7 +229,7 @@ class OpenEndedTask(BaseTask):
 
             self.epoch += 1
 
-    def get_predictions(self, dataset, get_scores=True):
+    def get_predictions(self, get_scores=True):
         if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
             logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
@@ -239,8 +239,9 @@ class OpenEndedTask(BaseTask):
 
         self.model.eval()
         results = []
-        with tqdm(desc='Getting predictions: ', unit='it', total=len(dataset)) as pbar:
-            for it, items in enumerate(dataset):
+        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dataset)) as pbar:
+            for it, items in enumerate(self.test_dataset):
+                items = items.unsqueeze(0)
                 items = items.to(self.device)
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, beam_size=self.evaluating_beam_size, out_size=1)

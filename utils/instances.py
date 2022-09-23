@@ -95,6 +95,34 @@ class Instances:
             ret.set(k, v)
         return ret
 
+    # Tensor-like methods
+    def unsqueeze(self, *args: Any, **kwargs) -> "Instances":
+        """
+        Returns:
+            Instances: all fields are called with a `unsqueeze(dim)`, if the field has this method.
+        """
+        ret = Instances()
+        for k, v in self._fields.items():
+            if hasattr(v, "unsqueeze"):
+                v = v.unsqueeze(*args, **kwargs)
+            ret.set(k, v)
+        
+        return ret
+
+    # Tensor-like methods
+    def squeeze(self, *args: Any, **kwargs) -> "Instances":
+        """
+        Returns:
+            Instances: all fields are called with a `squeeze(dim)`, if the field has this method.
+        """
+        ret = Instances()
+        for k, v in self._fields.items():
+            if hasattr(v, "squeeze"):
+                v = v.squeeze(*args, **kwargs)
+            ret.set(k, v)
+        
+        return ret
+
     def __getitem__(self, item: Union[int, slice, torch.BoolTensor]) -> "Instances":
         """
         Args:

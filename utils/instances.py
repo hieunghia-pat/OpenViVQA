@@ -169,10 +169,17 @@ class Instances:
         assert all(isinstance(i, Instances) for i in instance_lists)
         assert len(instance_lists) > 0
         if len(instance_lists) == 1:
-            return instance_lists[0].unsqueeze(dim=0)
+            ret = Instances()
+            for k, v in instance_lists[0].get_fields().items():
+                if isinstance(v, list):
+                    ret.set(k, [v])
+                elif isinstance(v, torch.Tensor):
+                    ret.set(k, v.unsqueeze(dim=0))
+            
+            return ret
 
         ret = Instances()
-        for key in instance_lists[0]._fields.keys():
+        for key in instance_lists[0].get_fields().keys():
             values = [instance.get(key) for instance in instance_lists]
             v0 = values[0]
             if isinstance(v0, np.ndarray):

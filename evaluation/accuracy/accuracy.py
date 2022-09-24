@@ -9,12 +9,17 @@ class Accuracy:
                 res (dict)  : dictionary with key <image> and value <tokenized reference sentence>
         :return: accuracy (float) : computed Accuracy score for the corpus
         """
-        res = {key: value.split() for key, value in res.items()}
+        res = {key: value[0].split() for key, value in res.items()}
         scores = []
         for key in res:
-            scores.append(accuracy_score(gts[key], res[key]))
+            r = res[key]
+            g = gts[key]
+            if len(r) > len(g):
+                r = r[:len(g)]
+            else:
+                r = r + ["<pad>"]*(len(g) - len(r))
+            scores.append(accuracy_score(g, r))
 
-        scores = np.array(scores)
         scores = np.array(scores)
 
         return scores, scores.mean()

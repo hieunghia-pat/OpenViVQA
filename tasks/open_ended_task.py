@@ -129,7 +129,7 @@ class OpenEndedTask(BaseTask):
         with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dict_dataloader)) as pbar:
             for it, items in enumerate(self.train_dict_dataloader):
                 items = items.to(self.device)
-                outs, log_probs = self.model.beam_search(items, batch_size=self.train_dict_dataloader.batch_size, 
+                outs, log_probs = self.model.beam_search(items, batch_size=items.batch_size, 
                                                             beam_size=self.training_beam_size, out_size=self.training_beam_size)
                 
                 self.optim.zero_grad()

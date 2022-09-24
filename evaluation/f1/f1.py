@@ -14,6 +14,7 @@ class F1:
             r = res[key]
             scores_per_res = []
             for gt in gts[key]:
+                gt = gt.split()
                 # if either the prediction or the truth is no-answer then f1 = 1 if they agree, 0 otherwise
                 if len(r) == 0 or len(gt) == 0:
                     scores_per_res.append(int(r == gt))

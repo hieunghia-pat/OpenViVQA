@@ -18,9 +18,9 @@ class ColorfulFormatter(logging.Formatter):
         log = self._fmt % {"asctime": asctime, "levelname": levelname, "message": message}
 
         if record.levelno == logging.DEBUG:
-            log = colored(log, "blue")
-        elif record.levelno == logging.INFO:
             log = colored(log, "green")
+        elif record.levelno == logging.INFO:
+            log = colored(log, "blue")
         if record.levelno == logging.WARNING:
             log = colored(log, "yellow")
         elif record.levelno == logging.ERROR or record.levelno == logging.CRITICAL:

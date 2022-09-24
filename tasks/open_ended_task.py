@@ -129,7 +129,7 @@ class OpenEndedTask(BaseTask):
         with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dict_dataloader)) as pbar:
             for it, items in enumerate(self.train_dict_dataloader):
                 items = items.to(self.device)
-                outs, log_probs = self.model.beam_search(items, batch_size=self.train_dict_dataloader.batch_size, 
+                outs, log_probs = self.model.beam_search(items, batch_size=items.batch_size, 
                                                             beam_size=self.training_beam_size, out_size=self.training_beam_size)
                 
                 self.optim.zero_grad()
@@ -161,6 +161,7 @@ class OpenEndedTask(BaseTask):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
             checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
             use_rl = checkpoint["use_rl"]
+            best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"]
             self.optim.load_state_dict(checkpoint['optimizer'])
@@ -176,16 +177,16 @@ class OpenEndedTask(BaseTask):
             else:
                 self.train_scst()
 
-            val_loss = self.evaluate_loss(self.val_dataloader)
+            self.evaluate_loss(self.val_dataloader)
 
             # val scores
             scores = self.evaluate_metrics(self.val_dict_dataloader)
-            logger.info("Validation scores", scores)
+            logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
             if self.test_dict_dataloader is not None:
                 scores = self.evaluate_metrics(self.test_dict_dataloader)
-                logger.info("Evaluation scores", scores)
+                logger.info("Evaluation scores %s", scores)
 
             # Prepare for next epoch
             best = False
@@ -214,8 +215,7 @@ class OpenEndedTask(BaseTask):
                 self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
 
             self.save_checkpoint({
-                'val_loss': val_loss,
-                'val_cider': val_score,
+                'best_val_score': best_val_score,
                 'patience': patience,
                 'use_rl': use_rl
             })

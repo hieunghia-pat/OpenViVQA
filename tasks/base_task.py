@@ -1,4 +1,3 @@
-from tabnanny import verbose
 import torch
 from torch.utils.data import DataLoader
 from torch.nn import NLLLoss
@@ -7,7 +6,6 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from data_utils.utils import collate_fn
 from utils.logging_utils import setup_logger
-from utils.instances import Instances
 from builders.model_builder import build_model
 
 import os
@@ -128,7 +126,7 @@ class BaseTask:
         if not os.path.exists(fname):
             return None
 
-        logger.info("Loading checkpoint from {}" % fname)
+        logger.info("Loading checkpoint from %s", fname)
 
         checkpoint = torch.load(fname)
 
@@ -139,15 +137,9 @@ class BaseTask:
 
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
-        logger.info(f"Resuming from epoch {checkpoint['epoch']}")
+        logger.info(f"Resuming from epoch %s", checkpoint['epoch'])
 
-        return Instances(
-            use_rl = checkpoint['use_rl'],
-            patience=checkpoint['patience'],
-            epoch=checkpoint["epoch"],
-            optimizer=checkpoint["optimizer"],
-            scheduler=checkpoint["scheduler"]
-        )
+        return checkpoint
 
     def save_checkpoint(self, dict_for_updating: dict) -> None:
         dict_for_saving = {

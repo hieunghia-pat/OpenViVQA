@@ -82,6 +82,14 @@ class Instances:
         """
         return self._fields
 
+    @property
+    def batch_size(self) -> int:
+        for k in self._fields:
+            if isinstance(self._fields[k], torch.Tensor):
+                return self._fields[k].shape[0]
+
+        return 0
+
     # Tensor-like methods
     def to(self, *args: Any, **kwargs: Any) -> "Instances":
         """

@@ -182,8 +182,6 @@ class Instances:
             if isinstance(v0, torch.Tensor):
                 values = pad_values(values)
                 values = torch.cat(values, dim=0)
-            elif isinstance(v0, list):
-                values = list(itertools.chain(*values))
             elif hasattr(type(v0), "cat"):
                 values = type(v0).cat(values)
             else:

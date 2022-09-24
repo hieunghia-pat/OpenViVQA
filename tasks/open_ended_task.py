@@ -85,7 +85,7 @@ class OpenEndedTask(BaseTask):
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
 
-                answers_gt = items.answer
+                answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
@@ -136,7 +136,7 @@ class OpenEndedTask(BaseTask):
 
                 # Rewards
                 bs = items.question_tokens.shape[0]
-                answers_gt = items.answer
+                answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
                 answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
                 gens = {f"{idx}": answer_gen for idx, answer_gen in enumerate(answers_gen)}
@@ -180,12 +180,12 @@ class OpenEndedTask(BaseTask):
 
             # val scores
             scores = self.evaluate_metrics(self.val_dict_dataloader)
-            logger.info("Validation scores %s", scores)
+            logger.info("Validation scores", scores)
             val_score = scores[self.score]
 
             if self.test_dict_dataloader is not None:
                 scores = self.evaluate_metrics(self.test_dict_dataloader)
-                logger.info("Evaluation scores %s", scores)
+                logger.info("Evaluation scores", scores)
 
             # Prepare for next epoch
             best = False

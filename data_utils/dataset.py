@@ -30,30 +30,7 @@ class BaseDataset(data.Dataset):
         self.scene_text_threshold = config.SCENE_TEXT_THRESHOLD
 
     def load_json(self, json_data: Dict) -> List[Dict]:
-        annotations = []
-        for ann in json_data["annotations"]:
-            # find the appropriate image
-            for image in json_data["images"]:
-                if image["id"] == ann["image_id"]:
-                    annotation = {
-                        "question": preprocess_sentence(ann["question"], self.vocab.tokenizer),
-                        "answer": preprocess_sentence(ann["answer"], self.vocab.tokenizer),
-                        "image_id": ann["image_id"],
-                        "filename": image["filename"]
-                    }
-                    break
-
-            annotations.append(annotation)
-
-        return annotations
-
-    @property
-    def questions(self):
-        return [ann["question"] for ann in self.annotations]
-
-    @property
-    def answers(self):
-        return [ann["answer"] for ann in self.annotations]
+        raise NotImplementedError
 
     def load_image_feature(self, image_id: int) -> Dict[str, Any]:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
@@ -90,19 +67,42 @@ class DictionaryDataset(BaseDataset):
     def __init__(self, json_path: str, vocab, config) -> None:
         super(DictionaryDataset, self).__init__(json_path, vocab, config)
 
+    def load_json(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
+                    answers = [preprocess_sentence(answer, self.vocab.tokenizer) for answer in ann["answers"]]
+                    answers = [" ".join(answer) for answer in answers]
+                    annotation = {
+                        "question": question,
+                        "answers": answers,
+                        "image_id": ann["image_id"],
+                        "filename": image["filename"]
+                    }
+                    break
+
+            annotations.append(annotation)
+
+        return annotations
+
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
         image_id = item["image_id"]
         filename = item["filename"]
         features = self.load_features(image_id)
-        question = self.vocab.encode_question(item["question"])
-        answer = [item["answer"]]
+        question = item["question"]
+        question_tokens = self.vocab.encode_question(question)
+        answers = item["answers"]
 
         return Instances(
             image_id=image_id,
             filename=filename,
-            question_tokens=question,
-            answer=answer,
+            question=question,
+            question_tokens=question_tokens,
+            answers=answers,
             **features
         )
 
@@ -113,6 +113,27 @@ class ImageDataset(BaseDataset):
 
         self.image_path = config.FEATURE_PATH.IMAGE
 
+    def load_json(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
+                    answers = [preprocess_sentence(answer, self.vocab.tokenizer) for answer in ann["answers"]]
+                    answers = [" ".join(answer) for answer in answers]
+                    annotation = {
+                        "question": question,
+                        "answers": answers,
+                        "image_id": ann["image_id"],
+                        "filename": image["filename"]
+                    }
+                    break
+
+            annotations.append(annotation)
+
+        return annotations
+
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
 
@@ -120,19 +141,47 @@ class ImageDataset(BaseDataset):
         image = cv.imread(image_file)
         image = cv.resize(image, (512, 512), interpolation=cv.INTER_AREA)
 
-        question = [item["question"]]
-        answer = [item["answer"]]
+        question = item["question"]
+        answers = item["answers"]
         features = self.load_features(item["image_id"])
 
         return Instances(
             **features,
             question=question,
-            answer=answer
+            answers=answers
         )
 
 class FeatureDataset(BaseDataset):
     def __init__(self, json_path: str, vocab, config) -> None:
         super(FeatureDataset, self).__init__(json_path, vocab, config)
+
+    @property
+    def questions(self):
+        return [ann["question"] for ann in self.annotations]
+
+    @property
+    def answers(self):
+        return [ann["answer"] for ann in self.annotations]
+
+    def load_json(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    for answer in ann["answers"]:
+                        question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
+                        answer = preprocess_sentence(answer, self.vocab.tokenizer)
+                        annotation = {
+                            "question": question,
+                            "answer": answer,
+                            "image_id": ann["image_id"],
+                            "filename": image["filename"]
+                        }
+                        annotations.append(annotation)
+                    break
+
+        return annotations
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
@@ -161,6 +210,35 @@ class FeatureClassificationDataset(BaseDataset):
     
     def __init__(self, json_path: str, vocab, config) -> None:
         super(FeatureClassificationDataset, self).__init__(json_path, vocab, config)
+
+    @property
+    def questions(self):
+        return [ann["question"] for ann in self.annotations]
+
+    @property
+    def answers(self):
+        return [ann["answer"] for ann in self.annotations]
+
+    def load_json(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    for answer in ann["answers"]:
+                        question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
+                        answer = preprocess_sentence(answer, self.vocab.tokenizer)
+                        answer = "_".join(answer)
+                        annotation = {
+                            "question": question,
+                            "answer": answer,
+                            "image_id": ann["image_id"],
+                            "filename": image["filename"]
+                        }
+                        annotations.append(annotation)
+                    break
+
+        return annotations
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]

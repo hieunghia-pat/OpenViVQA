@@ -180,12 +180,12 @@ class OpenEndedTask(BaseTask):
 
             # val scores
             scores = self.evaluate_metrics(self.val_dict_dataloader)
-            logger.info("Validation scores", scores)
+            logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
             if self.test_dict_dataloader is not None:
                 scores = self.evaluate_metrics(self.test_dict_dataloader)
-                logger.info("Evaluation scores", scores)
+                logger.info("Evaluation scores %s", scores)
 
             # Prepare for next epoch
             best = False

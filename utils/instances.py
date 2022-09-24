@@ -161,7 +161,7 @@ class Instances:
         assert all(isinstance(i, Instances) for i in instance_lists)
         assert len(instance_lists) > 0
         if len(instance_lists) == 1:
-            return instance_lists[0]
+            return instance_lists[0].unsqueeze(dim=0)
 
         ret = Instances()
         for key in instance_lists[0]._fields.keys():

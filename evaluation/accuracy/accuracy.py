@@ -12,18 +12,21 @@ class Accuracy:
         scores = []
         for key in res:
             r = res[key]
-            gt = gts[key]
-            
-            # if either the prediction or the truth is no-answer then f1 = 1 if they agree, 0 otherwise
-            if len(r) == 0 or len(gt) == 0:
-                scores.append(int(r == gt))
-            else:
-                common_tokens = set(r) & set(gt)
-                # if there are no common tokens then f1 = 0
-                if len(common_tokens) == 0:
-                    scores.append(0)
+            scores_per_res = []
+            for gt in gts[key]:
+                # if either the prediction or the truth is no-answer then f1 = 1 if they agree, 0 otherwise
+                if len(r) == 0 or len(gt) == 0:
+                    scores_per_res.append(int(r == gt))
                 else:
-                    scores.append(len(common_tokens)/len(r))
+                    common_tokens = set(r) & set(gt)
+                    # if there are no common tokens then f1 = 0
+                    if len(common_tokens) == 0:
+                        scores_per_res.append(0)
+                    else:
+                        scores_per_res.append(len(common_tokens)/len(r))
+
+            scores_per_res = np.array(scores_per_res).mean()
+            scores.append(scores_per_res)
 
         scores = np.array(scores)
 

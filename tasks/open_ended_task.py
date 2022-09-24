@@ -161,6 +161,7 @@ class OpenEndedTask(BaseTask):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
             checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
             use_rl = checkpoint["use_rl"]
+            best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"]
             self.optim.load_state_dict(checkpoint['optimizer'])
@@ -176,7 +177,7 @@ class OpenEndedTask(BaseTask):
             else:
                 self.train_scst()
 
-            val_loss = self.evaluate_loss(self.val_dataloader)
+            self.evaluate_loss(self.val_dataloader)
 
             # val scores
             scores = self.evaluate_metrics(self.val_dict_dataloader)
@@ -214,8 +215,7 @@ class OpenEndedTask(BaseTask):
                 self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
 
             self.save_checkpoint({
-                'val_loss': val_loss,
-                'val_cider': val_score,
+                'best_val_score': best_val_score,
                 'patience': patience,
                 'use_rl': use_rl
             })

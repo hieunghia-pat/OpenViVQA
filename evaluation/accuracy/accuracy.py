@@ -1,4 +1,3 @@
-from sklearn.metrics import accuracy_score
 import numpy as np
 
 class Accuracy:
@@ -28,7 +27,7 @@ class Accuracy:
 
         scores = np.array(scores)
 
-        return scores, scores.mean()
+        return scores.mean(), scores
 
     def __str__(self) -> str:
         return "Accuracy"

@@ -1,7 +1,6 @@
-from sklearn.metrics import f1_score
 import numpy as np
 
-class F1_micro:
+class F1:
     def compute_score(self, gts, res):
         """
         Main function to compute F1 score

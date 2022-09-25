@@ -142,7 +142,7 @@ class OpenEndedTask(BaseTask):
                 gens = {f"{idx}": answer_gen for idx, answer_gen in enumerate(answers_gen)}
                 gts = {f"{idx}": answer_gt for idx, answer_gt in enumerate(answers_gt)}
                 reward = self.train_cider.compute_score(gts, gens)[1].astype(np.float32)
-                reward = torch.from_numpy(reward).to(self.device).view(bs, self.config.training.training_beam_size)
+                reward = torch.from_numpy(reward).to(self.device).view(bs, self.training_beam_size)
                 reward_baseline = torch.mean(reward, dim=-1, keepdim=True)
                 loss = -torch.mean(log_probs, -1) * (reward - reward_baseline)
 

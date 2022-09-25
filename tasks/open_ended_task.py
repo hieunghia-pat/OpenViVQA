@@ -139,7 +139,7 @@ class OpenEndedTask(BaseTask):
                 answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
                 answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
-                gens = {f"{idx}": answer_gen for idx, answer_gen in enumerate(answers_gen)}
+                gens = {f"{idx}": [answer_gen, ] for idx, answer_gen in enumerate(answers_gen)}
                 gts = {f"{idx}": answer_gt for idx, answer_gt in enumerate(answers_gt)}
                 reward = self.train_cider.compute_score(gts, gens)[1].astype(np.float32)
                 reward = torch.from_numpy(reward).to(self.device).view(bs, self.training_beam_size)

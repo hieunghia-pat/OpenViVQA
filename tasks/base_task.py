@@ -137,7 +137,7 @@ class BaseTask:
 
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
-        logger.info(f"Resuming from epoch %s", checkpoint['epoch'])
+        logger.info("Resuming from epoch %s", checkpoint['epoch'])
 
         return checkpoint
 

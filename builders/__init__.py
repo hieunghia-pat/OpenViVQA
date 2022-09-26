@@ -24,3 +24,4 @@ from models.modules.text_embeddings import (
     LSTMTextEmbedding
 )
 from models.extended_mcan import ExtendedMCAN
+from models.extended_saaa import ExtendedSAAA

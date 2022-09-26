@@ -1,0 +1,95 @@
+TASK: OpenEndedTask
+
+DATASET:
+  BATCH_SIZE: 30
+  WORKERS: 0
+  MIN_FREQ: 1
+  SCENE_TEXT_THRESHOLD: 0.3
+  VOCAB:
+    TOKENIZER: null
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
+    BOS_TOKEN: <bos>
+    EOS_TOKEN: <eos>
+    PAD_TOKEN: <pad>
+    UNK_TOKEN: <unk>
+    USE_MAPPING: False
+    PRETRAINED_LANGUAGE_MODEL: null
+  JSON_PATH:
+    TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+    DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+    TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+  FEATURE_PATH:
+    FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+    SCENE_TEXT: null
+    IMAGE: null
+
+TRAINING:
+  CHECKPOINT_PATH: saved_models
+  LEARNING_RATE: 1.
+  RL_LEARNING_RATE: 0.000005
+  WARMUP: 10000
+  SCORE: CIDEr
+  GET_SCORES: False
+  TRAINING_BEAM_SIZE: 5
+  EVALUATING_BEAM_SIZE: 3
+  PATIENCE: 5
+
+MODEL:
+  ARCHITECTURE: ExtendedSAAA
+  NAME: extended_saaa_region_x152++
+  DEVICE: cuda
+  VISION_PROCESSOR:
+    ARCHITECTURE: FeatureEmbedding
+    D_FEATURE: 1024
+    D_MODEL: 512
+    DROPOUT: .1
+  TEXT_PROCESSOR:
+    D_EMBEDDING: 300
+    D_MODEL: 512
+    DROPOUT: .1
+  ATTENTION:
+    ARCHITECTURE: CoAttention
+    D_VISION: 512
+    D_LANGUAGE: 512
+    D_MODEL: 512
+    DROPOUT: .1
+    GLIMPSES: 2
+  MULTIMODAL_FUSION:
+    D_MODEL: 512
+    D_FF: 2048
+    DROPOUT: .1
+  DECODER:
+    ARCHITECTURE: Decoder
+    D_MODEL: 512
+    LAYERS: 1
+    ATTENTION:
+      SELF_ATTENTION:
+        ARCHITECTURE: ScaledDotProductAttention
+        HEAD: 8
+        D_MODEL: 512
+        D_KEY: 64
+        D_VALUE: 64
+        D_FF: 2048
+        D_FEATURE: 2048
+        USE_AOA: False
+        CAN_BE_STATEFUL: True
+        DROPOUT: .1
+      ENC_ATTENTION:
+        ARCHITECTURE: ScaledDotProductAttention
+        HEAD: 8
+        D_MODEL: 512
+        D_KEY: 64
+        D_VALUE: 64
+        D_FF: 2048
+        D_FEATURE: 2048
+        USE_AOA: False
+        CAN_BE_STATEFUL: False
+        DROPOUT: .1
+    TEXT_EMBEDDING:
+      ARCHITECTURE: UsualEmbedding
+      D_MODEL: 512
+      D_EMBEDDING: 300
+      WORD_EMBEDDING: null
+      WORD_EMBEDDING_CACHE: null
+      DROPOUT: 0.1

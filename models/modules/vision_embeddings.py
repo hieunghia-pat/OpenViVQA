@@ -1,4 +1,3 @@
-import torch
 from torch import nn
 
 from builders.vision_embedding_builder import META_VISION_EMBEDDING

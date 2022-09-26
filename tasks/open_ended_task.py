@@ -14,6 +14,7 @@ import numpy as np
 from tqdm import tqdm
 import itertools
 from shutil import copyfile
+import json
 
 logger = setup_logger()
 
@@ -229,30 +230,33 @@ class OpenEndedTask(BaseTask):
 
             self.epoch += 1
 
-    def get_predictions(self, dataset, get_scores=True):
+    def get_predictions(self, dataset=None, get_scores=False):
         if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
             logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
 
-        logger.info(f"Loading checkpoint from {os.path.join(self.checkpoint_path, 'best_model.pth')} for predicting")
         self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
+
+        if dataset is None:
+            assert self.test_dataloader is not None, "get_predictions require a dataset for predicting"
+            dataset = self.test_dict_dataset
 
         self.model.eval()
         results = []
         with tqdm(desc='Getting predictions: ', unit='it', total=len(dataset)) as pbar:
             for it, items in enumerate(dataset):
+                items = items.unsqueeze(dim=0)
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs, _ = self.model.beam_search(items, beam_size=self.evaluating_beam_size, out_size=1)
+                    outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
 
                 answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
-                answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
+                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
                 gts = {}
                 gens = {}
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
-                    gens['%d_%d' % (it, i)] = [gen_i, ]
+                    gens['%d_%d' % (it, i)] = gen_i
                     gts['%d_%d' % (it, i)] = gts_i
                 pbar.update()
                 
@@ -262,6 +266,7 @@ class OpenEndedTask(BaseTask):
                     scores = None
 
                 results.append({
+                    "id": items.question_id,
                     "image_id": items.image_id,
                     "filename": items.filename,
                     "gens": gens,
@@ -271,4 +276,4 @@ class OpenEndedTask(BaseTask):
 
                 pbar.update()
 
-        return results
+        json.dump(results, open(os.path.join(self.checkpoint_path, "results.json"), "w+"), ensure_ascii=False)

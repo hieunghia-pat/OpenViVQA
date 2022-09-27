@@ -70,6 +70,8 @@ class ExtendedSAAA(BaseTransformer):
     def __init__(self, config, vocab):
         super().__init__(vocab)
 
+        self.device = torch.device(config.DEVICE)
+
         self.vision = build_vision_embedding(config.VISION_PROCESSOR)
         self.text = TextProcessor(config.TEXT_PROCESSOR, vocab)
         self.attention = CoAttention(config.ATTENTION)
@@ -94,15 +96,15 @@ class ExtendedSAAA(BaseTransformer):
         v = input_features.region_features
         q = input_features.question_tokens
 
-        q_padding_mask = generate_padding_mask(q, padding_idx=self.padding_idx)
-        v_padding_mask = generate_padding_mask(v, padding_idx=0)
-
+        v, v_padding_mask = self.vision(v)
         q = self.text(q)
+        q_padding_mask = generate_padding_mask(q.unsqueeze(dim=1), padding_idx=self.padding_idx)
 
         v = v / (v.norm(p=2, dim=1, keepdim=True).expand_as(v) + 1e-8)
         a = self.attention(v, q)
         v = apply_attention(v, a)
 
+        q = q.unsqueeze(dim=1)
         combined = torch.cat([v, q], dim=1)
         combined_mask = torch.cat([v_padding_mask, q_padding_mask], dim=-1)
         combined = self.fusion(combined)

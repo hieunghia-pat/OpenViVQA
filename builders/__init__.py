@@ -1,5 +1,6 @@
 from tasks.base_task import BaseTask
 from tasks.open_ended_task import OpenEndedTask
+from tasks.training_saaa_task import TrainingSAAATask
 from tasks.classification_task import ClassificationTask
 from models.modules.attentions import (
     ScaledDotProductAttention,

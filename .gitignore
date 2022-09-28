@@ -1,6 +1,7 @@
 .vector_cache
 features
 saved_models
+images
 
 __pycache__
 

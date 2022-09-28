@@ -1,8 +1,10 @@
 import argparse
-import json
 
 from configs.utils import get_config
 from builders.task_builder import build_task
+from utils.logging_utils import setup_logger
+
+logger = setup_logger()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config-file", type=str, required=True)
@@ -14,3 +16,4 @@ config = get_config(args.config_file)
 task = build_task(config)
 task.start()
 task.get_predictions(get_scores=config.TRAINING.GET_SCORES)
+logger.info("Task done.")

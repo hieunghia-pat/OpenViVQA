@@ -1,8 +1,8 @@
 TASK: ClassificationTask
 
 DATASET:
-  TYPE: ImageQuestionClassificationDataset
-  BATCH_SIZE: 60
+  TYPE: MultilingualImageQuestionClassificationDataset
+  BATCH_SIZE: 10
   WORKERS: 0
   MIN_FREQ: 1
   SCENE_TEXT_THRESHOLD: 0.3
@@ -28,7 +28,7 @@ DATASET:
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
-  LEARNING_RATE: 0.01
+  LEARNING_RATE: 0.001
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
   SCORE: CIDEr
@@ -44,12 +44,14 @@ MODEL:
   VISION_EMBEDDING:
     ARCHITECTURE: ViTEmbedding
     PRETRAINED_NAME: google/vit-base-patch16-224-in21k
+    DEVICE: cuda
     D_PRETRAINED_FEATURE: 768
     D_MODEL: 512
     DROPOUT: .1
   TEXT_EMBEDDING:
     ARCHITECTURE: mBERTEmbedding
     PRETRAINED_NAME: bert-base-multilingual-uncased
+    DEVICE: cuda
     D_PRETRAINED_FEATURE: 768
     D_MODEL: 512
     DROPOUT: .1

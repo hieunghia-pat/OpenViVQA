@@ -6,10 +6,13 @@ from utils.instances import Instances
 from builders.dataset_builder import META_DATASET
 
 import json
+import re
 import os
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFile
 from typing import Dict, List, Any
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 class BaseDataset(data.Dataset):
     def __init__(self, json_path: str, vocab, config) -> None:
@@ -274,7 +277,7 @@ class ImageQuestionClassificationDataset(FeatureClassificationDataset):
         item = self.annotations[idx]
 
         image_file = os.path.join(self.image_path, f"{item['filename']}")
-        image = Image.open(image_file)
+        image = Image.open(image_file).convert("RGB")
 
         question = item["question"]
         answer = item["answer"]
@@ -288,3 +291,29 @@ class ImageQuestionClassificationDataset(FeatureClassificationDataset):
             answer=answer,
             answer_tokens=answer_tokens
         )
+
+@META_DATASET.register()
+class MultilingualImageQuestionClassificationDataset(ImageQuestionClassificationDataset):
+    def __init__(self, json_path: str, vocab, config) -> None:
+        super().__init__(json_path, vocab, config)
+
+    def load_json(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    for answer in ann["answers"]:
+                        if re.search(r"\s", answer) is not None: # hieroglyphs language
+                            answer = preprocess_sentence(answer, self.vocab.tokenizer)
+                            answer = "_".join(answer)
+                        annotation = {
+                            "question": ann["question"],
+                            "answer": answer,
+                            "image_id": ann["image_id"],
+                            "filename": image["filename"]
+                        }
+                        annotations.append(annotation)
+                    break
+
+        return annotations

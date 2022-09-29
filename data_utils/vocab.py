@@ -288,10 +288,10 @@ class MultilingualClassificationVocab(ClassificationVocab):
                 for answer in ann["answers"]:
                     if re.search(r"\s", question) is None: # This is Japanese annotation
                         question = list(question)
-                        itoa.add(answer)
                     else: # This is Vietnamese or English annotation
                         question = preprocess_sentence(question, self.tokenizer)
-                        answer = "_".join(answer.split())
+                        answer = preprocess_sentence(answer, self.tokenizer)
+                        answer = "_".join(answer)
                     itoa.add(answer)
                 self.freqs.update(question)
                 if len(question) + 2 > self.max_question_length:

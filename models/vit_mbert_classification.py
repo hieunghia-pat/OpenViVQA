@@ -30,7 +30,8 @@ class ViTmBERTClassification(BaseClassification):
         text_features = self.text_embedding(questions)
 
         fused_features = torch.cat([vision_features, text_features], dim=1)
-        out = self.dropout(self.fusion(fused_features))
+        fused_features = self.dropout(self.fusion(fused_features))
+        out = fused_features.sum(dim=1)
         out = self.proj(out)
 
-        return F.softmax(out, dim=-1)
+        return F.log_softmax(out, dim=-1)

@@ -85,7 +85,7 @@ class ClassificationTask(BaseTask):
             for it, items in enumerate(dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs, _ = self.model(items).contiguous()
+                    outs = self.model(items).contiguous()
 
                 answers_gt = items.answer
                 answers_gen = self.vocab.decode_answer(outs)
@@ -140,13 +140,12 @@ class ClassificationTask(BaseTask):
             self.evaluate_loss(self.dev_dataloader)
 
             # val scores
-            scores = self.evaluate_metrics(self.dev_dict_dataloader)
+            scores = self.evaluate_metrics(self.dev_dataloader)
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
-            if self.test_dict_dataloader is not None:
-                scores = self.evaluate_metrics(self.test_dict_dataloader)
-                logger.info("Evaluation scores %s", scores)
+            scores = self.evaluate_metrics(self.test_dataloader)
+            logger.info("Evaluation scores %s", scores)
 
             # Prepare for next epoch
             best = False
@@ -190,7 +189,7 @@ class ClassificationTask(BaseTask):
                 items = items.unsqueeze(dim=0)
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs, _ = self.model(items)
+                    outs = self.model(items)
 
                 answers_gt = items.answer
                 answers_gen = self.vocab.decode_answer(outs)

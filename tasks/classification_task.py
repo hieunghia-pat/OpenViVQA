@@ -88,7 +88,7 @@ class ClassificationTask(BaseTask):
                     outs = self.model(items).contiguous()
 
                 answers_gt = items.answer
-                answers_gen = self.vocab.decode_answer(outs)
+                answers_gen = self.vocab.decode_answer(outs.argmax(dim=-1))
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = [gts_i, ]
@@ -192,7 +192,7 @@ class ClassificationTask(BaseTask):
                     outs = self.model(items)
 
                 answers_gt = items.answer
-                answers_gen = self.vocab.decode_answer(outs)
+                answers_gen = self.vocab.decode_answer(outs.argmax(dim=-1))
                 gts = {}
                 gens = {}
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):

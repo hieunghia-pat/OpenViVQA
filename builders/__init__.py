@@ -1,5 +1,6 @@
 from tasks.base_task import BaseTask
 from tasks.open_ended_task import OpenEndedTask
+from tasks.training_saaa_task import TrainingSAAATask
 from tasks.classification_task import ClassificationTask
 from models.modules.attentions import (
     ScaledDotProductAttention,
@@ -17,11 +18,27 @@ from models.modules.decoders import (
     AdaptiveDecoder
 )
 from models.modules.vision_embeddings import (
-    FeatureEmbedding
+    FeatureEmbedding,
+    ViTEmbedding
 )
 from models.modules.text_embeddings import (
     UsualEmbedding,
-    LSTMTextEmbedding
+    LSTMTextEmbedding,
+    mBERTEmbedding
 )
+from models.vit_mbert_classification import ViTmBERTClassification
 from models.extended_mcan import ExtendedMCAN
 from models.extended_saaa import ExtendedSAAA
+from data_utils.dataset import (
+    FeatureDataset,
+    DictionaryDataset,
+    ImageDataset,
+    ImageQuestionClassificationDataset,
+    FeatureClassificationDataset
+)
+from data_utils.vocab import (
+    Vocab,
+    MultilingualVocab,
+    ClassificationVocab,
+    MultilingualClassificationVocab
+)

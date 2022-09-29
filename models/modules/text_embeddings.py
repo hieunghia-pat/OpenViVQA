@@ -1,9 +1,14 @@
+import torch
 from torch import nn
 
 from data_utils.vocab import Vocab
 from builders.text_embedding_builder import META_TEXT_EMBEDDING
 from builders.word_embedding_builder import build_word_embedding
 from models.utils import generate_sequential_mask, generate_padding_mask
+
+from transformers import BertTokenizer, BertModel
+
+from typing import List
 
 @META_TEXT_EMBEDDING.register()
 class UsualEmbedding(nn.Module):
@@ -57,3 +62,30 @@ class LSTMTextEmbedding(nn.Module):
         features, _ = self.lstm(features)
 
         return features, (padding_masks, sequential_masks)
+
+@META_TEXT_EMBEDDING.register()
+class mBERTEmbedding(nn.Module):
+    def __init__(self, config, vocab):
+        super().__init__()
+
+        self.device = config.DEVICE
+
+        self.tokenizer = BertTokenizer.from_pretrained(config.PRETRAINED_NAME)
+        self.embedding = BertModel.from_pretrained(config.PRETRAINED_NAME)
+        # freeze all parameters of pretrained model
+        for param in self.embedding.parameters():
+            param.requires_grad = False
+
+        self.proj = nn.Linear(config.D_PRETRAINED_FEATURE, config.D_MODEL)
+        self.gelu = nn.GELU()
+        self.dropout = nn.Dropout(config.DROPOUT)
+
+    def forward(self, questions: List[str]):
+        inputs = self.tokenizer(questions, return_tensors="pt", padding=True).to(self.device)
+        features = self.embedding(**inputs).last_hidden_state
+
+        out = self.proj(features)
+        out = self.dropout(self.gelu(out))
+
+        return out
+        

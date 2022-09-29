@@ -1,11 +1,12 @@
 import torch
+from torch.utils.data import DataLoader
 from torch.optim import Adam
 
 from utils.logging_utils import setup_logger
-from data_utils.vocab import Vocab
-from data_utils.dataset import FeatureDataset, DictionaryDataset
+from data_utils.utils import collate_fn
 from .base_task import BaseTask
 from builders.task_builder import META_TASK
+from builders.dataset_builder import build_dataset
 import evaluation
 from evaluation import Cider
 
@@ -23,6 +24,73 @@ class OpenEndedTask(BaseTask):
     def __init__(self, config):
         super().__init__(config)
 
+    def load_feature_datasets(self, config):
+        train_dataset = build_dataset(config.FEATURE_DATASET.TYPE)(config.JSON_PATH.TRAIN, self.vocab, config)
+        dev_dataset = build_dataset(config.FEATURE_DATASET.TYPE)(config.JSON_PATH.DEV, self.vocab, config)
+        test_dataset = build_dataset(config.FEATURE_DATASET.TYPE)(config.JSON_PATH.TEST, self.vocab, config)
+
+        return train_dataset, dev_dataset, test_dataset
+
+    def load_dict_datasets(self, config):
+        train_dataset = build_dataset(config.DICT_DATASET.TYPE)(config.JSON_PATH.TRAIN, self.vocab, config)
+        dev_dataset = build_dataset(config.DICT_DATASET.TYPE)(config.JSON_PATH.DEV, self.vocab, config)
+        test_dataset = build_dataset(config.DICT_DATASET.TYPE)(config.JSON_PATH.TEST, self.vocab, config)
+
+        return train_dataset, dev_dataset, test_dataset
+
+    def load_datasets(self, config):
+        self.train_dataset, self.dev_dataset, self.test_dataset = self.load_feature_datasets(config)
+        self.train_dict_dataset, self.dev_dict_dataset, self.test_dict_dataset = self.load_dict_datasets(config)
+
+    def create_feature_dataloaders(self, config):
+        # creating iterable-dataset data loader
+        self.train_dataloader = DataLoader(
+            dataset=self.train_dataset,
+            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
+            shuffle=True,
+            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
+            collate_fn=collate_fn
+        )
+        self.dev_dataloader = DataLoader(
+            dataset=self.dev_dataset,
+            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
+            shuffle=True,
+            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
+            collate_fn=collate_fn
+        )
+        self.test_dataloader = DataLoader(
+            dataset=self.test_dataset,
+            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
+            shuffle=True,
+            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
+            collate_fn=collate_fn
+        )
+
+    def create_dict_dataloaders(self, config):
+        # creating dictionary iterable-dataset data loader
+        self.train_dict_dataloader = DataLoader(
+            dataset=self.train_dict_dataset,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            shuffle=True,
+            collate_fn=collate_fn
+        )
+        self.dev_dict_dataloader = DataLoader(
+            dataset=self.dev_dict_dataset,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            shuffle=True,
+            collate_fn=collate_fn
+        )
+        self.test_dict_dataloader = DataLoader(
+            dataset=self.test_dict_dataset,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            shuffle=True,
+            collate_fn=collate_fn
+        )
+
+    def create_dataloaders(self, config):
+        self.create_feature_dataloaders(config)
+        self.create_dict_dataloaders(config)
+
     def configuring_hyperparameters(self, config):
         self.epoch = 0
         self.warmup = config.TRAINING.WARMUP
@@ -34,25 +102,6 @@ class OpenEndedTask(BaseTask):
         self.evaluating_beam_size = config.TRAINING.EVALUATING_BEAM_SIZE
         self.patience = config.TRAINING.PATIENCE
         self.train_cider = Cider({f"{idx}": answer for idx, answer in enumerate(self.train_dataset.answers)})
-
-    def load_vocab(self, config):
-        vocab = Vocab(config.DATASET)
-
-        return vocab
-
-    def load_feature_datasets(self, config):
-        train_dataset = FeatureDataset(config.JSON_PATH.TRAIN, self.vocab, config)
-        dev_dataset = FeatureDataset(config.JSON_PATH.DEV, self.vocab, config)
-        test_dataset = FeatureDataset(config.JSON_PATH.TEST, self.vocab, config)
-
-        return train_dataset, dev_dataset, test_dataset
-
-    def load_dict_datasets(self, config):
-        train_dataset = DictionaryDataset(config.JSON_PATH.TRAIN, self.vocab, config)
-        dev_dataset = DictionaryDataset(config.JSON_PATH.DEV, self.vocab, config)
-        test_dataset = DictionaryDataset(config.JSON_PATH.TEST, self.vocab, config)
-
-        return train_dataset, dev_dataset, test_dataset
 
     def evaluate_loss(self, dataloader):
         self.model.eval()

@@ -1,8 +1,14 @@
 TASK: OpenEndedTask
 
 DATASET:
-  BATCH_SIZE: 60
-  WORKERS: 0
+  FEATURE_DATASET:
+    TYPE: FeatureDataset
+    BATCH_SIZE: 60
+    WORKERS: 0
+  DICT_DATASET:
+    TYPE: DictionaryDataset
+    BATCH_SIZE: 60
+    WORKERS: 0
   MIN_FREQ: 1
   SCENE_TEXT_THRESHOLD: 0.3
   VOCAB:

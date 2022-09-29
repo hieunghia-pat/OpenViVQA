@@ -3,8 +3,8 @@ from torch.utils.data import DataLoader
 from torch.nn import NLLLoss
 from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
+from builders.vocab_builder import build_vocab
 
-from data_utils.utils import collate_fn
 from utils.logging_utils import setup_logger
 from builders.model_builder import build_model
 
@@ -25,7 +25,7 @@ class BaseTask:
 
         if not os.path.isfile(os.path.join(self.checkpoint_path, "vocab.bin")):
             logger.info("Creating vocab")
-            self.vocab = self.load_vocab(config)
+            self.vocab = self.load_vocab(config.DATASET)
             logger.info("Saving vocab to %s" % os.path.join(self.checkpoint_path, "vocab.bin"))
             pickle.dump(self.vocab, open(os.path.join(self.checkpoint_path, "vocab.bin"), "wb"))
         else:
@@ -33,57 +33,8 @@ class BaseTask:
             self.vocab = pickle.load(open(os.path.join(self.checkpoint_path, "vocab.bin"), "rb"))
 
         logger.info("Loading data")
-        self.train_dataset, self.dev_dataset, self.test_dataset = self.load_feature_datasets(config.DATASET)
-        self.train_dict_dataset, self.dev_dict_dataset, self.test_dict_dataset = self.load_dict_datasets(config.DATASET)
-        
-        # creating iterable-dataset data loader
-        self.train_dataloader = DataLoader(
-            dataset=self.train_dataset,
-            batch_size=config.DATASET.BATCH_SIZE,
-            shuffle=True,
-            num_workers=config.DATASET.WORKERS,
-            collate_fn=collate_fn
-        )
-        self.val_dataloader = DataLoader(
-            dataset=self.dev_dataset,
-            batch_size=config.DATASET.BATCH_SIZE,
-            shuffle=True,
-            num_workers=config.DATASET.WORKERS,
-            collate_fn=collate_fn
-        )
-        if self.test_dataset is not None:
-            self.test_dataloader = DataLoader(
-                dataset=self.test_dataset,
-                batch_size=config.DATASET.BATCH_SIZE,
-                shuffle=True,
-                num_workers=config.DATASET.WORKERS,
-                collate_fn=collate_fn
-            )
-        else:
-            self.test_dataloader = None
-
-        # creating dictionary iterable-dataset data loader
-        self.train_dict_dataloader = DataLoader(
-            dataset=self.train_dict_dataset,
-            batch_size=config.DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
-            shuffle=True,
-            collate_fn=collate_fn
-        )
-        self.val_dict_dataloader = DataLoader(
-            dataset=self.dev_dict_dataset,
-            batch_size=config.DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
-            shuffle=True,
-            collate_fn=collate_fn
-        )
-        if self.test_dict_dataset is not None:
-            self.test_dict_dataloader = DataLoader(
-                dataset=self.test_dict_dataset,
-                batch_size=config.DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
-                shuffle=True,
-                collate_fn=collate_fn
-            )
-        else:
-            self.test_dict_dataloader = None
+        self.load_datasets(config.DATASET)
+        self.create_dataloaders(config)
 
         logger.info("Building model")
         self.model = build_model(config.MODEL, self.vocab)
@@ -100,12 +51,14 @@ class BaseTask:
         raise NotImplementedError
 
     def load_vocab(self, config):
+        vocab = build_vocab(config)
+
+        return vocab
+    
+    def load_datasets(self, config):
         raise NotImplementedError
 
-    def load_feature_datasets(self, config):
-        raise NotImplementedError
-
-    def load_dict_datasets(self, config):
+    def create_dataloaders(self, config):
         raise NotImplementedError
 
     def evaluate_loss(self, dataloader: DataLoader):

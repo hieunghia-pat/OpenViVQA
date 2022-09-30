@@ -148,7 +148,8 @@ class ImageQuestionDictionaryDataset(DictionaryDataset):
         item = self.annotations[idx]
         image_id = item["image_id"]
         filename = item["filename"]
-        features = self.load_features(image_id)
+        
+        image = Image.open(os.path.join(self.image_path, filename)).convert("RGB")
         question = item["question"]
         answers = item["answers"]
 
@@ -157,9 +158,9 @@ class ImageQuestionDictionaryDataset(DictionaryDataset):
             type=item["type"],
             image_id=image_id,
             filename=filename,
+            image=image,
             question=question,
-            answers=answers,
-            **features
+            answers=answers
         )
 
 @META_DATASET.register()

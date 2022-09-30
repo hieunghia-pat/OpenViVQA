@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from models.base_classification import BaseClassification
+from models.base_transformer import BaseTransformer
 from builders.model_builder import META_ARCHITECTURE
 from builders.vision_embedding_builder import build_vision_embedding
 from builders.text_embedding_builder import build_text_embedding
@@ -10,9 +10,11 @@ from builders.decoder_builder import build_decoder
 from utils.instances import Instances
 
 @META_ARCHITECTURE.register()
-class ViTmBERTGeneration(BaseClassification):
+class ViTmBERTGeneration(BaseTransformer):
     def __init__(self, config, vocab):
-        super().__init__(config)
+        super().__init__(vocab)
+
+        self.device = torch.device(config.DEVICE)
 
         self.vision_encoder = build_vision_embedding(config.VISION_EMBEDDING)
         self.text_embedding = build_text_embedding(config.TEXT_EMBEDDING, vocab)
@@ -45,7 +47,7 @@ class ViTmBERTGeneration(BaseClassification):
 
         return F.log_softmax(out, dim=-1)
 
-    def forward_encoder(self, inputs: Instances):
+    def encoder_forward(self, inputs: Instances):
         images = inputs.image
         questions = inputs.question
 

@@ -227,10 +227,10 @@ class OpenEndedTask(BaseTask):
             else:
                 self.train_scst()
 
-            self.evaluate_loss(self.val_dataloader)
+            self.evaluate_loss(self.dev_dataloader)
 
             # val scores
-            scores = self.evaluate_metrics(self.val_dict_dataloader)
+            scores = self.evaluate_metrics(self.dev_dict_dataloader)
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 

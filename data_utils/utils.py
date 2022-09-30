@@ -119,7 +119,7 @@ def default_value():
 def collate_fn(samples: List[Instances]):
     return Instances.cat(samples)
 
-def is_japense_sentence(text: str):
+def is_japanese_sentence(text: str):
     # REFERENCE UNICODE TABLES: 
     # http:#www.rikai.com/library/kanjitables/kanji_codes.unicode.shtml
     # http:#www.tamasoft.co.jp/en/general-info/unicode.html

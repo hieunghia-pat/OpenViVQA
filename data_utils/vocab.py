@@ -1,6 +1,6 @@
 import torch
 
-from data_utils.utils import is_japense_sentence, preprocess_sentence, unk_init
+from data_utils.utils import is_japanese_sentence, preprocess_sentence, unk_init
 from builders.word_embedding_builder import build_word_embedding
 from builders.vocab_builder import META_VOCAB
 
@@ -226,7 +226,7 @@ class MultilingualVocab(Vocab):
             for ann in json_data["annotations"]:
                 for answer in ann["answers"]:
                     question = ann["question"]
-                    if is_japense_sentence(question):
+                    if is_japanese_sentence(question):
                         question = list(question)
                         answer = list(answer)
                     else: # This is Vietnamese or English annotation
@@ -296,7 +296,7 @@ class MultilingualClassificationVocab(ClassificationVocab):
             for ann in json_data["annotations"]:
                 question = ann["question"]
                 for answer in ann["answers"]:
-                    if is_japense_sentence(question): # This is Japanese annotation
+                    if is_japanese_sentence(question): # This is Japanese annotation
                         question = list(question)
                     else: # This is Vietnamese or English annotation
                         question = preprocess_sentence(question, self.tokenizer)

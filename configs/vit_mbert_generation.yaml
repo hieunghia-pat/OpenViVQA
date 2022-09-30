@@ -1,4 +1,4 @@
-TASK: OpenEndedTask
+TASK: VlspEvjVqaTask
 
 DATASET:
   FEATURE_DATASET:
@@ -21,7 +21,7 @@ DATASET:
     SCENE_TEXT_THRESHOLD: 0.3
   MIN_FREQ: 1
   VOCAB:
-    TYPE: MultilingualVocab
+    TYPE: VlspEvjVqaVocab
     TOKENIZER: null
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
@@ -34,7 +34,8 @@ DATASET:
   JSON_PATH:
     TRAIN: features/EVJVQA/annotations/evjvqa_train.json
     DEV: features/EVJVQA/annotations/evjvqa_dev.json
-    TEST: features/EVJVQA/annotations/evjvqa_public_test.json
+    PUBLIC_TEST: features/EVJVQA/annotations/evjvqa_public_test.json
+    PRIVATE_TEST: features/EVJVQA/annotations/evjvqa_private_test.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models

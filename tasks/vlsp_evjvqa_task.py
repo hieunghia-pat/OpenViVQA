@@ -20,27 +20,32 @@ import json
 logger = setup_logger()
 
 @META_TASK.register()
-class OpenEndedTask(BaseTask):
+class VlspEvjVqaTask(BaseTask):
+    '''
+        This task is designed especially for EVJVQA task at VLSP2022
+    '''
     def __init__(self, config):
         super().__init__(config)
 
     def load_feature_datasets(self, config):
         train_dataset = build_dataset(config.JSON_PATH.TRAIN, self.vocab, config.FEATURE_DATASET)
         dev_dataset = build_dataset(config.JSON_PATH.DEV, self.vocab, config.FEATURE_DATASET)
-        test_dataset = build_dataset(config.JSON_PATH.TEST, self.vocab, config.FEATURE_DATASET)
+        public_test_dataset = build_dataset(config.JSON_PATH.PUBLIC_TEST, self.vocab, config.FEATURE_DATASET)
+        private_test_dataset = build_dataset(config.JSON_PATH.PRIVATE_TEST, self.vocab, config.FEATURE_DATASET)
 
-        return train_dataset, dev_dataset, test_dataset
+        return train_dataset, dev_dataset, public_test_dataset, private_test_dataset
 
     def load_dict_datasets(self, config):
         train_dataset = build_dataset(config.JSON_PATH.TRAIN, self.vocab, config.DICT_DATASET)
         dev_dataset = build_dataset(config.JSON_PATH.DEV, self.vocab, config.DICT_DATASET)
-        test_dataset = build_dataset(config.JSON_PATH.TEST, self.vocab, config.DICT_DATASET)
+        public_test_dataset = build_dataset(config.JSON_PATH.PUBLIC_TEST, self.vocab, config.DICT_DATASET)
+        private_test_dataset = build_dataset(config.JSON_PATH.PRIVATE_TEST, self.vocab, config.DICT_DATASET)
 
-        return train_dataset, dev_dataset, test_dataset
+        return train_dataset, dev_dataset, public_test_dataset, private_test_dataset
 
     def load_datasets(self, config):
-        self.train_dataset, self.dev_dataset, self.test_dataset = self.load_feature_datasets(config)
-        self.train_dict_dataset, self.dev_dict_dataset, self.test_dict_dataset = self.load_dict_datasets(config)
+        self.train_dataset, self.dev_dataset, self.public_test_dataset, self.private_test_dataset = self.load_feature_datasets(config)
+        self.train_dict_dataset, self.dev_dict_dataset, self.public_test_dict_dataset, self.private_test_dict_dataset = self.load_dict_datasets(config)
 
     def create_feature_dataloaders(self, config):
         # creating iterable-dataset data loader
@@ -58,8 +63,15 @@ class OpenEndedTask(BaseTask):
             num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
             collate_fn=collate_fn
         )
-        self.test_dataloader = DataLoader(
-            dataset=self.test_dataset,
+        self.public_test_dataloader = DataLoader(
+            dataset=self.public_test_dataset,
+            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
+            shuffle=True,
+            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
+            collate_fn=collate_fn
+        )
+        self.private_test_dataloader = DataLoader(
+            dataset=self.private_test_dataset,
             batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
             shuffle=True,
             num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
@@ -80,8 +92,14 @@ class OpenEndedTask(BaseTask):
             shuffle=True,
             collate_fn=collate_fn
         )
-        self.test_dict_dataloader = DataLoader(
-            dataset=self.test_dict_dataset,
+        self.public_test_dict_dataloader = DataLoader(
+            dataset=self.public_test_dict_dataset,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            shuffle=True,
+            collate_fn=collate_fn
+        )
+        self.private_test_dict_dataloader = DataLoader(
+            dataset=self.private_test_dict_dataset,
             batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
@@ -141,6 +159,7 @@ class OpenEndedTask(BaseTask):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
+
                 pbar.update()
 
         scores, _ = evaluation.compute_scores(gts, gens)
@@ -234,9 +253,6 @@ class OpenEndedTask(BaseTask):
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
-            scores = self.evaluate_metrics(self.test_dict_dataloader)
-            logger.info("Evaluation scores %s", scores)
-
             # Prepare for next epoch
             best = False
             if val_score >= best_val_score:
@@ -287,8 +303,43 @@ class OpenEndedTask(BaseTask):
 
         self.model.eval()
         results = []
-        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataset)) as pbar:
-            for it, items in enumerate(self.test_dict_dataset):
+        with tqdm(desc='Getting predictions on public test: ', unit='it', total=len(self.public_test_dict_dataset)) as pbar:
+            for it, items in enumerate(self.public_test_dict_dataset):
+                items = items.unsqueeze(dim=0)
+                items = items.to(self.device)
+                with torch.no_grad():
+                    outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
+
+                answers_gt = items.answers
+                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
+                gts = {}
+                gens = {}
+                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
+                    gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
+                    gens['%d_%d' % (it, i)] = gen_i
+                    gts['%d_%d' % (it, i)] = gts_i
+                pbar.update()
+                
+                if get_scores:
+                    scores, _ = evaluation.compute_scores(gts, gens)
+                else:
+                    scores = None
+
+                results.append({
+                    "id": items.question_id,
+                    "image_id": items.image_id,
+                    "filename": items.filename,
+                    "gens": gens,
+                    "gts": gts,
+                    "scores": scores
+                })
+
+                pbar.update()
+
+        json.dump(results, open(os.path.join(self.checkpoint_path, "results.json"), "w+"), ensure_ascii=False)
+
+        with tqdm(desc='Getting predictions on private test: ', unit='it', total=len(self.private_test_dict_dataset)) as pbar:
+            for it, items in enumerate(self.private_test_dict_dataset):
                 items = items.unsqueeze(dim=0)
                 items = items.to(self.device)
                 with torch.no_grad():

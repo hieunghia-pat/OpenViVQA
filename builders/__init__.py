@@ -2,6 +2,7 @@ from tasks.base_task import BaseTask
 from tasks.open_ended_task import OpenEndedTask
 from tasks.training_saaa_task import TrainingSAAATask
 from tasks.classification_task import ClassificationTask
+from tasks.vlsp_evjvqa_task import VlspEvjVqaTask
 from models.modules.attentions import (
     ScaledDotProductAttention,
     AugmentedGeometryScaledDotProductAttention,

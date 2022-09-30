@@ -181,6 +181,8 @@ class MultilingualImageQuestionDictionaryDataset(ImageQuestionDictionaryDataset)
                     for answer in ann["answers"]:
                         if re.search(r"\s", question):
                             answer = " ".join(preprocess_sentence(answer, self.vocab.tokenizer))
+                        else:
+                            answer = " ".join(list(answer))
                         answers.append(answer)
                     annotation = {
                         "question_id": ann["id"],

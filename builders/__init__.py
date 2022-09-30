@@ -27,14 +27,20 @@ from models.modules.text_embeddings import (
     mBERTEmbedding
 )
 from models.vit_mbert_classification import ViTmBERTClassification
+from models.vit_mbert_generation import ViTmBERTGeneration
 from models.extended_mcan import ExtendedMCAN
 from models.extended_saaa import ExtendedSAAA
 from data_utils.dataset import (
-    FeatureDataset,
     DictionaryDataset,
+    ImageQuestionDictionaryDataset,
+    MultilingualImageQuestionDictionaryDataset,
     ImageDataset,
+    FeatureDataset,
+    ImageQuestionDataset,
+    MultilingualImageQuestionDataset,
+    FeatureClassificationDataset,
     ImageQuestionClassificationDataset,
-    FeatureClassificationDataset
+    MultilingualImageQuestionClassificationDataset
 )
 from data_utils.vocab import (
     Vocab,

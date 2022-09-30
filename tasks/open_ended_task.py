@@ -227,10 +227,10 @@ class OpenEndedTask(BaseTask):
             else:
                 self.train_scst()
 
-            self.evaluate_loss(self.val_dataloader)
+            self.evaluate_loss(self.dev_dataloader)
 
             # val scores
-            scores = self.evaluate_metrics(self.val_dict_dataloader)
+            scores = self.evaluate_metrics(self.dev_dict_dataloader)
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
@@ -279,21 +279,17 @@ class OpenEndedTask(BaseTask):
 
             self.epoch += 1
 
-    def get_predictions(self, dataset=None, get_scores=False):
+    def get_predictions(self, get_scores=False):
         if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
             logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
 
         self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
 
-        if dataset is None:
-            assert self.test_dataloader is not None, "get_predictions require a dataset for predicting"
-            dataset = self.test_dict_dataset
-
         self.model.eval()
         results = []
-        with tqdm(desc='Getting predictions: ', unit='it', total=len(dataset)) as pbar:
-            for it, items in enumerate(dataset):
+        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataset)) as pbar:
+            for it, items in enumerate(self.test_dict_dataset):
                 items = items.unsqueeze(dim=0)
                 items = items.to(self.device)
                 with torch.no_grad():

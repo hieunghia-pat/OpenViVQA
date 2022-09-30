@@ -48,7 +48,8 @@ def get_tokenizer(tokenizer):
                   "See the docs at https://github.com/vncorenlp/VnCoreNLP for more information.")
             raise
 
-def preprocess_sentence(sentence, tokenizer: str):
+def preprocess_sentence(sentence: str, tokenizer: str):
+    sentence = sentence.lower()
     sentence = re.sub(r"[“”]", "\"", sentence)
     sentence = re.sub(r"!", " ! ", sentence)
     sentence = re.sub(r"\?", " ? ", sentence)

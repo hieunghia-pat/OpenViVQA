@@ -12,7 +12,9 @@ from utils.instances import Instances
 @META_ARCHITECTURE.register()
 class ViTmBERTGeneration(BaseTransformer):
     def __init__(self, config, vocab):
-        super().__init__(config)
+        super().__init__(vocab)
+
+        self.device = torch.device(config.DEVICE)
 
         self.vision_encoder = build_vision_embedding(config.VISION_EMBEDDING)
         self.text_embedding = build_text_embedding(config.TEXT_EMBEDDING, vocab)
@@ -45,7 +47,7 @@ class ViTmBERTGeneration(BaseTransformer):
 
         return F.log_softmax(out, dim=-1)
 
-    def forward_encoder(self, inputs: Instances):
+    def encoder_forward(self, inputs: Instances):
         images = inputs.image
         questions = inputs.question
 

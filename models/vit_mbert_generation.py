@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from models.base_classification import BaseClassification
+from models.base_transformer import BaseTransformer
 from builders.model_builder import META_ARCHITECTURE
 from builders.vision_embedding_builder import build_vision_embedding
 from builders.text_embedding_builder import build_text_embedding
@@ -10,7 +10,7 @@ from builders.decoder_builder import build_decoder
 from utils.instances import Instances
 
 @META_ARCHITECTURE.register()
-class ViTmBERTGeneration(BaseClassification):
+class ViTmBERTGeneration(BaseTransformer):
     def __init__(self, config, vocab):
         super().__init__(config)
 

@@ -82,10 +82,11 @@ class mBERTEmbedding(nn.Module):
 
     def forward(self, questions: List[str]):
         inputs = self.tokenizer(questions, return_tensors="pt", padding=True).to(self.device)
+        padding_mask = generate_padding_mask(inputs.input_ids, padding_idx=self.tokenizer.pad_token_id)
         features = self.embedding(**inputs).last_hidden_state
 
         out = self.proj(features)
         out = self.dropout(self.gelu(out))
 
-        return out
+        return out, padding_mask
         

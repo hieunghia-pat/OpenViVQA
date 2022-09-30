@@ -23,9 +23,19 @@ class Vocab(object):
         if config.VOCAB.PRETRAINED_LANGUAGE_MODEL is not None: # use special tokens and vocab from pretrained language model
             token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
             self.padding_token = token_encoder.pad_token
-            self.bos_token = token_encoder.bos_token
-            self.eos_token = token_encoder.eos_token
             self.unk_token = token_encoder.unk_token
+            cls_token = token_encoder.cls_token
+            if cls_token is None:
+                cls_token = token_encoder.pad_token
+            if sep_token is None:
+                sep_token = token_encoder.pad_token
+            sep_token = token_encoder.sep_token
+            self.bos_token = token_encoder.bos_token
+            if self.bos_token is None:
+                self.bos_token = cls_token
+            self.eos_token = token_encoder.eos_token
+            if self.eos_token is None:
+                self.eos_token = sep_token
         else: # use defined special tokens
             self.padding_token = config.VOCAB.PAD_TOKEN
             self.bos_token = config.VOCAB.BOS_TOKEN

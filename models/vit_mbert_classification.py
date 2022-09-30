@@ -26,8 +26,8 @@ class ViTmBERTClassification(BaseClassification):
         images = inputs.image
         questions = inputs.question
 
-        vision_features = self.vision_encoder(images)
-        text_features = self.text_embedding(questions)
+        vision_features, _ = self.vision_encoder(images)
+        text_features, _ = self.text_embedding(questions)
 
         fused_features = torch.cat([vision_features, text_features], dim=1)
         fused_features = self.dropout(self.fusion(fused_features))

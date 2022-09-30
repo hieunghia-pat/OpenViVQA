@@ -44,8 +44,9 @@ class ViTEmbedding(nn.Module):
     def forward(self, images: List[Image.Image]):
         inputs = self.feature_extractor(images, return_tensors="pt").to(self.device)
         features = self.backbone(**inputs).last_hidden_state
+        padding_mask = generate_padding_mask(features, padding_idx=0)
 
         out = self.proj(features)
         out = self.dropout(self.gelu(out))
         
-        return out
+        return out, padding_mask

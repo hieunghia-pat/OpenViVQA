@@ -1,7 +1,7 @@
 import torch
 from torch.utils import data
 
-from data_utils.utils import preprocess_sentence
+from data_utils.utils import preprocess_sentence, is_japense_sentence
 from utils.instances import Instances
 from builders.dataset_builder import META_DATASET
 
@@ -179,7 +179,7 @@ class MultilingualImageQuestionDictionaryDataset(ImageQuestionDictionaryDataset)
                     question = ann["question"]
                     answers = []
                     for answer in ann["answers"]:
-                        if re.search(r"\s", question):
+                        if not is_japense_sentence(question):
                             answer = " ".join(preprocess_sentence(answer, self.vocab.tokenizer))
                         else:
                             answer = " ".join(list(answer))
@@ -312,7 +312,7 @@ class MultilingualFeatureDataset(FeatureDataset):
                 if image["id"] == ann["image_id"]:
                     question = ann["question"]
                     for answer in ann["answers"]:
-                        if re.search(r"\s", question) is None:
+                        if is_japense_sentence(question):
                             question = list(question)
                             answer = list(answer)
                         else:
@@ -391,7 +391,7 @@ class MultilingualImageQuestionDataset(ImageQuestionDataset):
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     for answer in ann["answers"]:
-                        if re.search(r"\s", answer) is not None: # hieroglyphs language
+                        if not is_japense_sentence(answer):
                             answer = preprocess_sentence(answer, self.vocab.tokenizer)
                         else:
                             answer = list(answer)
@@ -494,7 +494,7 @@ class MultilingualImageQuestionClassificationDataset(ImageQuestionClassification
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     for answer in ann["answers"]:
-                        if re.search(r"\s", answer) is not None: # hieroglyphs language
+                        if not is_japense_sentence(answer):
                             answer = preprocess_sentence(answer, self.vocab.tokenizer)
                             answer = "_".join(answer)
                         annotation = {

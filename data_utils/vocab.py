@@ -1,6 +1,6 @@
 import torch
 
-from data_utils.utils import preprocess_sentence, unk_init
+from data_utils.utils import is_japanese_sentence, preprocess_sentence, unk_init
 from builders.word_embedding_builder import build_word_embedding
 from builders.vocab_builder import META_VOCAB
 
@@ -9,7 +9,6 @@ from transformers import AutoTokenizer
 from collections import defaultdict, Counter
 import json
 from typing import List
-import re
 
 @META_VOCAB.register()
 class Vocab(object):
@@ -211,9 +210,6 @@ class Vocab(object):
 
 @META_VOCAB.register()
 class MultilingualVocab(Vocab):
-    '''
-        This vocab is designed specially for EVJVQA dataset
-    '''
     def __init__(self, config) -> None:
         super().__init__(config)
 
@@ -226,7 +222,7 @@ class MultilingualVocab(Vocab):
             for ann in json_data["annotations"]:
                 for answer in ann["answers"]:
                     question = ann["question"]
-                    if re.search(r"[^A-TT-Za-tt-z]", question): # This is Japanese annotation
+                    if is_japanese_sentence(question):
                         question = list(question)
                         answer = list(answer)
                     else: # This is Vietnamese or English annotation
@@ -238,6 +234,91 @@ class MultilingualVocab(Vocab):
                             self.max_question_length = len(question) + 2
                     if len(answer) + 2 > self.max_answer_length:
                         self.max_answer_length = len(answer) + 2
+
+@META_VOCAB.register()
+class VlspEvjVqaVocab(MultilingualVocab):
+    '''
+        This vocab is designed specially for EVJVQA dataset
+    '''
+    
+    def __init__(self, config) -> None:
+        self.tokenizer = config.VOCAB.TOKENIZER
+
+        if config.VOCAB.PRETRAINED_LANGUAGE_MODEL is not None: # use special tokens and vocab from pretrained language model
+            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
+            self.padding_token = token_encoder.pad_token
+            self.unk_token = token_encoder.unk_token
+            cls_token = token_encoder.cls_token
+            if cls_token is None:
+                cls_token = token_encoder.pad_token
+            if sep_token is None:
+                sep_token = token_encoder.pad_token
+            sep_token = token_encoder.sep_token
+            self.bos_token = token_encoder.bos_token
+            if self.bos_token is None:
+                self.bos_token = cls_token
+            self.eos_token = token_encoder.eos_token
+            if self.eos_token is None:
+                self.eos_token = sep_token
+        else: # use defined special tokens
+            self.padding_token = config.VOCAB.PAD_TOKEN
+            self.bos_token = config.VOCAB.BOS_TOKEN
+            self.eos_token = config.VOCAB.EOS_TOKEN
+            self.unk_token = config.VOCAB.UNK_TOKEN
+
+        self.make_vocab([
+            config.JSON_PATH.TRAIN,
+            config.JSON_PATH.DEV,
+            config.JSON_PATH.PUBLIC_TEST,
+            config.JSON_PATH.PRIVATE_TEST
+        ])
+        counter = self.freqs.copy()
+    
+        min_freq = max(config.MIN_FREQ, 1)
+
+        specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
+        self.itos = specials
+        # frequencies of special tokens are not counted when building vocabulary
+        # in frequency order
+        for tok in specials:
+            del counter[tok]
+
+        # sort by frequency, then alphabetically
+        words_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
+        words_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
+
+        for word, freq in words_and_frequencies:
+            if freq < min_freq:
+                break
+            self.itos.append(word)
+
+        self.stoi = defaultdict()
+        # stoi is simply a reverse dict for itos
+        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
+
+        self.padding_idx = self.stoi[self.padding_token]
+        self.bos_idx = self.stoi[self.bos_token]
+        self.eos_idx = self.stoi[self.eos_token]
+        self.unk_idx = self.stoi[self.unk_token]
+
+        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
+
+        if config.VOCAB.USE_MAPPING:
+            assert config.VOCAB.PRETRAINED_LANGUAGE_MODEL is not None, "Pretrained language model is required if using map for vocab"
+            self.mapping = defaultdict()
+            # map from original vocab to pretrained language models vocab
+            self.mapping.update({ori_idx: self.token_encoder.convert_tokens_to_ids(token) for ori_idx, token in enumerate(self.itos)})
+            # map special tokens
+            self.mapping[self.padding_idx] = token_encoder.encoder[self.padding_token]
+            self.mapping[self.bos_idx] = token_encoder.ecoder[self.bos_token]
+            self.mapping[self.eos_idx] = token_encoder.encoder[self.eos_token]
+            self.mapping[self.unk_idx] = token_encoder.encoder[self.unk_token]
+        else:
+            self.mapping = None
+
+        self.word_embeddings = None
+        if config.VOCAB.WORD_EMBEDDING is not None:
+            self.load_word_embeddings(build_word_embedding(config))
 
 @META_VOCAB.register()
 class ClassificationVocab(Vocab):
@@ -296,7 +377,7 @@ class MultilingualClassificationVocab(ClassificationVocab):
             for ann in json_data["annotations"]:
                 question = ann["question"]
                 for answer in ann["answers"]:
-                    if re.search(r"\s", question) is None: # This is Japanese annotation
+                    if is_japanese_sentence(question): # This is Japanese annotation
                         question = list(question)
                     else: # This is Vietnamese or English annotation
                         question = preprocess_sentence(question, self.tokenizer)

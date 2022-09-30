@@ -25,16 +25,16 @@ class OpenEndedTask(BaseTask):
         super().__init__(config)
 
     def load_feature_datasets(self, config):
-        train_dataset = build_dataset(config.FEATURE_DATASET.TYPE)(config.JSON_PATH.TRAIN, self.vocab, config)
-        dev_dataset = build_dataset(config.FEATURE_DATASET.TYPE)(config.JSON_PATH.DEV, self.vocab, config)
-        test_dataset = build_dataset(config.FEATURE_DATASET.TYPE)(config.JSON_PATH.TEST, self.vocab, config)
+        train_dataset = build_dataset(config.JSON_PATH.TRAIN, self.vocab, config.FEATURE_DATASET)
+        dev_dataset = build_dataset(config.JSON_PATH.DEV, self.vocab, config.FEATURE_DATASET)
+        test_dataset = build_dataset(config.JSON_PATH.TEST, self.vocab, config.FEATURE_DATASET)
 
         return train_dataset, dev_dataset, test_dataset
 
     def load_dict_datasets(self, config):
-        train_dataset = build_dataset(config.DICT_DATASET.TYPE)(config.JSON_PATH.TRAIN, self.vocab, config)
-        dev_dataset = build_dataset(config.DICT_DATASET.TYPE)(config.JSON_PATH.DEV, self.vocab, config)
-        test_dataset = build_dataset(config.DICT_DATASET.TYPE)(config.JSON_PATH.TEST, self.vocab, config)
+        train_dataset = build_dataset(config.JSON_PATH.TRAIN, self.vocab, config.DICT_DATASET)
+        dev_dataset = build_dataset(config.JSON_PATH.DEV, self.vocab, config.DICT_DATASET)
+        test_dataset = build_dataset(config.JSON_PATH.TEST, self.vocab, config.DICT_DATASET)
 
         return train_dataset, dev_dataset, test_dataset
 

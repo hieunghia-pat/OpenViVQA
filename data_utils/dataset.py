@@ -24,7 +24,7 @@ class BaseDataset(data.Dataset):
         self.vocab = vocab
 
         # quesion-answer pairs
-        self.annotations = self.load_json(json_data)
+        self.annotations = self.load_annotations(json_data)
 
         # image features
         self.image_features_path = config.FEATURE_PATH.FEATURES
@@ -33,7 +33,7 @@ class BaseDataset(data.Dataset):
         self.scene_text_feature_path = config.FEATURE_PATH.SCENE_TEXT
         self.scene_text_threshold = config.SCENE_TEXT_THRESHOLD
 
-    def load_json(self, json_data: Dict) -> List[Dict]:
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
         raise NotImplementedError
 
     def load_image_feature(self, image_id: int) -> Dict[str, Any]:
@@ -72,7 +72,7 @@ class DictionaryDataset(BaseDataset):
     def __init__(self, json_path: str, vocab, config) -> None:
         super(DictionaryDataset, self).__init__(json_path, vocab, config)
 
-    def load_json(self, json_data: Dict) -> List[Dict]:
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
         annotations = []
         for ann in json_data["annotations"]:
             # find the appropriate image
@@ -116,6 +116,86 @@ class DictionaryDataset(BaseDataset):
         )
 
 @META_DATASET.register()
+class ImageQuestionDictionaryDataset(DictionaryDataset):
+    def __init__(self, json_path: str, vocab, config) -> None:
+        super().__init__(json_path, vocab, config)
+
+        self.image_path = config.FEATURE_PATH.IMAGE
+
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    answers = [preprocess_sentence(answer, self.vocab.tokenizer) for answer in ann["answers"]]
+                    answers = [" ".join(answer) for answer in answers]
+                    annotation = {
+                        "question_id": ann["id"],
+                        "type": ann["QA-type"],
+                        "question": ann["question"],
+                        "answers": answers,
+                        "image_id": ann["image_id"],
+                        "filename": image["filename"]
+                    }
+                    break
+
+            annotations.append(annotation)
+
+        return annotations
+
+    def __getitem__(self, idx: int):
+        item = self.annotations[idx]
+        image_id = item["image_id"]
+        filename = item["filename"]
+        features = self.load_features(image_id)
+        question = item["question"]
+        answers = item["answers"]
+
+        return Instances(
+            question_id=item["question_id"],
+            type=item["type"],
+            image_id=image_id,
+            filename=filename,
+            question=question,
+            answers=answers,
+            **features
+        )
+
+@META_DATASET.register()
+class MultilingualImageQuestionDictionaryDataset(ImageQuestionDictionaryDataset):
+    def __init__(self, json_path: str, vocab, config) -> None:
+        super().__init__(json_path, vocab, config)
+
+        self.image_path = config.FEATURE_PATH.IMAGE
+
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    question = ann["question"]
+                    answers = []
+                    for answer in ann["answers"]:
+                        if re.search(r"\s", question):
+                            answer = " ".join(preprocess_sentence(answer, self.vocab.tokenizer))
+                        answers.append(answer)
+                    annotation = {
+                        "question_id": ann["id"],
+                        "type": ann["QA-type"],
+                        "question": ann["question"],
+                        "answers": answers,
+                        "image_id": ann["image_id"],
+                        "filename": image["filename"]
+                    }
+                    break
+
+            annotations.append(annotation)
+
+        return annotations
+
+@META_DATASET.register()
 class ImageDataset(BaseDataset):
     # This class is designed especially for visualizing purposes
     def __init__(self, json_path: str, vocab, config) -> None:
@@ -123,7 +203,7 @@ class ImageDataset(BaseDataset):
 
         self.image_path = config.FEATURE_PATH.IMAGE
 
-    def load_json(self, json_data: Dict) -> List[Dict]:
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
         annotations = []
         for ann in json_data["annotations"]:
             # find the appropriate image
@@ -175,7 +255,7 @@ class FeatureDataset(BaseDataset):
     def answers(self):
         return [ann["answer"] for ann in self.annotations]
 
-    def load_json(self, json_data: Dict) -> List[Dict]:
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
         annotations = []
         for ann in json_data["annotations"]:
             # find the appropriate image
@@ -217,6 +297,113 @@ class FeatureDataset(BaseDataset):
         return len(self.annotations)
 
 @META_DATASET.register()
+class MultilingualFeatureDataset(FeatureDataset):
+    def __init__(self, json_path: str, vocab, config) -> None:
+        super().__init__(json_path, vocab, config)
+
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    question = ann["question"]
+                    for answer in ann["answers"]:
+                        if re.search(r"\s", question) is None:
+                            question = list(question)
+                            answer = list(answer)
+                        else:
+                            question = preprocess_sentence(question, self.vocab.tokenizer)
+                            answer = preprocess_sentence(answer, self.vocab.tokenizer)
+                        annotation = {
+                            "question": question,
+                            "answer": answer,
+                            "image_id": ann["image_id"],
+                            "filename": image["filename"]
+                        }
+                        annotations.append(annotation)
+                    break
+
+        return annotations
+
+@META_DATASET.register()
+class ImageQuestionDataset(FeatureDataset):
+    def __init__(self, json_path: str, vocab, config) -> None:
+        super().__init__(json_path, vocab, config)
+
+        self.image_path = config.FEATURE_PATH.IMAGE
+
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    for answer in ann["answers"]:
+                        answer = preprocess_sentence(answer, self.vocab.tokenizer)
+                        annotation = {
+                            "question": ann["question"],
+                            "answer": answer,
+                            "image_id": ann["image_id"],
+                            "filename": image["filename"]
+                        }
+                        annotations.append(annotation)
+                    break
+
+        return annotations
+
+    def __getitem__(self, idx: int):
+        item = self.annotations[idx]
+
+        image_file = os.path.join(self.image_path, f"{item['filename']}")
+        image = Image.open(image_file).convert("RGB")
+
+        question = item["question"]
+        answer = item["answer"]
+        answer_tokens = self.vocab.encode_answer(answer)
+
+        shifted_right_answer_tokens = torch.zeros_like(answer_tokens).fill_(self.vocab.padding_idx)
+        shifted_right_answer_tokens[:-1] = answer_tokens[1:]
+        answer_tokens = torch.where(answer_tokens == self.vocab.eos_idx, self.vocab.padding_idx, answer_tokens) # remove eos_token in answer
+
+        return Instances(
+            question_id=idx,
+            filename=image_file,
+            image=image,
+            question=question,
+            answer=answer,
+            answer_tokens=answer_tokens,
+            shifted_right_answer_tokens=shifted_right_answer_tokens
+        )
+
+@META_DATASET.register()
+class MultilingualImageQuestionDataset(ImageQuestionDataset):
+    def __init__(self, json_path: str, vocab, config) -> None:
+        super().__init__(json_path, vocab, config)
+
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    for answer in ann["answers"]:
+                        if re.search(r"\s", answer) is not None: # hieroglyphs language
+                            answer = preprocess_sentence(answer, self.vocab.tokenizer)
+                        else:
+                            answer = list(answer)
+                        annotation = {
+                            "question": ann["question"],
+                            "answer": answer,
+                            "image_id": ann["image_id"],
+                            "filename": image["filename"]
+                        }
+                        annotations.append(annotation)
+                    break
+
+        return annotations
+
+@META_DATASET.register()
 class FeatureClassificationDataset(BaseDataset):
     # This class is especially designed for ViVQA dataset by treating the VQA as a classification task. 
     # For more information, please visit https://arxiv.org/abs/1708.02711
@@ -232,7 +419,7 @@ class FeatureClassificationDataset(BaseDataset):
     def answers(self):
         return [ann["answer"] for ann in self.annotations]
 
-    def load_json(self, json_data: Dict) -> List[Dict]:
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
         annotations = []
         for ann in json_data["annotations"]:
             # find the appropriate image
@@ -297,7 +484,7 @@ class MultilingualImageQuestionClassificationDataset(ImageQuestionClassification
     def __init__(self, json_path: str, vocab, config) -> None:
         super().__init__(json_path, vocab, config)
 
-    def load_json(self, json_data: Dict) -> List[Dict]:
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
         annotations = []
         for ann in json_data["annotations"]:
             # find the appropriate image

@@ -302,7 +302,10 @@ class VlspEvjVqaTask(BaseTask):
         self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
 
         self.model.eval()
+
         results = []
+        overall_gens = {}
+        overall_gts = {}
         with tqdm(desc='Getting predictions on public test: ', unit='it', total=len(self.public_test_dict_dataset)) as pbar:
             for it, items in enumerate(self.public_test_dict_dataset):
                 items = items.unsqueeze(dim=0)
@@ -318,6 +321,8 @@ class VlspEvjVqaTask(BaseTask):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = gen_i
                     gts['%d_%d' % (it, i)] = gts_i
+                    overall_gens['%d_%d' % (it, i)] = [gen_i, ]
+                    overall_gts['%d_%d' % (it, i)] = [gts_i, ]
                 pbar.update()
                 
                 if get_scores:
@@ -336,8 +341,17 @@ class VlspEvjVqaTask(BaseTask):
 
                 pbar.update()
 
-        json.dump(results, open(os.path.join(self.checkpoint_path, "results.json"), "w+"), ensure_ascii=False)
+        scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+        logger.info("Evaluation score on public test: %s", scores)
 
+        json.dump({
+            "results": results,
+            **scores
+        }, open(os.path.join(self.checkpoint_path, "public_test_results.json"), "w+"), ensure_ascii=False)
+
+        results = []
+        overall_gens = {}
+        overall_gts = {}
         with tqdm(desc='Getting predictions on private test: ', unit='it', total=len(self.private_test_dict_dataset)) as pbar:
             for it, items in enumerate(self.private_test_dict_dataset):
                 items = items.unsqueeze(dim=0)
@@ -353,6 +367,9 @@ class VlspEvjVqaTask(BaseTask):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = gen_i
                     gts['%d_%d' % (it, i)] = gts_i
+                    overall_gens['%d_%d' % (it, i)] = [gen_i, ]
+                    overall_gts['%d_%d' % (it, i)] = [gts_i, ]
+
                 pbar.update()
                 
                 if get_scores:
@@ -371,4 +388,10 @@ class VlspEvjVqaTask(BaseTask):
 
                 pbar.update()
 
-        json.dump(results, open(os.path.join(self.checkpoint_path, "results.json"), "w+"), ensure_ascii=False)
+        scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+        logger.info("Evaluation score on public test: %s", scores)
+
+        json.dump({
+            "results": results,
+            **scores
+        }, open(os.path.join(self.checkpoint_path, "private_test_results.json"), "w+"), ensure_ascii=False)

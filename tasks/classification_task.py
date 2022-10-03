@@ -127,7 +127,7 @@ class ClassificationTask(BaseTask):
             checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
             best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]
-            self.epoch = checkpoint["epoch"]
+            self.epoch = checkpoint["epoch"] + 1
             self.optim.load_state_dict(checkpoint['optimizer'])
             self.scheduler.load_state_dict(checkpoint['scheduler'])
         else:

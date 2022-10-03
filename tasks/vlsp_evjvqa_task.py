@@ -232,7 +232,7 @@ class VlspEvjVqaTask(BaseTask):
             use_rl = checkpoint["use_rl"]
             best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]
-            self.epoch = checkpoint["epoch"]
+            self.epoch = checkpoint["epoch"] + 1
             self.optim.load_state_dict(checkpoint['optimizer'])
             self.scheduler.load_state_dict(checkpoint['scheduler'])
         else:
@@ -294,7 +294,7 @@ class VlspEvjVqaTask(BaseTask):
 
             self.epoch += 1
 
-    def get_predictions(self, get_scores=False):
+    def get_predictions(self):
         if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
             logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
@@ -302,7 +302,10 @@ class VlspEvjVqaTask(BaseTask):
         self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
 
         self.model.eval()
+
         results = []
+        overall_gens = {}
+        overall_gts = {}
         with tqdm(desc='Getting predictions on public test: ', unit='it', total=len(self.public_test_dict_dataset)) as pbar:
             for it, items in enumerate(self.public_test_dict_dataset):
                 items = items.unsqueeze(dim=0)
@@ -318,26 +321,31 @@ class VlspEvjVqaTask(BaseTask):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = gen_i
                     gts['%d_%d' % (it, i)] = gts_i
+                    overall_gens['%d_%d' % (it, i)] = [gen_i, ]
+                    overall_gts['%d_%d' % (it, i)] = [gts_i, ]
                 pbar.update()
-                
-                if get_scores:
-                    scores, _ = evaluation.compute_scores(gts, gens)
-                else:
-                    scores = None
 
                 results.append({
                     "id": items.question_id,
                     "image_id": items.image_id,
                     "filename": items.filename,
                     "gens": gens,
-                    "gts": gts,
-                    "scores": scores
+                    "gts": gts
                 })
 
                 pbar.update()
 
-        json.dump(results, open(os.path.join(self.checkpoint_path, "results.json"), "w+"), ensure_ascii=False)
+        scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+        logger.info("Evaluation score on public test: %s", scores)
 
+        json.dump({
+            "results": results,
+            **scores
+        }, open(os.path.join(self.checkpoint_path, "public_test_results.json"), "w+"), ensure_ascii=False)
+
+        results = []
+        overall_gens = {}
+        overall_gts = {}
         with tqdm(desc='Getting predictions on private test: ', unit='it', total=len(self.private_test_dict_dataset)) as pbar:
             for it, items in enumerate(self.private_test_dict_dataset):
                 items = items.unsqueeze(dim=0)
@@ -353,22 +361,25 @@ class VlspEvjVqaTask(BaseTask):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = gen_i
                     gts['%d_%d' % (it, i)] = gts_i
+                    overall_gens['%d_%d' % (it, i)] = [gen_i, ]
+                    overall_gts['%d_%d' % (it, i)] = gts_i
+
                 pbar.update()
-                
-                if get_scores:
-                    scores, _ = evaluation.compute_scores(gts, gens)
-                else:
-                    scores = None
 
                 results.append({
                     "id": items.question_id,
                     "image_id": items.image_id,
                     "filename": items.filename,
                     "gens": gens,
-                    "gts": gts,
-                    "scores": scores
+                    "gts": gts
                 })
 
                 pbar.update()
 
-        json.dump(results, open(os.path.join(self.checkpoint_path, "results.json"), "w+"), ensure_ascii=False)
+        scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+        logger.info("Evaluation score on public test: %s", scores)
+
+        json.dump({
+            "results": results,
+            **scores
+        }, open(os.path.join(self.checkpoint_path, "private_test_results.json"), "w+"), ensure_ascii=False)

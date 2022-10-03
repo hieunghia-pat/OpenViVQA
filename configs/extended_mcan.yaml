@@ -5,10 +5,20 @@ DATASET:
     TYPE: FeatureDataset
     BATCH_SIZE: 60
     WORKERS: 0
+    FEATURE_PATH:
+      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      SCENE_TEXT: null
+      IMAGE: null
+    SCENE_TEXT_THRESHOLD: 0.3
   DICT_DATASET:
     TYPE: DictionaryDataset
     BATCH_SIZE: 60
     WORKERS: 0
+    FEATURE_PATH:
+      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      SCENE_TEXT: null
+      IMAGE: null
+    SCENE_TEXT_THRESHOLD: 0.3
   MIN_FREQ: 1
   SCENE_TEXT_THRESHOLD: 0.3
   VOCAB:
@@ -25,10 +35,6 @@ DATASET:
     TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
     DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
     TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
-  FEATURE_PATH:
-    FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
-    SCENE_TEXT: null
-    IMAGE: null
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -36,7 +42,6 @@ TRAINING:
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
   SCORE: CIDEr
-  GET_SCORES: False
   TRAINING_BEAM_SIZE: 5
   EVALUATING_BEAM_SIZE: 3
   PATIENCE: 5

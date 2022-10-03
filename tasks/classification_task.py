@@ -127,7 +127,7 @@ class ClassificationTask(BaseTask):
             checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
             best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]
-            self.epoch = checkpoint["epoch"]
+            self.epoch = checkpoint["epoch"] + 1
             self.optim.load_state_dict(checkpoint['optimizer'])
             self.scheduler.load_state_dict(checkpoint['scheduler'])
         else:
@@ -143,9 +143,6 @@ class ClassificationTask(BaseTask):
             scores = self.evaluate_metrics(self.dev_dataloader)
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
-
-            scores = self.evaluate_metrics(self.test_dataloader)
-            logger.info("Evaluation scores %s", scores)
 
             # Prepare for next epoch
             best = False
@@ -175,7 +172,7 @@ class ClassificationTask(BaseTask):
 
             self.epoch += 1
 
-    def get_predictions(self, get_scores=True):
+    def get_predictions(self):
         if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
             logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
@@ -184,6 +181,8 @@ class ClassificationTask(BaseTask):
 
         self.model.eval()
         results = []
+        overall_gens = {}
+        overall_gts = {}
         with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dataset)) as pbar:
             for it, items in enumerate(self.test_dataset):
                 items = items.unsqueeze(dim=0)
@@ -196,14 +195,11 @@ class ClassificationTask(BaseTask):
                 gts = {}
                 gens = {}
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
-                    gens['%d_%d' % (it, i)] = [gen_i, ]
-                    gts['%d_%d' % (it, i)] = [gts_i, ]
+                    gens['%d_%d' % (it, i)] = gen_i
+                    gts['%d_%d' % (it, i)] = gts_i
+                    overall_gens['%d_%d' % (it, i)] = [gen_i, ]
+                    overall_gts['%d_%d' % (it, i)] = [gts_i, ]
                 pbar.update()
-                
-                if get_scores:
-                    scores, _ = evaluation.compute_scores(gts, gens)
-                else:
-                    scores = None
 
                 results.append({
                     "id": items.question_id,
@@ -215,4 +211,10 @@ class ClassificationTask(BaseTask):
 
                 pbar.update()
 
-        json.dump(results, open(os.path.join(self.checkpoint_path, "results.json"), "w+"), ensure_ascii=False)
+        scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+        logger.info("Evaluation scores on test: %s", scores)
+
+        json.dump({
+            "results": results,
+            **scores,
+        }, open(os.path.join(self.checkpoint_path, "test_results.json"), "w+"), ensure_ascii=False)

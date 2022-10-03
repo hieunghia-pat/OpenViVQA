@@ -294,7 +294,7 @@ class VlspEvjVqaTask(BaseTask):
 
             self.epoch += 1
 
-    def get_predictions(self, get_scores=False):
+    def get_predictions(self):
         if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
             logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
@@ -324,19 +324,13 @@ class VlspEvjVqaTask(BaseTask):
                     overall_gens['%d_%d' % (it, i)] = [gen_i, ]
                     overall_gts['%d_%d' % (it, i)] = [gts_i, ]
                 pbar.update()
-                
-                if get_scores:
-                    scores, _ = evaluation.compute_scores(gts, gens)
-                else:
-                    scores = None
 
                 results.append({
                     "id": items.question_id,
                     "image_id": items.image_id,
                     "filename": items.filename,
                     "gens": gens,
-                    "gts": gts,
-                    "scores": scores
+                    "gts": gts
                 })
 
                 pbar.update()
@@ -368,22 +362,16 @@ class VlspEvjVqaTask(BaseTask):
                     gens['%d_%d' % (it, i)] = gen_i
                     gts['%d_%d' % (it, i)] = gts_i
                     overall_gens['%d_%d' % (it, i)] = [gen_i, ]
-                    overall_gts['%d_%d' % (it, i)] = [gts_i, ]
+                    overall_gts['%d_%d' % (it, i)] = gts_i
 
                 pbar.update()
-                
-                if get_scores:
-                    scores, _ = evaluation.compute_scores(gts, gens)
-                else:
-                    scores = None
 
                 results.append({
                     "id": items.question_id,
                     "image_id": items.image_id,
                     "filename": items.filename,
                     "gens": gens,
-                    "gts": gts,
-                    "scores": scores
+                    "gts": gts
                 })
 
                 pbar.update()

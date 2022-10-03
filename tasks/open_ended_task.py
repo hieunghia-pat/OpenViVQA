@@ -234,9 +234,6 @@ class OpenEndedTask(BaseTask):
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
-            scores = self.evaluate_metrics(self.test_dict_dataloader)
-            logger.info("Evaluation scores %s", scores)
-
             # Prepare for next epoch
             best = False
             if val_score >= best_val_score:
@@ -287,6 +284,8 @@ class OpenEndedTask(BaseTask):
 
         self.model.eval()
         results = []
+        overall_gens = {}
+        overall_gts = {}
         with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataset)) as pbar:
             for it, items in enumerate(self.test_dict_dataset):
                 items = items.unsqueeze(dim=0)
@@ -302,22 +301,24 @@ class OpenEndedTask(BaseTask):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = gen_i
                     gts['%d_%d' % (it, i)] = gts_i
+                    overall_gens['%d_%d' % (it, i)] = [gen_i, ]
+                    overall_gts['%d_%d' % (it, i)] = gts_i
                 pbar.update()
-                
-                if get_scores:
-                    scores, _ = evaluation.compute_scores(gts, gens)
-                else:
-                    scores = None
 
                 results.append({
                     "id": items.question_id,
                     "image_id": items.image_id,
                     "filename": items.filename,
                     "gens": gens,
-                    "gts": gts,
-                    "scores": scores
+                    "gts": gts
                 })
 
                 pbar.update()
 
-        json.dump(results, open(os.path.join(self.checkpoint_path, "results.json"), "w+"), ensure_ascii=False)
+        scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+        logger.info("Evaluation scores on test: %s", scores)
+
+        json.dump({
+            "results": results,
+            **scores,
+        }, open(os.path.join(self.checkpoint_path, "test_results.json"), "w+"), ensure_ascii=False)

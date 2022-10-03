@@ -25,12 +25,14 @@ from models.modules.vision_embeddings import (
 from models.modules.text_embeddings import (
     UsualEmbedding,
     LSTMTextEmbedding,
-    mBERTEmbedding
+    mBERTEmbedding,
+    mT5Embedding
 )
 from models.vit_mbert_classification import ViTmBERTClassification
 from models.vit_mbert_generation import ViTmBERTGeneration
 from models.extended_mcan import ExtendedMCAN
 from models.extended_saaa import ExtendedSAAA
+from models.vit_mt5 import ViTmT5
 from data_utils.dataset import (
     DictionaryDataset,
     ImageQuestionDictionaryDataset,

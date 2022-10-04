@@ -56,7 +56,7 @@ class LSTMTextEmbedding(nn.Module):
         seq_len = tokens.shape[-1]
         sequential_masks = generate_sequential_mask(seq_len).to(tokens.device)
 
-        features = self.proj(self.embedding(tokens))
+        features = self.proj(self.embedding(tokens)) # (bs, seq_len, d_model)
         features = self.dropout(features)
 
         features, _ = self.lstm(features)
@@ -101,9 +101,9 @@ class mT5Embedding(nn.Module):
         self.embedding = AutoModel.from_pretrained(config.PRETRAINED_NAME)
 
     def forward(self, questions: List[str]):
-        input_ids = self.tokenizer(questions, return_tensors='pt', padding=True).input_ids
+        input_ids = self.tokenizer(questions, return_tensors='pt', padding=True).input_ids.to(self.device)
         padding_mask = generate_padding_mask(input_ids, padding_idx=self.tokenizer.pad_token_id)
 
-        out = self.embedding(input_ids=input_ids, decoder_input_ids=input_ids)
+        out = self.embedding(input_ids=input_ids, decoder_input_ids=input_ids).last_hidden_states
 
         return out, padding_mask

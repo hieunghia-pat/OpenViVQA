@@ -24,11 +24,11 @@ class Vocab(object):
             self.padding_token = token_encoder.pad_token
             self.unk_token = token_encoder.unk_token
             cls_token = token_encoder.cls_token
+            sep_token = token_encoder.sep_token
             if cls_token is None:
                 cls_token = token_encoder.pad_token
             if sep_token is None:
                 sep_token = token_encoder.pad_token
-            sep_token = token_encoder.sep_token
             self.bos_token = token_encoder.bos_token
             if self.bos_token is None:
                 self.bos_token = cls_token
@@ -75,20 +75,7 @@ class Vocab(object):
         self.eos_idx = self.stoi[self.eos_token]
         self.unk_idx = self.stoi[self.unk_token]
 
-        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
-
-        if config.VOCAB.USE_MAPPING:
-            assert config.VOCAB.PRETRAINED_LANGUAGE_MODEL is not None, "Pretrained language model is required if using map for vocab"
-            self.mapping = defaultdict()
-            # map from original vocab to pretrained language models vocab
-            self.mapping.update({ori_idx: self.token_encoder.convert_tokens_to_ids(token) for ori_idx, token in enumerate(self.itos)})
-            # map special tokens
-            self.mapping[self.padding_idx] = token_encoder.encoder[self.padding_token]
-            self.mapping[self.bos_idx] = token_encoder.ecoder[self.bos_token]
-            self.mapping[self.eos_idx] = token_encoder.encoder[self.eos_token]
-            self.mapping[self.unk_idx] = token_encoder.encoder[self.unk_token]
-        else:
-            self.mapping = None
+        self.specials = specials
 
         self.word_embeddings = None
         if config.VOCAB.WORD_EMBEDDING is not None:
@@ -249,11 +236,11 @@ class VlspEvjVqaVocab(MultilingualVocab):
             self.padding_token = token_encoder.pad_token
             self.unk_token = token_encoder.unk_token
             cls_token = token_encoder.cls_token
+            sep_token = token_encoder.sep_token
             if cls_token is None:
                 cls_token = token_encoder.pad_token
             if sep_token is None:
                 sep_token = token_encoder.pad_token
-            sep_token = token_encoder.sep_token
             self.bos_token = token_encoder.bos_token
             if self.bos_token is None:
                 self.bos_token = cls_token
@@ -268,9 +255,7 @@ class VlspEvjVqaVocab(MultilingualVocab):
 
         self.make_vocab([
             config.JSON_PATH.TRAIN,
-            config.JSON_PATH.DEV,
-            config.JSON_PATH.PUBLIC_TEST,
-            config.JSON_PATH.PRIVATE_TEST
+            config.JSON_PATH.DEV
         ])
         counter = self.freqs.copy()
     
@@ -301,20 +286,7 @@ class VlspEvjVqaVocab(MultilingualVocab):
         self.eos_idx = self.stoi[self.eos_token]
         self.unk_idx = self.stoi[self.unk_token]
 
-        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
-
-        if config.VOCAB.USE_MAPPING:
-            assert config.VOCAB.PRETRAINED_LANGUAGE_MODEL is not None, "Pretrained language model is required if using map for vocab"
-            self.mapping = defaultdict()
-            # map from original vocab to pretrained language models vocab
-            self.mapping.update({ori_idx: self.token_encoder.convert_tokens_to_ids(token) for ori_idx, token in enumerate(self.itos)})
-            # map special tokens
-            self.mapping[self.padding_idx] = token_encoder.encoder[self.padding_token]
-            self.mapping[self.bos_idx] = token_encoder.ecoder[self.bos_token]
-            self.mapping[self.eos_idx] = token_encoder.encoder[self.eos_token]
-            self.mapping[self.unk_idx] = token_encoder.encoder[self.unk_token]
-        else:
-            self.mapping = None
+        self.specials = specials
 
         self.word_embeddings = None
         if config.VOCAB.WORD_EMBEDDING is not None:
@@ -392,3 +364,202 @@ class MultilingualClassificationVocab(ClassificationVocab):
         self.atoi = defaultdict()
         self.atoi.update({answer: ith for ith, answer in self.itoa.items()})
         self.total_answers = len(self.atoi)
+
+@META_VOCAB.register()
+class MultiModalVocab(Vocab):
+    def __init__(self, config):
+
+        self.tokenizer = config.VOCAB.TOKENIZER
+
+        if config.VOCAB.PRETRAINED_LANGUAGE_MODEL is not None: # use special tokens and vocab from pretrained language model
+            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
+            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
+            self.padding_token = token_encoder.pad_token
+            self.unk_token = token_encoder.unk_token
+            cls_token = token_encoder.cls_token
+            sep_token = token_encoder.sep_token
+            if cls_token is None:
+                cls_token = token_encoder.pad_token
+            if sep_token is None:
+                sep_token = token_encoder.pad_token
+            self.bos_token = token_encoder.bos_token
+            if self.bos_token is None:
+                self.bos_token = cls_token
+            self.eos_token = token_encoder.eos_token
+            if self.eos_token is None:
+                self.eos_token = sep_token
+        else: # use defined special tokens
+            self.padding_token = config.VOCAB.PAD_TOKEN
+            self.bos_token = config.VOCAB.BOS_TOKEN
+            self.eos_token = config.VOCAB.EOS_TOKEN
+            self.unk_token = config.VOCAB.UNK_TOKEN
+
+        self.img_token = config.VOCAB.IMG_TOKEN
+        self.feat_token = config.VOCAB.FEAT_TOKEN
+        self.box_token = config.VOCAB.BOX_TOKEN
+        self.ocr_token = config.VOCAB.OCR_TOKEN
+        self.ocr_det_token = config.VOCAB.OCR_DET_TOKEN
+        self.ocr_rec_token = config.VOCAB.OCR_REC_TOKEN
+        self.question_token = config.VOCAB.QUESTION_TOKEN
+        self.answer_token = config.VOCAB.ANSWER_TOKEN
+
+        self.make_vocab([
+            config.JSON_PATH.TRAIN,
+            config.JSON_PATH.DEV,
+            config.JSON_PATH.TEST
+        ])
+        counter = self.freqs.copy()
+    
+        min_freq = max(config.MIN_FREQ, 1)
+
+        specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
+                    self.feat_token, self.box_token, self.ocr_token, self.question_token, self.answer_token]
+        self.itos = specials
+        # frequencies of special tokens are not counted when building vocabulary
+        # in frequency order
+        for tok in specials:
+            del counter[tok]
+
+        # sort by frequency, then alphabetically
+        words_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
+        words_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
+
+        for word, freq in words_and_frequencies:
+            if freq < min_freq:
+                break
+            self.itos.append(word)
+
+        self.stoi = defaultdict()
+        # stoi is simply a reverse dict for itos
+        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
+
+        self.padding_idx = self.stoi[self.padding_token]
+        self.bos_idx = self.stoi[self.bos_token]
+        self.eos_idx = self.stoi[self.eos_token]
+        self.unk_idx = self.stoi[self.unk_token]
+        self.img_idx = self.stoi[self.img_idx]
+        self.feat_idx = self.stoi[self.feat_idx]
+        self.box_idx = self.stoi[self.box_idx]
+        self.ocr_idx = self.stoi[self.ocr_idx]
+        self.ocr_det_idx = self.stoi[self.ocr_det_token]
+        self.ocr_rec_idx = self.stoi[self.ocr_rec_token]
+        self.question_idx = self.stoi[self.question_idx]
+        self.answer_idx = self.stoi[self.answer_idx]
+
+        self.specials = specials
+
+        self.word_embeddings = None
+        if config.VOCAB.WORD_EMBEDDING is not None:
+            self.load_word_embeddings(build_word_embedding(config))
+
+@META_VOCAB.register()
+class MultilingualMultiModalVocab(MultiModalVocab):
+    def __init__(self, config) -> None:
+        super().__init__(config)
+
+    def make_vocab(self, json_dirs):
+        self.freqs = Counter()
+        self.max_question_length = 0
+        self.max_answer_length = 0
+        for json_dir in json_dirs:
+            json_data = json.load(open(json_dir))
+            for ann in json_data["annotations"]:
+                for answer in ann["answers"]:
+                    question = ann["question"]
+                    if is_japanese_sentence(question):
+                        question = list(question)
+                        answer = list(answer)
+                    else: # This is Vietnamese or English annotation
+                        question = preprocess_sentence(ann["question"], self.tokenizer)
+                        answer = preprocess_sentence(answer, self.tokenizer)
+                    self.freqs.update(question)
+                    self.freqs.update(answer)
+                    if len(question) + 2 > self.max_question_length:
+                            self.max_question_length = len(question) + 2
+                    if len(answer) + 2 > self.max_answer_length:
+                        self.max_answer_length = len(answer) + 2
+
+@META_VOCAB.register()
+class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
+    def __init__(self, config) -> None:
+        self.tokenizer = config.VOCAB.TOKENIZER
+
+        if config.VOCAB.PRETRAINED_LANGUAGE_MODEL is not None: # use special tokens and vocab from pretrained language model
+            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
+            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
+            self.padding_token = token_encoder.pad_token
+            self.unk_token = token_encoder.unk_token
+            cls_token = token_encoder.cls_token
+            sep_token = token_encoder.sep_token
+            if cls_token is None:
+                cls_token = token_encoder.pad_token
+            if sep_token is None:
+                sep_token = token_encoder.pad_token
+            self.bos_token = token_encoder.bos_token
+            if self.bos_token is None:
+                self.bos_token = cls_token
+            self.eos_token = token_encoder.eos_token
+            if self.eos_token is None:
+                self.eos_token = sep_token
+        else: # use defined special tokens
+            self.padding_token = config.VOCAB.PAD_TOKEN
+            self.bos_token = config.VOCAB.BOS_TOKEN
+            self.eos_token = config.VOCAB.EOS_TOKEN
+            self.unk_token = config.VOCAB.UNK_TOKEN
+
+        self.img_token = config.VOCAB.IMG_TOKEN
+        self.feat_token = config.VOCAB.FEAT_TOKEN
+        self.box_token = config.VOCAB.BOX_TOKEN
+        self.ocr_token = config.VOCAB.OCR_TOKEN
+        self.ocr_det_token = config.VOCAB.OCR_DET_TOKEN
+        self.ocr_rec_token = config.VOCAB.OCR_REC_TOKEN
+        self.question_token = config.VOCAB.QUESTION_TOKEN
+        self.answer_token = config.VOCAB.ANSWER_TOKEN
+
+        self.make_vocab([
+            config.JSON_PATH.TRAIN,
+            config.JSON_PATH.DEV
+        ])
+        counter = self.freqs.copy()
+    
+        min_freq = max(config.MIN_FREQ, 1)
+
+        specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
+                    self.feat_token, self.box_token, self.ocr_token, self.question_token, self.answer_token]
+        self.itos = specials
+        # frequencies of special tokens are not counted when building vocabulary
+        # in frequency order
+        for tok in specials:
+            del counter[tok]
+
+        # sort by frequency, then alphabetically
+        words_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
+        words_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
+
+        for word, freq in words_and_frequencies:
+            if freq < min_freq:
+                break
+            self.itos.append(word)
+
+        self.stoi = defaultdict()
+        # stoi is simply a reverse dict for itos
+        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
+
+        self.padding_idx = self.stoi[self.padding_token]
+        self.bos_idx = self.stoi[self.bos_token]
+        self.eos_idx = self.stoi[self.eos_token]
+        self.unk_idx = self.stoi[self.unk_token]
+        self.img_idx = self.stoi[self.img_idx]
+        self.feat_idx = self.stoi[self.feat_idx]
+        self.box_idx = self.stoi[self.box_idx]
+        self.ocr_idx = self.stoi[self.ocr_idx]
+        self.ocr_det_idx = self.stoi[self.ocr_det_token]
+        self.ocr_rec_idx = self.stoi[self.ocr_rec_token]
+        self.question_idx = self.stoi[self.question_idx]
+        self.answer_idx = self.stoi[self.answer_idx]
+
+        self.specials = specials
+
+        self.word_embeddings = None
+        if config.VOCAB.WORD_EMBEDDING is not None:
+            self.load_word_embeddings(build_word_embedding(config))

@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 
 from utils.logging_utils import setup_logger
+from utils.instances import Instances
 from data_utils.utils import collate_fn
 from .base_task import BaseTask
 from builders.task_builder import META_TASK
@@ -275,7 +276,7 @@ class OpenEndedTask(BaseTask):
 
             self.epoch += 1
 
-    def get_predictions(self, get_scores=False):
+    def get_predictions(self):
         if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
             logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
@@ -288,7 +289,7 @@ class OpenEndedTask(BaseTask):
         overall_gts = {}
         with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataset)) as pbar:
             for it, items in enumerate(self.test_dict_dataset):
-                items = items.unsqueeze(dim=0)
+                items = Instances.cat([items])
                 items = items.to(self.device)
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)

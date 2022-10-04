@@ -15,5 +15,5 @@ config = get_config(args.config_file)
 
 task = build_task(config)
 task.start()
-task.get_predictions(get_scores=config.TRAINING.GET_SCORES)
+task.get_predictions()
 logger.info("Task done.")

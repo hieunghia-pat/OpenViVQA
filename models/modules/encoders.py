@@ -32,8 +32,8 @@ class CrossModalityEncoderLayer(nn.Module):
         self.language_mhattn = MultiHeadAttention(config.LANGUAGE_SELF_ATTENTION)
 
         # pff
-        self.vision_pff = PositionWiseFeedForward(config.VISION_PFF)
-        self.language_pff = PositionWiseFeedForward(config.LANGUAGE_PFF)
+        self.vision_pff = PositionWiseFeedForward(config.VISION_SELF_ATTENTION)
+        self.language_pff = PositionWiseFeedForward(config.LANGUAGE_SELF_ATTENTION)
 
     def forward(self, vision_features, vision_padding_mask, language_features, language_padding_mask, **kwargs):
         # perform cross-attention
@@ -189,7 +189,7 @@ class GuidedAttentionEncoder(nn.Module):
 @META_ENCODER.register()
 class CoAttentionEncoder(nn.Module):
     '''
-        This module is designed inspired from ViLBERT ().
+        This module is designed inspired from ViLBERT (https://arxiv.org/pdf/1908.02265.pdf).
     '''
     def __init__(self, config):
         super(CoAttentionEncoder, self).__init__()
@@ -260,6 +260,9 @@ class CoAttentionEncoder(nn.Module):
 
 @META_ENCODER.register()
 class CrossModalityEncoder(nn.Module):
+    '''
+        This module is designed inspired from LXMERT (https://arxiv.org/pdf/1908.07490.pdf).
+    '''
     def __init__(self, config):
         super(CoAttentionEncoder, self).__init__()
 
@@ -275,7 +278,7 @@ class CrossModalityEncoder(nn.Module):
         boxes = input_features.boxes
         vision_padding_mask = input_features.vision_padding_mask
 
-        language_features = input_features.language_padding_mask
+        language_features = input_features.language_features
         language_padding_mask = input_features.language_padding_mask
 
         vision_features = self.vision_layer_norm(vision_features) + self.pos_embedding(vision_features)
@@ -288,3 +291,5 @@ class CrossModalityEncoder(nn.Module):
                 language_features=language_features,
                 language_padding_mask=language_padding_mask
             )
+
+        return vision_features, language_features

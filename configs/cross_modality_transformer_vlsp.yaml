@@ -37,7 +37,6 @@ DATASET:
     OCR_REC_TOKEN: <ocr_rec>
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
-    USE_MAPPING: False
     PRETRAINED_LANGUAGE_MODEL: null
   JSON_PATH:
     TRAIN: features/EVJVQA/annotations/evjvqa_train.json

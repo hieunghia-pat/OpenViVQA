@@ -201,12 +201,12 @@ class CoAttentionEncoder(nn.Module):
         self.d_model = config.D_MODEL
 
         # cross-attention layers
-        self.vision_language_attn_layers = nn.ModuleDict([EncoderLayer(config.VISION_LANGUAGE_ATTENTION) for _ in range(config.LAYERS)])
-        self.language_vision_attn_layers = nn.ModuleDict([EncoderLayer(config.LANGUAGE_VISION_ATTENTION) for _ in range(config.LAYERS)])
+        self.vision_language_attn_layers = nn.ModuleList([EncoderLayer(config.VISION_LANGUAGE_ATTENTION) for _ in range(config.LAYERS)])
+        self.language_vision_attn_layers = nn.ModuleList([EncoderLayer(config.LANGUAGE_VISION_ATTENTION) for _ in range(config.LAYERS)])
 
         # self-attention layers
-        self.vision_self_attn_layers = nn.ModuleDict([EncoderLayer(config.VISION_SELF_ATTENTION) for _ in range(config.LAYERS)])
-        self.language_self_attn_layers = nn.ModuleDict([EncoderLayer(config.LANGUAGE_SELF_ATTENTION) for _ in range(config.LAYERS)])
+        self.vision_self_attn_layers = nn.ModuleList([EncoderLayer(config.VISION_SELF_ATTENTION) for _ in range(config.LAYERS)])
+        self.language_self_attn_layers = nn.ModuleList([EncoderLayer(config.LANGUAGE_SELF_ATTENTION) for _ in range(config.LAYERS)])
 
     def forward(self, input_features):
         vision_features = input_features.vision_features

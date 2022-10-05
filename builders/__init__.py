@@ -34,6 +34,7 @@ from models.extended_mcan import ExtendedMCAN
 from models.extended_saaa import ExtendedSAAA
 from models.vit_mt5 import ViTmT5
 from models.cross_modality_transformer import CrossModalityTransformer
+from models.visiolinguistic_transformer import VisiolinguisticTransformer
 from data_utils.dataset import (
     DictionaryDataset,
     ImageQuestionDictionaryDataset,

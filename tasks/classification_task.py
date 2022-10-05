@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from data_utils.utils import collate_fn
+from utils.instances import Instances
 from .base_task import BaseTask
 from builders.dataset_builder import build_dataset
 from builders.task_builder import META_TASK
@@ -185,7 +186,7 @@ class ClassificationTask(BaseTask):
         overall_gts = {}
         with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dataset)) as pbar:
             for it, items in enumerate(self.test_dataset):
-                items = items.unsqueeze(dim=0)
+                items = Instances.cat([items])
                 items = items.to(self.device)
                 with torch.no_grad():
                     outs = self.model(items)

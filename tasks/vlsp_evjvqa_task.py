@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 
 from utils.logging_utils import setup_logger
+from utils.instances import Instances
 from data_utils.utils import collate_fn
 from .base_task import BaseTask
 from builders.task_builder import META_TASK
@@ -69,14 +70,14 @@ class VlspEvjVqaTask(BaseTask):
             shuffle=True,
             num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
             collate_fn=collate_fn
-        )
+        ) if self.public_test_dict_dataset else None
         self.private_test_dataloader = DataLoader(
             dataset=self.private_test_dataset,
             batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
             shuffle=True,
             num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
             collate_fn=collate_fn
-        )
+        ) if self.private_test_dict_dataset else None
 
     def create_dict_dataloaders(self, config):
         # creating dictionary iterable-dataset data loader
@@ -97,13 +98,13 @@ class VlspEvjVqaTask(BaseTask):
             batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
-        )
+        ) if self.public_test_dataset else None
         self.private_test_dict_dataloader = DataLoader(
             dataset=self.private_test_dict_dataset,
             batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
-        )
+        ) if self.private_test_dataset else None
 
     def create_dataloaders(self, config):
         self.create_feature_dataloaders(config)
@@ -115,7 +116,6 @@ class VlspEvjVqaTask(BaseTask):
         self.score = config.TRAINING.SCORE
         self.learning_rate = config.TRAINING.LEARNING_RATE
         self.rl_learning_rate = config.TRAINING.RL_LEARNING_RATE
-        self.get_scores = config.TRAINING.GET_SCORES
         self.training_beam_size = config.TRAINING.TRAINING_BEAM_SIZE
         self.evaluating_beam_size = config.TRAINING.EVALUATING_BEAM_SIZE
         self.patience = config.TRAINING.PATIENCE
@@ -303,83 +303,85 @@ class VlspEvjVqaTask(BaseTask):
 
         self.model.eval()
 
-        results = []
-        overall_gens = {}
-        overall_gts = {}
-        with tqdm(desc='Getting predictions on public test: ', unit='it', total=len(self.public_test_dict_dataset)) as pbar:
-            for it, items in enumerate(self.public_test_dict_dataset):
-                items = items.unsqueeze(dim=0)
-                items = items.to(self.device)
-                with torch.no_grad():
-                    outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
+        if self.public_test_dict_dataset is not None:
+            results = []
+            overall_gens = {}
+            overall_gts = {}
+            with tqdm(desc='Getting predictions on public test: ', unit='it', total=len(self.public_test_dict_dataset)) as pbar:
+                for it, items in enumerate(self.public_test_dict_dataset):
+                    items = Instances.cat([items])
+                    items = items.to(self.device)
+                    with torch.no_grad():
+                        outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
 
-                answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
-                gts = {}
-                gens = {}
-                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
-                    gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
-                    gens['%d_%d' % (it, i)] = gen_i
-                    gts['%d_%d' % (it, i)] = gts_i
-                    overall_gens['%d_%d' % (it, i)] = [gen_i, ]
-                    overall_gts['%d_%d' % (it, i)] = [gts_i, ]
-                pbar.update()
+                    answers_gt = items.answers
+                    answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
+                    gts = {}
+                    gens = {}
+                    for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
+                        gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
+                        gens['%d_%d' % (it, i)] = gen_i
+                        gts['%d_%d' % (it, i)] = gts_i
+                        overall_gens['%d_%d' % (it, i)] = [gen_i, ]
+                        overall_gts['%d_%d' % (it, i)] = [gts_i, ]
+                    pbar.update()
 
-                results.append({
-                    "id": items.question_id,
-                    "image_id": items.image_id,
-                    "filename": items.filename,
-                    "gens": gens,
-                    "gts": gts
-                })
+                    results.append({
+                        "id": items.question_id,
+                        "image_id": items.image_id,
+                        "filename": items.filename,
+                        "gens": gens,
+                        "gts": gts
+                    })
 
-                pbar.update()
+                    pbar.update()
 
-        scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
-        logger.info("Evaluation score on public test: %s", scores)
+            scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+            logger.info("Evaluation score on public test: %s", scores)
 
-        json.dump({
-            "results": results,
-            **scores
-        }, open(os.path.join(self.checkpoint_path, "public_test_results.json"), "w+"), ensure_ascii=False)
+            json.dump({
+                "results": results,
+                **scores
+            }, open(os.path.join(self.checkpoint_path, "public_test_results.json"), "w+"), ensure_ascii=False)
 
-        results = []
-        overall_gens = {}
-        overall_gts = {}
-        with tqdm(desc='Getting predictions on private test: ', unit='it', total=len(self.private_test_dict_dataset)) as pbar:
-            for it, items in enumerate(self.private_test_dict_dataset):
-                items = items.unsqueeze(dim=0)
-                items = items.to(self.device)
-                with torch.no_grad():
-                    outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
+        if self.private_test_dict_dataset is not None:
+            results = []
+            overall_gens = {}
+            overall_gts = {}
+            with tqdm(desc='Getting predictions on private test: ', unit='it', total=len(self.private_test_dict_dataset)) as pbar:
+                for it, items in enumerate(self.private_test_dict_dataset):
+                    items = items.unsqueeze(dim=0)
+                    items = items.to(self.device)
+                    with torch.no_grad():
+                        outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
 
-                answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
-                gts = {}
-                gens = {}
-                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
-                    gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
-                    gens['%d_%d' % (it, i)] = gen_i
-                    gts['%d_%d' % (it, i)] = gts_i
-                    overall_gens['%d_%d' % (it, i)] = [gen_i, ]
-                    overall_gts['%d_%d' % (it, i)] = gts_i
+                    answers_gt = items.answers
+                    answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
+                    gts = {}
+                    gens = {}
+                    for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
+                        gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
+                        gens['%d_%d' % (it, i)] = gen_i
+                        gts['%d_%d' % (it, i)] = gts_i
+                        overall_gens['%d_%d' % (it, i)] = [gen_i, ]
+                        overall_gts['%d_%d' % (it, i)] = gts_i
 
-                pbar.update()
+                    pbar.update()
 
-                results.append({
-                    "id": items.question_id,
-                    "image_id": items.image_id,
-                    "filename": items.filename,
-                    "gens": gens,
-                    "gts": gts
-                })
+                    results.append({
+                        "id": items.question_id,
+                        "image_id": items.image_id,
+                        "filename": items.filename,
+                        "gens": gens,
+                        "gts": gts
+                    })
 
-                pbar.update()
+                    pbar.update()
 
-        scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
-        logger.info("Evaluation score on public test: %s", scores)
+            scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+            logger.info("Evaluation score on public test: %s", scores)
 
-        json.dump({
-            "results": results,
-            **scores
-        }, open(os.path.join(self.checkpoint_path, "private_test_results.json"), "w+"), ensure_ascii=False)
+            json.dump({
+                "results": results,
+                **scores
+            }, open(os.path.join(self.checkpoint_path, "private_test_results.json"), "w+"), ensure_ascii=False)

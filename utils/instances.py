@@ -173,10 +173,10 @@ class Instances:
         if len(instance_lists) == 1:
             ret = Instances()
             for k, v in instance_lists[0].get_fields().items():
-                if isinstance(v, list):
-                    ret.set(k, [v])
-                elif isinstance(v, torch.Tensor):
+                if isinstance(v, torch.Tensor):
                     ret.set(k, v.unsqueeze(dim=0))
+                else:
+                    ret.set(k, [v])
             
             return ret
 

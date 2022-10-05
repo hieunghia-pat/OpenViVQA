@@ -6,7 +6,7 @@ from builders.text_embedding_builder import META_TEXT_EMBEDDING
 from builders.word_embedding_builder import build_word_embedding
 from models.utils import generate_sequential_mask, generate_padding_mask
 
-from transformers import BertTokenizer, BertModel
+from transformers import BertTokenizer, BertModel, AutoTokenizer, AutoModel
 
 from typing import List
 
@@ -56,7 +56,7 @@ class LSTMTextEmbedding(nn.Module):
         seq_len = tokens.shape[-1]
         sequential_masks = generate_sequential_mask(seq_len).to(tokens.device)
 
-        features = self.proj(self.embedding(tokens))
+        features = self.proj(self.embedding(tokens)) # (bs, seq_len, d_model)
         features = self.dropout(features)
 
         features, _ = self.lstm(features)
@@ -89,4 +89,21 @@ class mBERTEmbedding(nn.Module):
         out = self.dropout(self.gelu(out))
 
         return out, padding_mask
-        
+
+@META_TEXT_EMBEDDING.register()
+class mT5Embedding(nn.Module):
+    def __init__(self, config, vocab):
+        super().__init__()
+
+        self.device = config.DEVICE
+
+        self.tokenizer = AutoTokenizer.from_pretrained(config.PRETRAINED_NAME)
+        self.embedding = AutoModel.from_pretrained(config.PRETRAINED_NAME)
+
+    def forward(self, questions: List[str]):
+        input_ids = self.tokenizer(questions, return_tensors='pt', padding=True).input_ids.to(self.device)
+        padding_mask = generate_padding_mask(input_ids, padding_idx=self.tokenizer.pad_token_id)
+
+        out = self.embedding(input_ids=input_ids, decoder_input_ids=input_ids).last_hidden_states
+
+        return out, padding_mask

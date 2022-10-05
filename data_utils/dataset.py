@@ -115,6 +115,30 @@ class DictionaryDataset(BaseDataset):
         )
 
 @META_DATASET.register()
+class MultilingualDictionaryDataset(DictionaryDataset):
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    answers = [preprocess_sentence(answer, self.vocab.tokenizer) for answer in ann["answers"]]
+                    answers = [" ".join(answer) for answer in answers]
+                    annotation = {
+                        "question_id": ann["id"],
+                        "type": ann["QA-type"],
+                        "question": ann["question"],
+                        "answers": answers,
+                        "image_id": ann["image_id"],
+                        "filename": image["filename"]
+                    }
+                    break
+
+            annotations.append(annotation)
+
+        return annotations    
+
+@META_DATASET.register()
 class ImageQuestionDictionaryDataset(DictionaryDataset):
     def __init__(self, json_path: str, vocab, config) -> None:
         super().__init__(json_path, vocab, config)

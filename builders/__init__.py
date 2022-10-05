@@ -25,12 +25,18 @@ from models.modules.vision_embeddings import (
 from models.modules.text_embeddings import (
     UsualEmbedding,
     LSTMTextEmbedding,
-    mBERTEmbedding
+    mBERTEmbedding,
+    mT5Embedding
 )
 from models.vit_mbert_classification import ViTmBERTClassification
 from models.vit_mbert_generation import ViTmBERTGeneration
-from models.extended_mcan import ExtendedMCAN
+from models.extended_mcan import ExtendedMCAN, ExtendedMCANUsingRegion
 from models.extended_saaa import ExtendedSAAA
+from models.vit_mt5 import ViTmT5
+from models.cross_modality_transformer import CrossModalityTransformer
+from models.visiolinguistic_transformer import VisiolinguisticTransformer
+from models.joint_transformer import JointTransformer
+from models.unique_transformer import UniqueTransformer
 from data_utils.dataset import (
     DictionaryDataset,
     ImageQuestionDictionaryDataset,

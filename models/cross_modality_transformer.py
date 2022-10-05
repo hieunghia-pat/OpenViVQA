@@ -16,7 +16,7 @@ class CrossModalityTransformer(BaseTransformer):
         This model is designed follow the idea of LXMERT (https://arxiv.org/pdf/1908.07490.pdf).
     '''
     def __init__(self, config, vocab: Vocab):
-        super().__init__(vocab)
+        super().__init__(config, vocab)
 
         self.device = torch.device(config.DEVICE)
 

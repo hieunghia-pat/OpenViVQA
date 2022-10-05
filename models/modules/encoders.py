@@ -42,7 +42,7 @@ class CrossModalityEncoderLayer(nn.Module):
             keys=language_features,
             values=language_features,
             padding_mask=vision_padding_mask,
-            attention_mask=vision_padding_mask,
+            attention_mask=language_padding_mask,
             **kwargs
         )
         language_attn = self.language_mhattn(
@@ -50,7 +50,7 @@ class CrossModalityEncoderLayer(nn.Module):
             keys=vision_features,
             values=vision_features,
             padding_mask=language_padding_mask,
-            attention_mask=language_padding_mask
+            attention_mask=vision_padding_mask
         )
 
         # perform self-attention
@@ -230,14 +230,14 @@ class CoAttentionEncoder(nn.Module):
                 values=language_features,
                 boxes=boxes,
                 padding_mask=vision_padding_mask,
-                attention_mask=vision_padding_mask
+                attention_mask=language_padding_mask
             )
             language_features = language_vision_attn_layer(
                 queries=language_features,
                 keys=vision_features,
                 values=vision_features,
                 padding_mask=language_padding_mask,
-                attention_mask=language_padding_mask
+                attention_mask=vision_padding_mask
             )
             # performing self-attention
             vision_features = vision_self_attn_layer(

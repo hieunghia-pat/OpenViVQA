@@ -59,7 +59,7 @@ class CrossModalityEncoderLayer(nn.Module):
             keys=vision_features,
             values=vision_features,
             padding_mask=vision_padding_mask,
-            attention_mask=vision_features,
+            attention_mask=vision_padding_mask,
             **kwargs
         )
         language_attn = self.language_mhattn(
@@ -67,7 +67,7 @@ class CrossModalityEncoderLayer(nn.Module):
             keys=language_features,
             values=language_features,
             padding_mask=language_padding_mask,
-            attention_mask=language_features
+            attention_mask=language_padding_mask
         )
 
         # perform pff

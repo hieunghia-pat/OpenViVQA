@@ -3,7 +3,7 @@ TASK: VlspEvjVqaTask
 DATASET:
   FEATURE_DATASET:
     TYPE: MultilingualFeatureDataset
-    BATCH_SIZE: 15
+    BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
       FEATURES: features/EVJVQA/vinvl_vinvl
@@ -20,7 +20,6 @@ DATASET:
       IMAGE: features/EVJVQA/images
     SCENE_TEXT_THRESHOLD: 0.3
   MIN_FREQ: 1
-  SCENE_TEXT_THRESHOLD: 0.3
   VOCAB:
     TYPE: VlspVqaMultiModalVocab
     TOKENIZER: null
@@ -47,7 +46,7 @@ DATASET:
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
-  LEARNING_RATE: 1.
+  LEARNING_RATE: 1
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
   SCORE: CIDEr
@@ -56,8 +55,8 @@ TRAINING:
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: ExtendedMCAN
-  NAME: extended_mcan_vlsp
+  ARCHITECTURE: JointTransformer
+  NAME: joint_transformer_vlsp
   DEVICE: cuda
   REGION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
@@ -85,7 +84,9 @@ MODEL:
     DROPOUT: .1
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
-  SELF_ENCODER:
+  D_MODEL: 512
+  DROPOUT: .1
+  ENCODER:
     ARCHITECTURE: Encoder
     D_MODEL: 512
     LAYERS: 3
@@ -100,36 +101,6 @@ MODEL:
       USE_AOA: False
       CAN_BE_STATEFUL: False
       DROPOUT: .1
-  GUIDED_ENCODER:
-    ARCHITECTURE: GuidedAttentionEncoder
-    D_MODEL: 512
-    LAYERS: 3
-    SELF_ATTENTION:
-      ARCHITECTURE: ScaledDotProductAttention
-      HEAD: 8
-      D_MODEL: 512
-      D_KEY: 64
-      D_VALUE: 64
-      D_FF: 2048
-      D_FEATURE: 2048
-      USE_AOA: False
-      CAN_BE_STATEFUL: False
-      DROPOUT: .1
-    GUIDED_ATTENTION:
-      ARCHITECTURE: ScaledDotProductAttention
-      HEAD: 8
-      D_MODEL: 512
-      D_KEY: 64
-      D_VALUE: 64
-      D_FF: 2048
-      D_FEATURE: 2048
-      USE_AOA: False
-      CAN_BE_STATEFUL: False
-      DROPOUT: .1
-  MULTIMODAL_FUSION:
-    D_MODEL: 512
-    D_FF: 2048
-    DROPOUT: .1
   DECODER:
     ARCHITECTURE: Decoder
     D_MODEL: 512

@@ -2,26 +2,27 @@ TASK: OpenEndedTask
 
 DATASET:
   FEATURE_DATASET:
-    TYPE: FeatureDataset
+    TYPE: MultilingualFeatureDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      FEATURES: features/EVJVQA/vinvl_vinvl
       SCENE_TEXT: null
-      IMAGE: null
+      IMAGE: features/EVJVQA/images
     SCENE_TEXT_THRESHOLD: 0.3
   DICT_DATASET:
-    TYPE: DictionaryDataset
+    TYPE: MultilingualDictionaryDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      FEATURES: features/EVJVQA/vinvl_vinvl
       SCENE_TEXT: null
-      IMAGE: null
+      IMAGE: features/EVJVQA/images
     SCENE_TEXT_THRESHOLD: 0.3
   MIN_FREQ: 1
   SCENE_TEXT_THRESHOLD: 0.3
   VOCAB:
+    TYPE: VlspVqaMultiModalVocab
     TOKENIZER: null
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
@@ -29,12 +30,20 @@ DATASET:
     EOS_TOKEN: <eos>
     PAD_TOKEN: <pad>
     UNK_TOKEN: <unk>
-    USE_MAPPING: False
+    IMG_TOKEN: <img>
+    FEAT_TOKEN: <feat>
+    BOX_TOKEN: <box>
+    OCR_TOKEN: <ocr>
+    OCR_DET_TOKEN: <ocr_det>
+    OCR_REC_TOKEN: <ocr_rec>
+    QUESTION_TOKEN: <question>
+    ANSWER_TOKEN: <answer>
     PRETRAINED_LANGUAGE_MODEL: null
   JSON_PATH:
-    TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
-    DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
-    TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+    TRAIN: features/EVJVQA/annotations/evjvqa_train.json
+    DEV: features/EVJVQA/annotations/evjvqa_dev.json
+    PUBLIC_TEST: features/EVJVQA/annotations/evjvqa_public_test.json
+    PRIVATE_TEST: features/EVJVQA/annotations/evjvqa_private_test.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -48,7 +57,7 @@ TRAINING:
 
 MODEL:
   ARCHITECTURE: ExtendedMCAN
-  NAME: extended_mcan_region_x152++
+  NAME: extended_mcan_vlsp
   DEVICE: cuda
   VISION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding

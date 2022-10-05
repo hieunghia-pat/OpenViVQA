@@ -129,7 +129,8 @@ class AdaptiveDecoder(Module):
         # get the language_signals
         _, language_signals = self.language_model(answer_tokens)
 
-        out = self.word_emb(answer_tokens) + self.pos_emb(seq)
+        embedded_answers, _ = self.word_emb(answer_tokens)
+        out = embedded_answers + self.pos_emb(seq)
         for layer in self.layers:
             out = layer(queries=out, 
                         keys=encoder_features,

@@ -6,7 +6,7 @@ DATASET:
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: null
+      FEATURES: features/EVJVQA/vinvl_vinvl
       SCENE_TEXT: null
       IMAGE: features/EVJVQA/images
     SCENE_TEXT_THRESHOLD: 0.3
@@ -15,7 +15,7 @@ DATASET:
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: null
+      FEATURES: features/EVJVQA/vinvl_vinvl
       SCENE_TEXT: null
       IMAGE: features/EVJVQA/images
     SCENE_TEXT_THRESHOLD: 0.3
@@ -29,6 +29,14 @@ DATASET:
     EOS_TOKEN: <eos>
     PAD_TOKEN: <pad>
     UNK_TOKEN: <unk>
+    IMG_TOKEN: <img>
+    FEAT_TOKEN: <feat>
+    BOX_TOKEN: <box>
+    OCR_TOKEN: <ocr>
+    OCR_DET_TOKEN: <ocr_det>
+    OCR_REC_TOKEN: <ocr_rec>
+    QUESTION_TOKEN: <question>
+    ANSWER_TOKEN: <answer>
     USE_MAPPING: False
     PRETRAINED_LANGUAGE_MODEL: null
   JSON_PATH:
@@ -51,10 +59,22 @@ MODEL:
   ARCHITECTURE: CrossModalityTransformer
   NAME: cross_modality_transformer_vlsp
   DEVICE: cuda
-  VISION_EMBEDDING:
+  REGION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
     DEVICE: cuda
     D_FEATURE: 2048
+    D_MODEL: 512
+    DROPOUT: .1
+  GRID_EMBEDDING:
+    ARCHITECTURE: FeatureEmbedding
+    DEVICE: cuda
+    D_FEATURE: 2048
+    D_MODEL: 512
+    DROPOUT: .1
+  BOX_EMBEDDING:
+    ARCHITECTURE: FeatureEmbedding
+    DEVICE: cuda
+    D_FEATURE: 4
     D_MODEL: 512
     DROPOUT: .1
   TEXT_EMBEDDING:
@@ -63,6 +83,8 @@ MODEL:
     D_EMBEDDING: 300
     D_MODEL: 512
     DROPOUT: .1
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
   D_MODEL: 512
   DROPOUT: .1
   ENCODER:

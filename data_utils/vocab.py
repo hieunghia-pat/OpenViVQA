@@ -413,7 +413,8 @@ class MultiModalVocab(Vocab):
         min_freq = max(config.MIN_FREQ, 1)
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
-                    self.feat_token, self.box_token, self.ocr_token, self.question_token, self.answer_token]
+                    self.feat_token, self.box_token, self.ocr_token, self.ocr_det_token, self.ocr_rec_token, 
+                    self.question_token, self.answer_token]
         self.itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
@@ -437,14 +438,14 @@ class MultiModalVocab(Vocab):
         self.bos_idx = self.stoi[self.bos_token]
         self.eos_idx = self.stoi[self.eos_token]
         self.unk_idx = self.stoi[self.unk_token]
-        self.img_idx = self.stoi[self.img_idx]
-        self.feat_idx = self.stoi[self.feat_idx]
-        self.box_idx = self.stoi[self.box_idx]
-        self.ocr_idx = self.stoi[self.ocr_idx]
+        self.img_idx = self.stoi[self.img_token]
+        self.feat_idx = self.stoi[self.feat_token]
+        self.box_idx = self.stoi[self.box_token]
+        self.ocr_idx = self.stoi[self.ocr_token]
         self.ocr_det_idx = self.stoi[self.ocr_det_token]
         self.ocr_rec_idx = self.stoi[self.ocr_rec_token]
-        self.question_idx = self.stoi[self.question_idx]
-        self.answer_idx = self.stoi[self.answer_idx]
+        self.question_idx = self.stoi[self.question_token]
+        self.answer_idx = self.stoi[self.answer_token]
 
         self.specials = specials
 
@@ -525,7 +526,8 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
         min_freq = max(config.MIN_FREQ, 1)
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
-                    self.feat_token, self.box_token, self.ocr_token, self.question_token, self.answer_token]
+                    self.feat_token, self.box_token, self.ocr_token, self.ocr_det_token, self.ocr_rec_token, 
+                    self.question_token, self.answer_token]
         self.itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
@@ -549,14 +551,14 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
         self.bos_idx = self.stoi[self.bos_token]
         self.eos_idx = self.stoi[self.eos_token]
         self.unk_idx = self.stoi[self.unk_token]
-        self.img_idx = self.stoi[self.img_idx]
-        self.feat_idx = self.stoi[self.feat_idx]
-        self.box_idx = self.stoi[self.box_idx]
-        self.ocr_idx = self.stoi[self.ocr_idx]
+        self.img_idx = self.stoi[self.img_token]
+        self.feat_idx = self.stoi[self.feat_token]
+        self.box_idx = self.stoi[self.box_token]
+        self.ocr_idx = self.stoi[self.ocr_token]
         self.ocr_det_idx = self.stoi[self.ocr_det_token]
         self.ocr_rec_idx = self.stoi[self.ocr_rec_token]
-        self.question_idx = self.stoi[self.question_idx]
-        self.answer_idx = self.stoi[self.answer_idx]
+        self.question_idx = self.stoi[self.question_token]
+        self.answer_idx = self.stoi[self.answer_token]
 
         self.specials = specials
 

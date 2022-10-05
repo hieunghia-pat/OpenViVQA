@@ -264,7 +264,7 @@ class CrossModalityEncoder(nn.Module):
         This module is designed inspired from LXMERT (https://arxiv.org/pdf/1908.07490.pdf).
     '''
     def __init__(self, config):
-        super(CoAttentionEncoder, self).__init__()
+        super(CrossModalityEncoder, self).__init__()
 
         self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL)
         self.vision_layer_norm = nn.LayerNorm(config.D_MODEL)

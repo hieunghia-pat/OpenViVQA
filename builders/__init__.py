@@ -33,6 +33,7 @@ from models.vit_mbert_generation import ViTmBERTGeneration
 from models.extended_mcan import ExtendedMCAN
 from models.extended_saaa import ExtendedSAAA
 from models.vit_mt5 import ViTmT5
+from models.cross_modality_transformer import CrossModalityTransformer
 from data_utils.dataset import (
     DictionaryDataset,
     ImageQuestionDictionaryDataset,

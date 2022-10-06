@@ -28,36 +28,13 @@ class BaseDataset(data.Dataset):
         # image features
         self.image_features_path = config.FEATURE_PATH.FEATURES
 
-        # scene text features
-        self.scene_text_feature_path = config.FEATURE_PATH.SCENE_TEXT
-        self.scene_text_threshold = config.SCENE_TEXT_THRESHOLD
-
     def load_annotations(self, json_data: Dict) -> List[Dict]:
         raise NotImplementedError
 
-    def load_image_feature(self, image_id: int) -> Dict[str, Any]:
+    def load_features(self, image_id: int) -> Dict[str, Any]:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         features = np.load(feature_file, allow_pickle=True)[()]
         
-        return features
-
-    def load_scene_text_features(self, image_id: int) -> Dict[str, Any]:
-        feature_file = os.path.join(self.scene_text_feature_path, f"{image_id}.npy")
-        features = np.load(feature_file, allow_pickle=True)[()]
-
-        return features
-
-    def load_features(self, image_id: int) -> Dict[str, Any]:
-        image_features = self.load_image_feature(image_id)
-        if self.scene_text_feature_path is not None:
-            scene_text_features = self.load_scene_text_features(image_id)
-            features = {
-                **image_features,
-                **scene_text_features
-            }
-        else:
-            features = image_features
-
         return features
 
     def __getitem__(self, idx: int):
@@ -113,6 +90,41 @@ class DictionaryDataset(BaseDataset):
             answers=answers,
             **features
         )
+
+@META_DATASET.register()
+class OcrDictionaryDataset(DictionaryDataset):
+    def __init__(self, json_path: str, vocab, config) -> None:
+        super().__init__(json_path, vocab, config)
+
+        # scene text features
+        self.scene_text_features_path = config.FEATURE_PATH.SCENE_TEXT
+        self.scene_text_threshold = config.SCENE_TEXT_THRESHOLD
+
+    def load_image_features(self, image_id: int) -> Dict[str, Any]:
+        feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
+        features = np.load(feature_file, allow_pickle=True)[()]
+
+        return features
+
+    def load_scene_text_features(self, image_id: int) -> Dict[str, Any]:
+        feature_file = os.path.join(self.scene_text_features_path, f"{image_id}.npy")
+        features = np.load(feature_file, allow_pickle=True)[()]
+        
+        selected_ids = features["scores"] >= self.scene_text_threshold
+        for key, feature in features.items():
+            features[key] = feature[selected_ids]
+
+        return features
+
+    def load_features(self, image_id: int) -> Dict[str, Any]:
+        image_features = self.load_image_features(image_id)
+        scene_text_features = self.load_scene_text_features(image_id)
+        features = {
+            **image_features,
+            **scene_text_features
+        }
+
+        return features
 
 @META_DATASET.register()
 class MultilingualDictionaryDataset(DictionaryDataset):
@@ -315,6 +327,66 @@ class FeatureDataset(BaseDataset):
 
     def __len__(self) -> int:
         return len(self.annotations)
+
+@META_DATASET.register()
+class OcrFeatureDataset(FeatureDataset):
+    def __init__(self, json_path: str, vocab, config) -> None:
+        super().__init__(json_path, vocab, config)
+
+        # scene text features
+        self.scene_text_features_path = config.FEATURE_PATH.SCENE_TEXT
+        self.scene_text_threshold = config.SCENE_TEXT_THRESHOLD
+
+    def load_image_features(self, image_id: int) -> Dict[str, Any]:
+        feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
+        features = np.load(feature_file, allow_pickle=True)[()]
+
+        return features
+
+    def load_scene_text_features(self, image_id: int) -> Dict[str, Any]:
+        feature_file = os.path.join(self.scene_text_features_path, f"{image_id}.npy")
+        features = np.load(feature_file, allow_pickle=True)[()]
+        
+        selected_ids = torch.tensor(features["scores"]) >= self.scene_text_threshold
+        for key, feature in features.items():
+            if isinstance(feature, torch.Tensor) or isinstance(feature, np.ndarray):
+                feature = feature[selected_ids]
+            else:
+                feature = [feature[id] for id in selected_ids]
+            features[key] = feature
+
+        return features
+
+    def load_features(self, image_id: int) -> Dict[str, Any]:
+        image_features = self.load_image_features(image_id)
+        scene_text_features = self.load_scene_text_features(image_id)
+        features = {
+            **image_features,
+            **scene_text_features
+        }
+
+        return features
+
+    def __getitem__(self, idx: int):
+        features = self.load_features(self.annotations[idx]["image_id"])
+
+        item = self.annotations[idx]
+        question = self.vocab.encode_question(item["question"])
+        ocr_tokens = {}
+        for idx, text in enumerate(features["texts"]):
+            ocr_tokens[text] = len(self.vocab) + idx
+        answer = self.vocab.encode_answer(item["answer"], ocr_tokens)
+
+        shifted_right_answer = torch.zeros_like(answer).fill_(self.vocab.padding_idx)
+        shifted_right_answer[:-1] = answer[1:]
+        answer = torch.where(answer == self.vocab.eos_idx, self.vocab.padding_idx, answer) # remove eos_token in answer
+
+        return Instances(
+            question_tokens=question,
+            answer_tokens=answer,
+            shifted_right_answer_tokens=shifted_right_answer,
+            **features,
+        )
 
 @META_DATASET.register()
 class MultilingualFeatureDataset(FeatureDataset):

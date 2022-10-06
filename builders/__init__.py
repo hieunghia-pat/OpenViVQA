@@ -26,8 +26,9 @@ from models.modules.vision_embeddings import (
 from models.modules.text_embeddings import (
     UsualEmbedding,
     LSTMTextEmbedding,
-    mBERTEmbedding,
-    mT5Embedding
+    BertEmbedding,
+    T5Embedding,
+    AlbertEmbedding
 )
 from models.vit_mbert_classification import ViTmBERTClassification
 from models.vit_mbert_generation import ViTmBERTGeneration
@@ -38,6 +39,7 @@ from models.cross_modality_transformer import CrossModalityTransformer
 from models.visiolinguistic_transformer import VisiolinguisticTransformer
 from models.joint_transformer import JointTransformer
 from models.unique_transformer import UniqueTransformer
+from models.m4c import M4C
 from data_utils.dataset import (
     DictionaryDataset,
     ImageQuestionDictionaryDataset,

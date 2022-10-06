@@ -12,6 +12,7 @@ DATASET:
   MIN_FREQ: 1
   SCENE_TEXT_THRESHOLD: 0.3
   VOCAB:
+    TYPE: Vocab
     TOKENIZER: null
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
@@ -19,8 +20,11 @@ DATASET:
     EOS_TOKEN: <eos>
     PAD_TOKEN: <pad>
     UNK_TOKEN: <unk>
-    USE_MAPPING: False
-    PRETRAINED_LANGUAGE_MODEL: null
+    IMG_TOKEN: <img>
+    FEAT_TOKEN: <feat>
+    BOX_TOKEN: <box>
+    QUESTION_TOKEN: <question>
+    ANSWER_TOKEN: <answer>
   JSON_PATH:
     TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
     DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json

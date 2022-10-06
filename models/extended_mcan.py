@@ -13,7 +13,7 @@ from builders.model_builder import META_ARCHITECTURE
 @META_ARCHITECTURE.register()
 class ExtendedMCAN(BaseTransformer):
     def __init__(self, config, vocab):
-        super().__init__(vocab)
+        super().__init__(config, vocab)
 
         self.device = torch.device(config.DEVICE)
         self.vocab = vocab

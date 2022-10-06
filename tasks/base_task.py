@@ -73,7 +73,7 @@ class BaseTask:
     def lambda_lr(self, step):
         warm_up = self.warmup
         step += 1
-        return (self.model.decoder.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
+        return (self.model.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
 
     def load_checkpoint(self, fname) -> dict:
         if not os.path.exists(fname):

@@ -13,7 +13,7 @@ from builders.model_builder import META_ARCHITECTURE
 @META_ARCHITECTURE.register()
 class ViTmT5(BaseTransformer):
     def __init__(self, config, vocab: Vocab):
-        super().__init__(vocab)
+        super().__init__(config, vocab)
 
         self.device = torch.device(config.DEVICE)
 

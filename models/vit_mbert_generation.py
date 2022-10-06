@@ -12,7 +12,7 @@ from utils.instances import Instances
 @META_ARCHITECTURE.register()
 class ViTmBERTGeneration(BaseTransformer):
     def __init__(self, config, vocab):
-        super().__init__(vocab)
+        super().__init__(config, vocab)
 
         self.device = torch.device(config.DEVICE)
 

@@ -33,9 +33,6 @@ DATASET:
     IMG_TOKEN: <img>
     FEAT_TOKEN: <feat>
     BOX_TOKEN: <box>
-    OCR_TOKEN: <ocr>
-    OCR_DET_TOKEN: <ocr_det>
-    OCR_REC_TOKEN: <ocr_rec>
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
     PRETRAINED_LANGUAGE_MODEL: null

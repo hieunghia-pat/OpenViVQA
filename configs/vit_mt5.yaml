@@ -30,7 +30,6 @@ DATASET:
     PAD_TOKEN: <pad>
     UNK_TOKEN: <unk>
     USE_MAPPING: False
-    PRETRAINED_LANGUAGE_MODEL: null
   JSON_PATH:
     TRAIN: features/EVJVQA/annotations/evjvqa_train.json
     DEV: features/EVJVQA/annotations/evjvqa_dev.json
@@ -59,7 +58,7 @@ MODEL:
     D_MODEL: 512
     DROPOUT: .1
   TEXT_EMBEDDING:
-    ARCHITECTURE: mT5Embedding
+    ARCHITECTURE: T5Embedding
     PRETRAINED_NAME: google/mt5-small
     DEVICE: cuda
     D_PRETRAINED_FEATURE: 512

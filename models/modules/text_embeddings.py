@@ -1,4 +1,3 @@
-import torch
 from torch import nn
 
 from data_utils.vocab import Vocab
@@ -6,7 +5,7 @@ from builders.text_embedding_builder import META_TEXT_EMBEDDING
 from builders.word_embedding_builder import build_word_embedding
 from models.utils import generate_sequential_mask, generate_padding_mask
 
-from transformers import BertTokenizer, BertModel, AutoTokenizer, AutoModel
+from transformers import BertTokenizer, BertModel, AlbertTokenizer, AlbertModel, T5Tokenizer, T5EncoderModel
 
 from typing import List
 
@@ -64,7 +63,7 @@ class LSTMTextEmbedding(nn.Module):
         return features, (padding_masks, sequential_masks)
 
 @META_TEXT_EMBEDDING.register()
-class mBERTEmbedding(nn.Module):
+class BertEmbedding(nn.Module):
     def __init__(self, config, vocab):
         super().__init__()
 
@@ -91,14 +90,41 @@ class mBERTEmbedding(nn.Module):
         return out, padding_mask
 
 @META_TEXT_EMBEDDING.register()
-class mT5Embedding(nn.Module):
+class AlbertEmbedding(nn.Module):
     def __init__(self, config, vocab):
         super().__init__()
 
         self.device = config.DEVICE
 
-        self.tokenizer = AutoTokenizer.from_pretrained(config.PRETRAINED_NAME)
-        self.embedding = AutoModel.from_pretrained(config.PRETRAINED_NAME)
+        self.tokenizer = AlbertTokenizer.from_pretrained(config.PRETRAINED_NAME)
+        self.embedding = AlbertModel.from_pretrained(config.PRETRAINED_NAME)
+        # freeze all parameters of pretrained model
+        for param in self.embedding.parameters():
+            param.requires_grad = False
+
+        self.proj = nn.Linear(config.D_PRETRAINED_FEATURE, config.D_MODEL)
+        self.gelu = nn.GELU()
+        self.dropout = nn.Dropout(config.DROPOUT)
+
+    def forward(self, questions: List[str]):
+        inputs = self.tokenizer(questions, return_tensors="pt", padding=True).to(self.device)
+        padding_mask = generate_padding_mask(inputs.input_ids, padding_idx=self.tokenizer.pad_token_id)
+        features = self.embedding(**inputs).last_hidden_state
+
+        out = self.proj(features)
+        out = self.dropout(self.gelu(out))
+
+        return out, padding_mask
+
+@META_TEXT_EMBEDDING.register()
+class T5Embedding(nn.Module):
+    def __init__(self, config, vocab):
+        super().__init__()
+
+        self.device = config.DEVICE
+
+        self.tokenizer = T5Tokenizer.from_pretrained(config.PRETRAINED_NAME)
+        self.embedding = T5EncoderModel.from_pretrained(config.PRETRAINED_NAME)
 
     def forward(self, questions: List[str]):
         input_ids = self.tokenizer(questions, return_tensors='pt', padding=True).input_ids.to(self.device)

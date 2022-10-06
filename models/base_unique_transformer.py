@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from torch.nn import functional as F
 
 from data_utils.vocab import Vocab
 from models.modules.containers import Module
@@ -46,7 +45,7 @@ class BaseUniqueTransformer(Module):
             features_attention_mask=self.encoder_padding_mask
         ))
 
-        return F.log_softmax(out[:, self.join_feature_len:], dim=-1)
+        return out
 
     def beam_search(self, input_features: Instances, batch_size: int, beam_size: int, out_size=1, return_probs=False, **kwargs):
         beam_search = BeamSearch(model=self, max_len=self.max_len, eos_idx=self.eos_idx, beam_size=beam_size, 

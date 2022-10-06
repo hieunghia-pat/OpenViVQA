@@ -60,42 +60,48 @@ class UniqueTransformer(BaseUniqueTransformer):
         question_features += q_embeded
 
         joint_features = torch.cat([vision_features, question_features], dim=1)
-        joint_attention_mask = torch.cat([vision_padding_mask, question_padding_mask], dim=-1)
+        joint_padding_mask = torch.cat([vision_padding_mask, question_padding_mask], dim=-1)
 
-        return joint_features, joint_attention_mask
+        joint_features_len = joint_features.shape[1]
+        joint_attention_mask = joint_padding_mask.expand((-1, -1, joint_features_len, -1)) # (bs, 1, joint_features_len, joint_features_len)
 
-    def append_answer(self, joint_features, joint_attention_mask, answer_tokens):
+        return joint_features, (joint_padding_mask, joint_attention_mask)
+
+    def append_answer(self, joint_features, joint_masks, answer_tokens):
         answer_features, (answer_padding_mask, answer_sequential_mask) = self.text_embedding(answer_tokens)
         answer_self_attention_mask = torch.logical_or(answer_padding_mask, answer_sequential_mask) # (bs, 1, answer_len, answer_len)
         a_tokens = torch.ones((answer_tokens.shape[0], answer_tokens.shape[1])).long().to(answer_tokens.device) * self.vocab.answer_idx
         a_embedded, _ = self.text_embedding(a_tokens)
         answer_features += a_embedded
         
-        joint_features = torch.cat([joint_features, answer_features], dim=1)
+        joint_features_len = joint_features.shape[1]
         answer_len = answer_features.shape[1]
+        joint_features = torch.cat([joint_features, answer_features], dim=1)
+        joint_padding_mask, joint_attention_mask = joint_masks
+        joint_padding_mask = torch.cat([joint_padding_mask, answer_padding_mask], dim=-1)
         # joint features cannot see the answer features
         batch_size = joint_features.shape[0]
-        joint_features_len = joint_features.shape[1]
-        joint_self_attention_mask = joint_attention_mask.expand((-1, -1, joint_features_len, -1)) # (bs, 1, joint_features_len, joint_features_len)
-        joint_features_mask_answer = torch.ones((batch_size, joint_features_len, answer_len)).bool().to(joint_features.device) # (bs, 1, joint_features_len, answer_len)
-        joint_features_mask_answer = torch.cat([joint_self_attention_mask, joint_features_mask_answer], dim=-1) # (bs, 1, joint_features_len, joint_features_len + answer_len)
+        joint_features_mask_answer = torch.ones((batch_size, 1, joint_features_len, answer_len)).bool().to(joint_features.device) # (bs, 1, joint_features_len, answer_len)
+        joint_attention_mask = torch.cat([joint_attention_mask, joint_features_mask_answer], dim=-1) # (bs, 1, joint_features_len, joint_features_len + answer_len)
         # answer tokens can attend to all joint features
-        answer_attend_joint_features = torch.zeros((batch_size, answer_len, joint_features_len)).bool().to(answer_features.device) # (bs, 1, answer_len, joint_features_len)
+        answer_attend_joint_features = torch.zeros((batch_size, 1, answer_len, joint_features_len)).bool().to(answer_features.device) # (bs, 1, answer_len, joint_features_len)
         answer_attend_joint_features = torch.cat([answer_attend_joint_features, answer_self_attention_mask], dim=-1) # (bs, 1, answer_len, joint_features_len + answer_len)
-        
-        joint_attention_mask = torch.cat([joint_features_mask_answer, answer_attend_joint_features], dim=-2) # (bs, 1 , joint_features_len + answer_len, joint_features_len + answer_len)
+        joint_attention_mask = torch.cat([joint_attention_mask, answer_attend_joint_features], dim=-2) # (bs, 1 , joint_features_len + answer_len, joint_features_len + answer_len)
 
-        return joint_features, joint_attention_mask
+        return joint_features, (joint_padding_mask, joint_attention_mask)
 
     def forward(self, input_features: Instances):
-        joint_features, joint_attention_mask = self.embed_features(input_features)
+        joint_features, (joint_padding_mask, joint_attention_mask) = self.embed_features(input_features)
         joint_features_len = joint_features.shape[1]
         answer_tokens = input_features.answer_tokens
-        joint_features, joint_attention_mask = self.append_answer(joint_features, joint_attention_mask, answer_tokens)
+        joint_features, (joint_padding_mask, joint_attention_mask) = self.append_answer(joint_features, (joint_padding_mask, joint_attention_mask), answer_tokens)
 
         out = self.encoder(Instances(
             features=joint_features,
-            features_padding_mask=joint_attention_mask
+            features_padding_mask=joint_padding_mask,
+            features_attention_mask=joint_attention_mask
         ))
+        out = out[:, joint_features_len:]
+        out = self.fc(out)
 
-        return F.log_softmax(out[:, joint_features_len:], dim=-1)
+        return F.log_softmax(out, dim=-1)

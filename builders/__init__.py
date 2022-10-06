@@ -11,6 +11,7 @@ from models.modules.attentions import (
 )
 from models.modules.encoders import (
     Encoder,
+    MultiModalEncoder,
     CoAttentionEncoder,
     CrossModalityEncoder
 )

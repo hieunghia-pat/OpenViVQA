@@ -87,9 +87,9 @@ MODEL:
   D_MODEL: 512
   DROPOUT: .1
   ENCODER:
-    ARCHITECTURE: Encoder
+    ARCHITECTURE: MultiModalEncoder
     D_MODEL: 512
-    LAYERS: 3
+    LAYERS: 6
     SELF_ATTENTION:
       ARCHITECTURE: ScaledDotProductAttention
       HEAD: 8

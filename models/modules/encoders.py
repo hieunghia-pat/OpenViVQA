@@ -128,6 +128,22 @@ class Encoder(nn.Module):
         return out
 
 @META_ENCODER.register()
+class MultiModalEncoder(Encoder):
+    def __init__(self, config) -> None:
+        super().__init__(config)
+
+    def forward(self, input_features: Instances):
+        features = input_features.features
+        padding_mask = input_features.features_padding_mask
+        attention_mask = input_features.features_attention_mask
+        
+        out = self.layer_norm(features) + self.pos_embedding(features)
+        for layer in self.layers:
+            out = layer(queries=out, keys=out, values=out, padding_mask=padding_mask, attention_mask=attention_mask)
+
+        return out
+
+@META_ENCODER.register()
 class GeometricEncoder(nn.Module):
     def __init__(self, config):
         super(Encoder, self).__init__()

@@ -34,7 +34,7 @@ class Instances:
         self._fields: Dict[str, Any] = {}
         for k, v in kwargs.items():
             if isinstance(v, torch.Tensor):
-                v = v.float()
+                v = v.float() if v.dtype is torch.float64 else v
             self.set(k, v)
 
     def __setattr__(self, name: str, val: Any) -> None:
@@ -55,7 +55,7 @@ class Instances:
         and must agree with other existing fields in this object.
         """
         if isinstance(value, torch.Tensor):
-            value = value.float()
+            value = value.float() if value.dtype is torch.float64 else value
         self._fields[name] = value
 
     def has(self, name: str) -> bool:

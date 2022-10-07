@@ -91,8 +91,8 @@ class M4C(BaseUniqueTransformer):
         ocr_box_embedded, _ = self.text_embedding(ocr_box_tokens)
         boxes += ocr_box_embedded
 
-        ocr_features, _ = self.text_embedding(ocr_tokens)
-        ocr_embedding_tokens = torch.ones((ocr_tokens.shape[0], ocr_tokens.shape[1])).long().to(ocr_tokens.device) * self.vocab.ocr_idx
+        ocr_features, _ = self.ocr_text_embedding(ocr_tokens)
+        ocr_embedding_tokens = torch.ones((ocr_features.shape[0], ocr_features.shape[1])).long().to(ocr_features.device) * self.vocab.ocr_idx
         ocr_embedded, _ = self.text_embedding(ocr_embedding_tokens)
         ocr_features += ocr_embedded
 

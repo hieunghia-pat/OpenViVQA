@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 
 from data_utils.vocab import Vocab
@@ -26,7 +27,7 @@ class UsualEmbedding(nn.Module):
                 nn.Dropout(config.DROPOUT)
             )
 
-    def forward(self, tokens):
+    def forward(self, tokens: List[str]):
         padding_masks = generate_padding_mask(tokens, padding_idx=self.padding_idx).to(tokens.device)
         seq_len = tokens.shape[-1]
         sequential_masks = generate_sequential_mask(seq_len).to(tokens.device)
@@ -34,6 +35,41 @@ class UsualEmbedding(nn.Module):
         features = self.components(tokens)
 
         return features, (padding_masks, sequential_masks)
+
+@META_TEXT_EMBEDDING.register()
+class OcrUsualEmbedding(UsualEmbedding):
+    def __init__(self, config, vocab):
+        super().__init__(self, config, vocab)
+
+    def forward(self, tokens: List[List[str]]):
+        list_of_features = []
+        max_len = 0
+        for tokens_per_batch in tokens:
+            if len(tokens_per_batch) > 0:
+                refined_tokens = []
+                for token in tokens_per_batch:
+                    refined_tokens += token.split()
+                input_ids = self.vocab.encode_question(refined_tokens)
+                features_per_batch = self.embedding(input_ids).to(self.device)
+                features_per_batch = self.components(input_ids)
+                features_per_batch = features_per_batch.sum(dim=1)
+            else:
+                features_per_batch = torch.ones((1, self.d_pretrained_feature)).to(self.embedding.device)
+            list_of_features.append(features_per_batch)
+            max_len = len(tokens_per_batch) if len(tokens_per_batch) > max_len else max_len
+        padding_tensor = torch.zeros((1, self.d_pretrained_feature)).to(self.embedding.device)
+        for idx, feature in enumerate(list_of_features):
+            delta_len = max_len - feature.shape[0]
+            list_of_features[idx] = torch.cat([feature] + [padding_tensor]*delta_len, dim=0)
+        
+        features = torch.cat([feature.unsqueeze(0) for feature in list_of_features], dim=0)
+        padding_mask = generate_padding_mask(features, padding_idx=0)
+        sequential_mask = generate_sequential_mask(features.shape[1])
+
+        out = self.proj(features)
+        out = self.dropout(self.gelu(out))
+
+        return out, (padding_mask, sequential_mask)
 
 @META_TEXT_EMBEDDING.register()
 class LSTMTextEmbedding(nn.Module):
@@ -50,7 +86,7 @@ class LSTMTextEmbedding(nn.Module):
 
         self.lstm = nn.LSTM(input_size=config.D_MODEL, hidden_size=config.D_MODEL, batch_first=True)
 
-    def forward(self, tokens):
+    def forward(self, tokens: List[str]):
         padding_masks = generate_padding_mask(tokens, padding_idx=self.padding_idx).to(tokens.device)
         seq_len = tokens.shape[-1]
         sequential_masks = generate_sequential_mask(seq_len).to(tokens.device)
@@ -61,6 +97,44 @@ class LSTMTextEmbedding(nn.Module):
         features, _ = self.lstm(features)
 
         return features, (padding_masks, sequential_masks)
+
+@META_TEXT_EMBEDDING.register()
+class OcrLSTMEmbedding(LSTMTextEmbedding):
+    def __init__(self, config, vocab):
+        super().__init__(self, config, vocab)
+
+        self.vocab = vocab
+
+    def forward(self, tokens: List[List[str]]):
+        list_of_features = []
+        max_len = 0
+        for tokens_per_batch in tokens:
+            if len(tokens_per_batch) > 0:
+                refined_tokens = []
+                for token in tokens_per_batch:
+                    refined_tokens += token.split()
+                input_ids = self.vocab.encoder_question(refined_tokens)
+                features_per_batch = self.embedding(input_ids).to(self.device)
+                features_per_batch = self.dropout(self.proj(features_per_batch))
+                features_per_batch, _ = self.lstm(features_per_batch)
+                features_per_batch = features_per_batch.sum(dim=1)
+            else:
+                features_per_batch = torch.ones((1, self.d_pretrained_feature)).to(self.embedding.device)
+            list_of_features.append(features_per_batch)
+            max_len = len(tokens_per_batch) if len(tokens_per_batch) > max_len else max_len
+        padding_tensor = torch.zeros((1, self.d_pretrained_feature)).to(self.embedding.device)
+        for idx, feature in enumerate(list_of_features):
+            delta_len = max_len - feature.shape[0]
+            list_of_features[idx] = torch.cat([feature] + [padding_tensor]*delta_len, dim=0)
+        
+        features = torch.cat([feature.unsqueeze(0) for feature in list_of_features], dim=0)
+        padding_mask = generate_padding_mask(features, padding_idx=0)
+        sequential_mask = generate_sequential_mask(features.shape[1])
+
+        out = self.proj(features)
+        out = self.dropout(self.gelu(out))
+
+        return out, (padding_mask, sequential_mask)
 
 @META_TEXT_EMBEDDING.register()
 class BertEmbedding(nn.Module):
@@ -79,15 +153,49 @@ class BertEmbedding(nn.Module):
         self.gelu = nn.GELU()
         self.dropout = nn.Dropout(config.DROPOUT)
 
-    def forward(self, questions: List[str]):
-        inputs = self.tokenizer(questions, return_tensors="pt", padding=True).to(self.device)
+    def forward(self, tokens: List[str]):
+        inputs = self.tokenizer(tokens, return_tensors="pt", padding=True).to(self.device)
         padding_mask = generate_padding_mask(inputs.input_ids, padding_idx=self.tokenizer.pad_token_id)
+        sequential_mask = generate_sequential_mask(tokens.shape[1])
         features = self.embedding(**inputs).last_hidden_state
 
         out = self.proj(features)
         out = self.dropout(self.gelu(out))
 
-        return out, padding_mask
+        return out, (padding_mask, sequential_mask)
+
+@META_TEXT_EMBEDDING.register()
+class OcrBertEmbedding(BertEmbedding):
+    def __init__(self, config, vocab):
+        super().__init__(config, vocab)
+
+        self.d_pretrained_feature = config.D_PRETRAINED_FEATURE
+
+    def forward(self, tokens: List[List[str]]):
+        list_of_features = []
+        max_len = 0
+        for tokens_per_batch in tokens:
+            if len(tokens_per_batch) > 0:
+                inputs = self.tokenizer(tokens_per_batch, return_tensors="pt", padding=True).to(self.device)
+                features_per_batch = self.embedding(**inputs).last_hidden_state
+                features_per_batch = features_per_batch.sum(dim=1)
+            else:
+                features_per_batch = torch.ones((1, self.d_pretrained_feature)).to(self.embedding.device)
+            list_of_features.append(features_per_batch)
+            max_len = len(tokens_per_batch) if len(tokens_per_batch) > max_len else max_len
+        padding_tensor = torch.zeros((1, self.d_pretrained_feature)).to(self.embedding.device)
+        for idx, feature in enumerate(list_of_features):
+            delta_len = max_len - feature.shape[0]
+            list_of_features[idx] = torch.cat([feature] + [padding_tensor]*delta_len, dim=0)
+        
+        features = torch.cat([feature.unsqueeze(0) for feature in list_of_features], dim=0)
+        padding_mask = generate_padding_mask(features, padding_idx=0)
+        sequential_mask = generate_sequential_mask(features.shape[1])
+
+        out = self.proj(features)
+        out = self.dropout(self.gelu(out))
+
+        return out, (padding_mask, sequential_mask)
 
 @META_TEXT_EMBEDDING.register()
 class T5Embedding(nn.Module):
@@ -99,10 +207,11 @@ class T5Embedding(nn.Module):
         self.tokenizer = AutoTokenizer.from_pretrained(config.PRETRAINED_NAME)
         self.embedding = AutoModel.from_pretrained(config.PRETRAINED_NAME)
 
-    def forward(self, questions: List[str]):
-        input_ids = self.tokenizer(questions, return_tensors='pt', padding=True).input_ids.to(self.device)
+    def forward(self, tokens: List[str]):
+        input_ids = self.tokenizer(tokens, return_tensors='pt', padding=True).input_ids.to(self.device)
         padding_mask = generate_padding_mask(input_ids, padding_idx=self.tokenizer.pad_token_id)
+        sequential_mask = generate_sequential_mask(input_ids.shape[1])
 
         out = self.embedding(input_ids=input_ids, decoder_input_ids=input_ids).last_hidden_states
 
-        return out, padding_mask
+        return out, (padding_mask, sequential_mask)

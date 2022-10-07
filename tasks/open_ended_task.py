@@ -98,7 +98,6 @@ class OpenEndedTask(BaseTask):
         self.score = config.TRAINING.SCORE
         self.learning_rate = config.TRAINING.LEARNING_RATE
         self.rl_learning_rate = config.TRAINING.RL_LEARNING_RATE
-        self.get_scores = config.TRAINING.GET_SCORES
         self.training_beam_size = config.TRAINING.TRAINING_BEAM_SIZE
         self.evaluating_beam_size = config.TRAINING.EVALUATING_BEAM_SIZE
         self.patience = config.TRAINING.PATIENCE

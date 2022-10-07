@@ -33,6 +33,8 @@ class Instances:
         """
         self._fields: Dict[str, Any] = {}
         for k, v in kwargs.items():
+            if isinstance(v, torch.Tensor):
+                v = v.float()
             self.set(k, v)
 
     def __setattr__(self, name: str, val: Any) -> None:
@@ -52,6 +54,8 @@ class Instances:
         The length of `value` must be the number of instances,
         and must agree with other existing fields in this object.
         """
+        if isinstance(value, torch.Tensor):
+            value = value.float()
         self._fields[name] = value
 
     def has(self, name: str) -> bool:

@@ -14,6 +14,8 @@ import math
 
 class DynamicPointerNetwork(nn.Module):
     def __init__(self, config):
+        super().__init__()
+
         self.query = nn.Linear(config.D_MODEL, config.D_MODEL)
         self.key = nn.Linear(config.D_MODEL, config.D_MODEL)
         self.d_model = config.D_MODEL
@@ -29,7 +31,7 @@ class DynamicPointerNetwork(nn.Module):
 @META_ARCHITECTURE.register()
 class M4C(BaseUniqueTransformer):
     def __init__(self, config, vocab):
-        super().__init__(vocab)
+        super().__init__(config, vocab)
 
         self.device = torch.device(config.DEVICE)
         self.d_model = config.D_MODEL
@@ -39,6 +41,7 @@ class M4C(BaseUniqueTransformer):
         self.box_embedding = build_vision_embedding(config.BOX_EMBEDDING)
         self.ocr_det_embedding = build_vision_embedding(config.OCR_DET_EMBEDDING)
         self.ocr_rec_embedding = build_vision_embedding(config.OCR_REC_EMBEDDING)
+        self.ocr_text_embedding = build_text_embedding(config.OCR_TEXT_EMBEDDING, vocab)
         self.text_embedding = build_text_embedding(config.TEXT_EMBEDDING, vocab)
 
         self.self_encoder = build_encoder(config.ENCODER)
@@ -104,7 +107,7 @@ class M4C(BaseUniqueTransformer):
         grid_boxes = input_features.grid_boxes
         grid_features, grid_padding_mask = self.forward_grid_features(grid_features, grid_boxes)
 
-        ocr_tokens = input_features.ocr_tokens
+        ocr_tokens = input_features.ocr_texts
         ocr_det_features = input_features.ocr_det_features
         ocr_rec_features = input_features.ocr_rec_features
         ocr_boxes = input_features.ocr_boxes

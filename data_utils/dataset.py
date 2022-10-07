@@ -34,6 +34,9 @@ class BaseDataset(data.Dataset):
     def load_features(self, image_id: int) -> Dict[str, Any]:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         features = np.load(feature_file, allow_pickle=True)[()]
+        for key, feature in features.items():
+            if isinstance(feature, np.ndarray):
+                features[key] = torch.tensor(feature)
         
         return features
 
@@ -103,12 +106,18 @@ class OcrDictionaryDataset(DictionaryDataset):
     def load_image_features(self, image_id: int) -> Dict[str, Any]:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         features = np.load(feature_file, allow_pickle=True)[()]
+        for key, feature in features.items():
+            if isinstance(feature, np.ndarray):
+                features[key] = torch.tensor(feature)
 
         return features
 
     def load_scene_text_features(self, image_id: int) -> Dict[str, Any]:
         feature_file = os.path.join(self.scene_text_features_path, f"{image_id}.npy")
         features = np.load(feature_file, allow_pickle=True)[()]
+        for key, feature in features.items():
+            if isinstance(feature, np.ndarray):
+                features[key] = torch.tensor(feature)
 
         selected_ids = (np.array(features["scores"]) >= self.scene_text_threshold).tolist()
         for key, feature in features.items():
@@ -144,12 +153,13 @@ class OcrDictionaryDataset(DictionaryDataset):
         question = item["question"]
         question_tokens = self.vocab.encode_question(question)
         answers = item["answers"]
-        ocr_tokens = {}
+        map_tokens_to_ids = {}
         ith = 0
-        for text in features["texts"]:
-            if text not in ocr_tokens:
-                ocr_tokens[text] = len(self.vocab) + ith
+        for text in features["ocr_texts"]:
+            if text not in map_tokens_to_ids:
+                map_tokens_to_ids[text] = len(self.vocab) + ith
                 ith += 1
+        map_ids_to_tokens = {id: token for token, id in map_tokens_to_ids.items()}
 
         return Instances(
             **features,
@@ -160,7 +170,8 @@ class OcrDictionaryDataset(DictionaryDataset):
             question=question,
             question_tokens=question_tokens,
             answers=answers,
-            ocr_tokens=ocr_tokens
+            map_tokens_to_ids=map_tokens_to_ids,
+            map_ids_to_tokens=map_ids_to_tokens
         )
 
 @META_DATASET.register()
@@ -377,12 +388,18 @@ class OcrFeatureDataset(FeatureDataset):
     def load_image_features(self, image_id: int) -> Dict[str, Any]:
         feature_file = os.path.join(self.image_features_path, f"{image_id}.npy")
         features = np.load(feature_file, allow_pickle=True)[()]
+        for key, feature in features.items():
+            if isinstance(feature, np.ndarray):
+                features[key] = torch.tensor(feature)
 
         return features
 
     def load_scene_text_features(self, image_id: int) -> Dict[str, Any]:
         feature_file = os.path.join(self.scene_text_features_path, f"{image_id}.npy")
         features = np.load(feature_file, allow_pickle=True)[()]
+        for key, feature in features.items():
+            if isinstance(feature, np.ndarray):
+                features[key] = torch.tensor(feature)
 
         selected_ids = (np.array(features["scores"]) >= self.scene_text_threshold).tolist()
         for key, feature in features.items():
@@ -415,13 +432,14 @@ class OcrFeatureDataset(FeatureDataset):
 
         item = self.annotations[idx]
         question = self.vocab.encode_question(item["question"])
-        ocr_tokens = {}
+        map_tokens_to_ids = {}
         ith = 0
         for text in features["ocr_texts"]:
-            if text not in ocr_tokens:
-                ocr_tokens[text] = len(self.vocab) + ith
+            if text not in map_tokens_to_ids:
+                map_tokens_to_ids[text] = len(self.vocab) + ith
                 ith += 1
-        answer = self.vocab.encode_answer(item["answer"], ocr_tokens)
+        map_ids_to_tokens = {id: token for token, id in map_tokens_to_ids.items()}
+        answer = self.vocab.encode_answer(item["answer"], map_tokens_to_ids)
 
         shifted_right_answer = torch.zeros_like(answer).fill_(self.vocab.padding_idx)
         shifted_right_answer[:-1] = answer[1:]
@@ -432,7 +450,8 @@ class OcrFeatureDataset(FeatureDataset):
             question_tokens=question,
             answer_tokens=answer,
             shifted_right_answer_tokens=shifted_right_answer,
-            ocr_tokens=ocr_tokens
+            map_tokens_to_ids=map_tokens_to_ids,
+            map_ids_to_tokens=map_ids_to_tokens
         )
 
 @META_DATASET.register()

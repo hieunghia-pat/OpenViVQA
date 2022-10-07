@@ -26,13 +26,13 @@ class BaseUniqueTransformer(Module):
     def embed_features(self, input_features: Instances):
         raise NotImplementedError
 
-    def append_answer(self, joint_features, joint_masks, answer_tokens):
+    def append_answer(self, joint_features, joint_masks, answer_tokens, maps_ids_to_tokens, maps_tokens_to_features):
         answer_features, (answer_padding_mask, answer_sequential_mask) = self.text_embedding(answer_tokens)
         answer_self_attention_mask = torch.logical_or(answer_padding_mask, answer_sequential_mask) # (bs, 1, answer_len, answer_len)
         a_tokens = torch.ones((answer_tokens.shape[0], answer_tokens.shape[1])).long().to(answer_tokens.device) * self.vocab.answer_idx
         a_embedded, _ = self.text_embedding(a_tokens)
         answer_features += a_embedded
-        
+
         joint_features_len = joint_features.shape[1]
         answer_len = answer_features.shape[1]
         joint_features = torch.cat([joint_features, answer_features], dim=1)

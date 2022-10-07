@@ -125,6 +125,19 @@ class M4C(BaseUniqueTransformer):
         joint_features_len = joint_features.shape[1]
         joint_attention_mask = joint_padding_mask.expand((-1, -1, joint_features_len, -1)) # (bs, 1, joint_features_len, joint_features_len)
 
+        maps_tokens_to_features = []
+        for batch in range(input_features.batch_size):
+            map_tokens_to_features = {}
+            ocr_texts = input_features.ocr_texts[batch]
+            for idx, token in enumerate(ocr_texts):
+                if token not in map_tokens_to_features:
+                    map_tokens_to_features[token] = ocr_features[batch, idx]
+            maps_tokens_to_features.append(map_tokens_to_features)
+
+        answer_tokens = input_features.answer_tokens
+        joint_features, (joint_padding_mask, joint_attention_mask) = self.append_answer(joint_features, (joint_padding_mask, joint_attention_mask), 
+                                                                                        answer_tokens, input_features.map_ids_to_tokens, maps_tokens_to_features)
+
         return joint_features, (joint_padding_mask, joint_attention_mask)
 
     def forward_questions(self, question_tokens):
@@ -136,9 +149,12 @@ class M4C(BaseUniqueTransformer):
         return question_features, question_padding_mask
 
     def forward(self, input_features: Instances):
+        region_features_len = input_features.region_features.shape[1]
+        grid_features_len = input_features.grid_features.shape[1]
+        ocr_tokens_len = input_features.ocr_boxes.shape[1]
+
         joint_features, (joint_padding_mask, joint_attention_mask) = self.embed_features(input_features)
-        answer_tokens = input_features.answer_tokens
-        joint_features, (joint_padding_mask, joint_attention_mask) = self.append_answer(joint_features, (joint_padding_mask, joint_attention_mask), answer_tokens)
+        ocr_features = joint_features[:, region_features_len+grid_features_len:region_features_len+grid_features_len+ocr_tokens_len]
 
         encoder_features = self.encoder(Instances(
             features=joint_features,
@@ -146,19 +162,11 @@ class M4C(BaseUniqueTransformer):
             features_attention_mask=joint_attention_mask
         ))
 
-        region_features_len = input_features.region_features.shape[1]
-        grid_features_len = input_features.grid_features.shape[1]
-        ocr_tokens_len = input_features.ocr_tokens.shape[1]
-        questions_len = input_features.question_tokens.shape[1]
-        joint_features_len = joint_features.shape[1]
-        answer_len = answer_tokens.shape[1]
-        assert joint_features_len == region_features_len + grid_features_len + ocr_tokens_len + questions_len
-
         ocr_features = encoder_features[:, region_features_len+grid_features_len:region_features_len+grid_features_len+ocr_tokens_len]
         ocr_padding_mask = joint_padding_mask[:, region_features_len+grid_features_len:region_features_len+grid_features_len+ocr_tokens_len]
-        answer_features = encoder_features[:, joint_features_len:]
-        assert answer_len == answer_features.shape[1]
 
+        joint_features_len = joint_features.shape[1]
+        answer_features = encoder_features[:, joint_features_len:]
         answer_features = self.vocab_proj(answer_features) # (bs, answer_len, num_vocab)
         ocr_features = self.dynamic_network(answer_features, ocr_features, ocr_padding_mask) # (bs, answer_len, ocr_len)
         out = torch.cat([answer_features, ocr_features], dim=-1) # (bs, answer_len, num_vocab + ocr_len)

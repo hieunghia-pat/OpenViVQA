@@ -44,7 +44,7 @@ class DynamicEmbedding(nn.Module):
         self.padding_idx = vocab.padding_idx
         self.d_embedding = config.D_EMBEDDING
         self.len_vocab = len(vocab)
-        self.weights = nn.Linear(len(vocab), config.D_EMBEDDING)
+        self.register_parameter("weights", nn.parameter.Parameter(nn.init.xavier_normal_(torch.zeros((self.len_vocab, self.d_embedding)))))
         self.fc = nn.Linear(config.D_EMBEDDING, config.D_MODEL)
         self.dropout = nn.Dropout(config.DROPOUT)
 
@@ -57,14 +57,14 @@ class DynamicEmbedding(nn.Module):
 
     def init_weights(self):
         nn.init.xavier_uniform_(self.fc.weight)
-        nn.init.xavier_uniform_(self.fc.bias)
 
-    def forward(self, tokens: torch.Tensor, maps_oov_to_features: Dict[int, torch.Tensor]):
+    def forward(self, tokens: torch.Tensor, maps_oov_to_features: List[Dict[int, torch.Tensor]]):
         # create one-hot vector
         bs, seq_len = tokens.shape
-        one_hot_vecs = torch.zeros((bs, seq_len, self.len_vocab)).to(tokens.device)
-        one_hot_vecs = torch.where()
-        
+        len_vocab = max(self.len_vocab, tokens.max())
+        one_hot_vecs = torch.zeros((bs, seq_len, len_vocab)).to(tokens.device)
+        one_vecs = torch.zeros((bs, seq_len, len_vocab)).to(tokens.device)
+        one_hot_vecs.scatter_(dim=-1, index=tokens.unsqueeze(-1), src=one_vecs)
 
 @META_TEXT_EMBEDDING.register()
 class OcrUsualEmbedding(UsualEmbedding):

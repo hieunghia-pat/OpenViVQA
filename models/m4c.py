@@ -43,7 +43,8 @@ class M4C(BaseUniqueTransformer):
         self.ocr_det_embedding = build_vision_embedding(config.OCR_DET_EMBEDDING)
         self.ocr_rec_embedding = build_vision_embedding(config.OCR_REC_EMBEDDING)
         self.ocr_text_embedding = build_text_embedding(config.OCR_TEXT_EMBEDDING, vocab)
-        self.text_embedding = build_text_embedding(config.TEXT_EMBEDDING, vocab)
+        self.text_embedding = build_text_embedding(config.QUESTION_EMBEDDING, vocab)
+        self.answer_embedding = build_text_embedding(config.ANSWER_EMBEDDING, vocab)
 
         self.self_encoder = build_encoder(config.ENCODER)
 
@@ -136,10 +137,13 @@ class M4C(BaseUniqueTransformer):
             maps_tokens_to_features.append(map_tokens_to_features)
 
         answer_tokens = input_features.answer_tokens
-        maps_ids_to_tokens = input_features.maps_ids_to_tokens
-        maps_ids_to_features = {}
-        for id, token in maps_ids_to_tokens.items():
-            maps_ids_to_features[id] = maps_tokens_to_features[token]
+        maps_ids_to_tokens = input_features.map_ids_to_tokens
+        maps_ids_to_features = []
+        for map_ids_to_tokens, map_tokens_to_features in zip(maps_ids_to_tokens, maps_tokens_to_features):
+            map_ids_to_features = {}
+            for id, token in map_ids_to_tokens.items():
+                map_ids_to_features[id] = map_tokens_to_features[token]
+            maps_ids_to_features.append(map_ids_to_features)
         joint_features, (joint_padding_mask, joint_attention_mask) = self.append_answer(joint_features, (joint_padding_mask, joint_attention_mask), 
                                                                                         answer_tokens, maps_ids_to_features)
 
@@ -154,10 +158,10 @@ class M4C(BaseUniqueTransformer):
         return question_features, question_padding_mask
 
     def append_answer(self, joint_features, joint_masks, answer_tokens, maps_ids_to_features):
-        answer_features, (answer_padding_mask, answer_sequential_mask) = self.text_embedding(answer_tokens, maps_ids_to_features)
+        answer_features, (answer_padding_mask, answer_sequential_mask) = self.answer_embedding(answer_tokens, maps_ids_to_features)
         answer_self_attention_mask = torch.logical_or(answer_padding_mask, answer_sequential_mask) # (bs, 1, answer_len, answer_len)
         a_tokens = torch.ones((answer_tokens.shape[0], answer_tokens.shape[1])).long().to(answer_tokens.device) * self.vocab.answer_idx
-        a_embedded, _ = self.text_embedding(a_tokens)
+        a_embedded, _ = self.answer_embedding(a_tokens)
         answer_features += a_embedded
 
         joint_features_len = joint_features.shape[1]

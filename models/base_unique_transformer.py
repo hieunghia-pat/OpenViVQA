@@ -27,27 +27,7 @@ class BaseUniqueTransformer(Module):
         raise NotImplementedError
 
     def append_answer(self, joint_features, joint_masks, answer_tokens, maps_ids_to_tokens, maps_tokens_to_features):
-        answer_features, (answer_padding_mask, answer_sequential_mask) = self.text_embedding(answer_tokens)
-        answer_self_attention_mask = torch.logical_or(answer_padding_mask, answer_sequential_mask) # (bs, 1, answer_len, answer_len)
-        a_tokens = torch.ones((answer_tokens.shape[0], answer_tokens.shape[1])).long().to(answer_tokens.device) * self.vocab.answer_idx
-        a_embedded, _ = self.text_embedding(a_tokens)
-        answer_features += a_embedded
-
-        joint_features_len = joint_features.shape[1]
-        answer_len = answer_features.shape[1]
-        joint_features = torch.cat([joint_features, answer_features], dim=1)
-        joint_padding_mask, joint_attention_mask = joint_masks
-        joint_padding_mask = torch.cat([joint_padding_mask, answer_padding_mask], dim=-1)
-        # joint features cannot see the answer features
-        batch_size = joint_features.shape[0]
-        joint_features_mask_answer = torch.ones((batch_size, 1, joint_features_len, answer_len)).bool().to(joint_features.device) # (bs, 1, joint_features_len, answer_len)
-        joint_attention_mask = torch.cat([joint_attention_mask, joint_features_mask_answer], dim=-1) # (bs, 1, joint_features_len, joint_features_len + answer_len)
-        # answer tokens can attend to all joint features
-        answer_attend_joint_features = torch.zeros((batch_size, 1, answer_len, joint_features_len)).bool().to(answer_features.device) # (bs, 1, answer_len, joint_features_len)
-        answer_attend_joint_features = torch.cat([answer_attend_joint_features, answer_self_attention_mask], dim=-1) # (bs, 1, answer_len, joint_features_len + answer_len)
-        joint_attention_mask = torch.cat([joint_attention_mask, answer_attend_joint_features], dim=-2) # (bs, 1 , joint_features_len + answer_len, joint_features_len + answer_len)
-
-        return joint_features, (joint_padding_mask, joint_attention_mask)
+        raise NotImplementedError
     
     def forward(self, input_features: Instances):
         raise NotImplementedError

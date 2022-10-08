@@ -8,7 +8,7 @@ from models.utils import generate_sequential_mask, generate_padding_mask
 
 from transformers import AutoTokenizer, AutoModel
 
-from typing import List
+from typing import Dict, List
 
 @META_TEXT_EMBEDDING.register()
 class UsualEmbedding(nn.Module):
@@ -20,7 +20,7 @@ class UsualEmbedding(nn.Module):
         if config.WORD_EMBEDDING is None:
             self.components = nn.Embedding(len(vocab), config.D_MODEL, vocab.padding_idx)
         else:
-            embedding_weights = build_word_embedding(config).vectors
+            embedding_weights = build_word_embedding(config).word_embeddings
             self.components = nn.Sequential(
                 nn.Embedding.from_pretrained(embeddings=embedding_weights, freeze=True, padding_idx=vocab.padding_idx),
                 nn.Linear(config.D_EMBEDDING, config.D_MODEL),
@@ -35,6 +35,36 @@ class UsualEmbedding(nn.Module):
         features = self.components(tokens)
 
         return features, (padding_masks, sequential_masks)
+
+@META_TEXT_EMBEDDING.register()
+class DynamicEmbedding(nn.Module):
+    def __init__(self, config, vocab: Vocab):
+        super().__init__(config, vocab)
+
+        self.padding_idx = vocab.padding_idx
+        self.d_embedding = config.D_EMBEDDING
+        self.len_vocab = len(vocab)
+        self.weights = nn.Linear(len(vocab), config.D_EMBEDDING)
+        self.fc = nn.Linear(config.D_EMBEDDING, config.D_MODEL)
+        self.dropout = nn.Dropout(config.DROPOUT)
+
+        self.init_weights()
+
+        if config.WORD_EMBEDDING is None:
+            nn.init.xavier_uniform_(self.weights)
+        else:
+            self.weights = build_word_embedding(config).word_embeddings
+
+    def init_weights(self):
+        nn.init.xavier_uniform_(self.fc.weight)
+        nn.init.xavier_uniform_(self.fc.bias)
+
+    def forward(self, tokens: torch.Tensor, maps_oov_to_features: Dict[int, torch.Tensor]):
+        # create one-hot vector
+        bs, seq_len = tokens.shape
+        one_hot_vecs = torch.zeros((bs, seq_len, self.len_vocab)).to(tokens.device)
+        one_hot_vecs = torch.where()
+        
 
 @META_TEXT_EMBEDDING.register()
 class OcrUsualEmbedding(UsualEmbedding):

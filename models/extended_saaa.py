@@ -133,10 +133,10 @@ class ExtendedSAAA(BaseTransformer):
         combined = self.norm(combined)
 
         answer_tokens = input_features.answer_tokens
-        out = self.decoder(Instances(
+        out = self.decoder(
             answer_tokens=answer_tokens,
             encoder_features=combined,
             encoder_attention_mask=combined_mask
-        ))
+        )
 
         return F.log_softmax(out, dim=-1)

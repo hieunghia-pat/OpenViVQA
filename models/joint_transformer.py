@@ -56,14 +56,14 @@ class JointTransformer(BaseTransformer):
         grid_feat_embedded, _ = self.text_embedding(grid_feat_tokens)
         grid_features += grid_feat_embedded
         
-        grid_boxes = input_features.grid_boxes
+        grid_boxes = input_features.grid_boxes.squeeze(1)
         grid_boxes, grid_boxes_padding_mask = self.box_embedding(grid_boxes)
         grid_box_tokens = torch.ones((grid_boxes.shape[0], grid_boxes.shape[1])).long().to(grid_boxes.device) * self.vocab.box_idx
         grid_box_embedded, _ = self.text_embedding(grid_box_tokens)
         grid_boxes += grid_box_embedded
         
-        vision_features = torch.cat([region_features, region_boxes, grid_features, grid_boxes], dim=1)
-        vision_padding_mask = torch.cat([region_padding_mask, region_boxes_padding_mask, grid_padding_mask, grid_boxes_padding_mask], dim=-1)
+        vision_features = torch.cat([region_features, region_boxes, grid_features], dim=1)
+        vision_padding_mask = torch.cat([region_padding_mask, region_boxes_padding_mask, grid_padding_mask], dim=-1)
 
         question_tokens = input_features.question_tokens
         q_tokens = torch.ones((question_tokens.shape[0], question_tokens.shape[1])).long().to(question_tokens.device) * self.vocab.question_idx

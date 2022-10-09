@@ -182,12 +182,20 @@ class MultilingualDictionaryDataset(DictionaryDataset):
             # find the appropriate image
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
-                    answer = preprocess_sentence(ann["answer"], self.vocab.tokenizer)
-                    answer = " ".join(answer)
+                    question = ann["question"]
+                    answer = ann["answer"]
+                    if is_japanese_sentence(question):
+                        question = list(question)
+                        answer = list(answer)
+                    else:
+                        question = preprocess_sentence(question, self.vocab.tokenizer)
+                        answer = preprocess_sentence(answer, self.vocab.tokenizer)
+                    answers = [" ".join(answer)]
                     annotation = {
                         "question_id": ann["id"],
-                        "question": ann["question"],
-                        "answers": [answer],
+                        "type": None,
+                        "question": question,
+                        "answers": answers,
                         "image_id": ann["image_id"],
                         "filename": image["filename"]
                     }

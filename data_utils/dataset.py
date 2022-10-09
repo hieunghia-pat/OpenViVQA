@@ -84,7 +84,7 @@ class DictionaryDataset(BaseDataset):
             filename=filename,
             question=question,
             question_tokens=question_tokens,
-            answer=answer,
+            answers=answers,
             **features
         )
 
@@ -177,7 +177,7 @@ class ImageQuestionDictionaryDataset(DictionaryDataset):
         
         image = Image.open(os.path.join(self.image_path, filename)).convert("RGB")
         question = item["question"]
-        answer = item["answer"]
+        answers = item["answer"]
 
         return Instances(
             question_id=item["question_id"],
@@ -185,7 +185,7 @@ class ImageQuestionDictionaryDataset(DictionaryDataset):
             filename=filename,
             image=image,
             question=question,
-            answer=answer
+            answers=answers
         )
 
 @META_DATASET.register()
@@ -266,7 +266,7 @@ class FeatureDataset(BaseDataset):
         return [ann["question"] for ann in self.annotations]
 
     @property
-    def answer(self):
+    def answers(self):
         return [ann["answer"] for ann in self.annotations]
 
     def load_annotations(self, json_data: Dict) -> List[Dict]:
@@ -481,7 +481,7 @@ class FeatureClassificationDataset(BaseDataset):
         return [ann["question"] for ann in self.annotations]
 
     @property
-    def answer(self):
+    def answers(self):
         return [ann["answer"] for ann in self.annotations]
 
     def load_annotations(self, json_data: Dict) -> List[Dict]:

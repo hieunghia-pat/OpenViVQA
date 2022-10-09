@@ -75,7 +75,7 @@ class DictionaryDataset(BaseDataset):
         features = self.load_features(image_id)
         question = item["question"]
         question_tokens = self.vocab.encode_question(question)
-        answers = item["answer"]
+        answer = item["answer"]
 
         return Instances(
             question_id=item["question_id"],
@@ -84,7 +84,7 @@ class DictionaryDataset(BaseDataset):
             filename=filename,
             question=question,
             question_tokens=question_tokens,
-            answers=answers,
+            answer=answer,
             **features
         )
 
@@ -162,7 +162,7 @@ class ImageQuestionDictionaryDataset(DictionaryDataset):
                         "question_id": ann["id"],
                         # "type": ann["QA-type"],
                         "question": ann["question"],
-                        "answer": answers,
+                        "answer": answer,
                         "image_id": ann["image_id"],
                         "filename": image["filename"]
                     }
@@ -177,7 +177,7 @@ class ImageQuestionDictionaryDataset(DictionaryDataset):
         
         image = Image.open(os.path.join(self.image_path, filename)).convert("RGB")
         question = item["question"]
-        answers = item["answer"]
+        answer = item["answer"]
 
         return Instances(
             question_id=item["question_id"],
@@ -185,7 +185,7 @@ class ImageQuestionDictionaryDataset(DictionaryDataset):
             filename=filename,
             image=image,
             question=question,
-            answers=answers
+            answer=answer
         )
 
 @META_DATASET.register()
@@ -266,7 +266,7 @@ class FeatureDataset(BaseDataset):
         return [ann["question"] for ann in self.annotations]
 
     @property
-    def answers(self):
+    def answer(self):
         return [ann["answer"] for ann in self.annotations]
 
     def load_annotations(self, json_data: Dict) -> List[Dict]:
@@ -481,7 +481,7 @@ class FeatureClassificationDataset(BaseDataset):
         return [ann["question"] for ann in self.annotations]
 
     @property
-    def answers(self):
+    def answer(self):
         return [ann["answer"] for ann in self.annotations]
 
     def load_annotations(self, json_data: Dict) -> List[Dict]:

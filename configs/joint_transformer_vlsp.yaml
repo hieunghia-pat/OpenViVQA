@@ -3,25 +3,20 @@ TASK: VlspEvjVqaTask
 DATASET:
   FEATURE_DATASET:
     TYPE: MultilingualFeatureDataset
-    BATCH_SIZE: 60
+    BATCH_SIZE: 15
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/features/vinvl_vinvl
-      SCENE_TEXT: null
-      IMAGE: features/EVJVQA/images
-    SCENE_TEXT_THRESHOLD: 0.3
+      FEATURES: features/EVJVQA/vinvl_vinvl
+      IMAGE: null
   DICT_DATASET:
     TYPE: MultilingualDictionaryDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/features/vinvl_vinvl
-      SCENE_TEXT: null
-      IMAGE: features/EVJVQA/images
-    SCENE_TEXT_THRESHOLD: 0.3
+      FEATURES: features/EVJVQA/vinvl_vinvl
+      IMAGE: null
   MIN_FREQ: 1
   VOCAB:
-    
     TYPE: VlspVqaMultiModalVocab
     TOKENIZER: null
     WORD_EMBEDDING: null
@@ -35,14 +30,11 @@ DATASET:
     BOX_TOKEN: <box>
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
-    OCR_TOKEN: null
-    OCR_DET_TOKEN: null
-    OCR_REC_TOKEN: null
     PRETRAINED_LANGUAGE_MODEL: null
   JSON_PATH:
-    TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/train_data.json
-    DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/dev_data.json
-    PUBLIC_TEST: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/official_evjvqa_public_test.json
+    TRAIN: features/EVJVQA/annotations/train_data.json
+    DEV: features/EVJVQA/annotations/dev_data.json
+    PUBLIC_TEST: null
     PRIVATE_TEST: null
 
 TRAINING:

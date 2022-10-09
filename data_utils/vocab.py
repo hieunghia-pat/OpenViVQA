@@ -4,8 +4,6 @@ from data_utils.utils import is_japanese_sentence, preprocess_sentence, unk_init
 from builders.word_embedding_builder import build_word_embedding
 from builders.vocab_builder import META_VOCAB
 
-from transformers import AutoTokenizer
-
 from collections import defaultdict, Counter
 import json
 from typing import Dict, List
@@ -19,27 +17,10 @@ class Vocab(object):
 
         self.tokenizer = config.VOCAB.TOKENIZER
 
-        if config.VOCAB.PRETRAINED_LANGUAGE_MODEL is not None: # use special tokens and vocab from pretrained language model
-            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
-            self.padding_token = token_encoder.pad_token
-            self.unk_token = token_encoder.unk_token
-            cls_token = token_encoder.cls_token
-            sep_token = token_encoder.sep_token
-            if cls_token is None:
-                cls_token = token_encoder.pad_token
-            if sep_token is None:
-                sep_token = token_encoder.pad_token
-            self.bos_token = token_encoder.bos_token
-            if self.bos_token is None:
-                self.bos_token = cls_token
-            self.eos_token = token_encoder.eos_token
-            if self.eos_token is None:
-                self.eos_token = sep_token
-        else: # use defined special tokens
-            self.padding_token = config.VOCAB.PAD_TOKEN
-            self.bos_token = config.VOCAB.BOS_TOKEN
-            self.eos_token = config.VOCAB.EOS_TOKEN
-            self.unk_token = config.VOCAB.UNK_TOKEN
+        self.padding_token = config.VOCAB.PAD_TOKEN
+        self.bos_token = config.VOCAB.BOS_TOKEN
+        self.eos_token = config.VOCAB.EOS_TOKEN
+        self.unk_token = config.VOCAB.UNK_TOKEN
 
         self.make_vocab([
             config.JSON_PATH.TRAIN,
@@ -88,24 +69,24 @@ class Vocab(object):
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
-                answer = ann["answer"]
-                question = preprocess_sentence(ann["question"], self.tokenizer)
-                answer = preprocess_sentence(answer, self.tokenizer)
-                self.freqs.update(question)
-                self.freqs.update(answer)
-                if len(question) + 2 > self.max_question_length:
-                        self.max_question_length = len(question) + 2
-                if len(answer) + 2 > self.max_answer_length:
-                    self.max_answer_length = len(answer) + 2
+                for answer in ann["answers"]:
+                    question = preprocess_sentence(ann["question"], self.tokenizer)
+                    answer = preprocess_sentence(answer, self.tokenizer)
+                    self.freqs.update(question)
+                    self.freqs.update(answer)
+                    if len(question) + 2 > self.max_question_length:
+                            self.max_question_length = len(question) + 2
+                    if len(answer) + 2 > self.max_answer_length:
+                        self.max_answer_length = len(answer) + 2
 
-    def encode_question(self, question: str) -> torch.Tensor:
+    def encode_question(self, question: List[str]) -> torch.Tensor:
         """ Turn a question into a vector of indices and a question length """
         vec = torch.ones(self.max_question_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + question + [self.eos_token]):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
         return vec
 
-    def encode_answer(self, answer: str) -> torch.Tensor:
+    def encode_answer(self, answer: List[str]) -> torch.Tensor:
         """ Turn a answer into a vector of indices and a question length """
         vec = torch.ones(self.max_answer_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + answer + [self.eos_token]):
@@ -207,20 +188,20 @@ class MultilingualVocab(Vocab):
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
-                answer =ann["answer"]
-                question = ann["question"]
-                if is_japanese_sentence(question):
-                    question = list(question)
-                    answer = list(answer)
-                else: # This is Vietnamese or English annotation
-                    question = preprocess_sentence(ann["question"], self.tokenizer)
-                    answer = preprocess_sentence(answer, self.tokenizer)
-                self.freqs.update(question)
-                self.freqs.update(answer)
-                if len(question) + 2 > self.max_question_length:
-                        self.max_question_length = len(question) + 2
-                if len(answer) + 2 > self.max_answer_length:
-                    self.max_answer_length = len(answer) + 2
+                for answer in ann["answers"]:
+                    question = ann["question"]
+                    if is_japanese_sentence(question):
+                        question = list(question)
+                        answer = list(answer)
+                    else: # This is Vietnamese or English annotation
+                        question = preprocess_sentence(ann["question"], self.tokenizer)
+                        answer = preprocess_sentence(answer, self.tokenizer)
+                    self.freqs.update(question)
+                    self.freqs.update(answer)
+                    if len(question) + 2 > self.max_question_length:
+                            self.max_question_length = len(question) + 2
+                    if len(answer) + 2 > self.max_answer_length:
+                        self.max_answer_length = len(answer) + 2
 
 @META_VOCAB.register()
 class VlspEvjVqaVocab(MultilingualVocab):
@@ -231,27 +212,10 @@ class VlspEvjVqaVocab(MultilingualVocab):
     def __init__(self, config) -> None:
         self.tokenizer = config.VOCAB.TOKENIZER
 
-        if config.VOCAB.PRETRAINED_LANGUAGE_MODEL is not None: # use special tokens and vocab from pretrained language model
-            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
-            self.padding_token = token_encoder.pad_token
-            self.unk_token = token_encoder.unk_token
-            cls_token = token_encoder.cls_token
-            sep_token = token_encoder.sep_token
-            if cls_token is None:
-                cls_token = token_encoder.pad_token
-            if sep_token is None:
-                sep_token = token_encoder.pad_token
-            self.bos_token = token_encoder.bos_token
-            if self.bos_token is None:
-                self.bos_token = cls_token
-            self.eos_token = token_encoder.eos_token
-            if self.eos_token is None:
-                self.eos_token = sep_token
-        else: # use defined special tokens
-            self.padding_token = config.VOCAB.PAD_TOKEN
-            self.bos_token = config.VOCAB.BOS_TOKEN
-            self.eos_token = config.VOCAB.EOS_TOKEN
-            self.unk_token = config.VOCAB.UNK_TOKEN
+        self.padding_token = config.VOCAB.PAD_TOKEN
+        self.bos_token = config.VOCAB.BOS_TOKEN
+        self.eos_token = config.VOCAB.EOS_TOKEN
+        self.unk_token = config.VOCAB.UNK_TOKEN
 
         self.make_vocab([
             config.JSON_PATH.TRAIN,
@@ -308,12 +272,13 @@ class ClassificationVocab(Vocab):
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
                 question = preprocess_sentence(ann["question"], self.tokenizer)
-                answer = ann["answer"]
-                answer = "_".join(answer.split())
-                self.freqs.update(question)
-                itoa.add(answer)
-            if len(question) + 2 > self.max_question_length:
-                    self.max_question_length = len(question) + 2
+                for answer in ann["answers"]:
+                    answer = ann["answer"]
+                    answer = "_".join(answer.split())
+                    self.freqs.update(question)
+                    itoa.add(answer)
+                if len(question) + 2 > self.max_question_length:
+                        self.max_question_length = len(question) + 2
 
         self.itoa = {ith: answer for ith, answer in enumerate(itoa)}
         self.atoi = defaultdict()
@@ -347,17 +312,17 @@ class MultilingualClassificationVocab(ClassificationVocab):
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
                 question = ann["question"]
-                answer = ann["answer"]
-                if is_japanese_sentence(question): # This is Japanese annotation
-                    question = list(question)
-                else: # This is Vietnamese or English annotation
-                    question = preprocess_sentence(question, self.tokenizer)
-                    answer = preprocess_sentence(answer, self.tokenizer)
-                    answer = "_".join(answer)
-                itoa.add(answer)
-            self.freqs.update(question)
-            if len(question) + 2 > self.max_question_length:
-                    self.max_question_length = len(question) + 2
+                for answer in ann["answers"]:
+                    if is_japanese_sentence(question): # This is Japanese annotation
+                        question = list(question)
+                    else: # This is Vietnamese or English annotation
+                        question = preprocess_sentence(question, self.tokenizer)
+                        answer = preprocess_sentence(answer, self.tokenizer)
+                        answer = "_".join(answer)
+                    itoa.add(answer)
+                self.freqs.update(question)
+                if len(question) + 2 > self.max_question_length:
+                        self.max_question_length = len(question) + 2
 
         self.itoa = {ith: answer for ith, answer in enumerate(itoa)}
         self.atoi = defaultdict()
@@ -370,29 +335,10 @@ class MultiModalVocab(Vocab):
 
         self.tokenizer = config.VOCAB.TOKENIZER
 
-        if config.VOCAB.PRETRAINED_LANGUAGE_MODEL is not None: # use special tokens and vocab from pretrained language model
-            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
-            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
-            self.padding_token = token_encoder.pad_token
-            self.unk_token = token_encoder.unk_token
-            cls_token = token_encoder.cls_token
-            sep_token = token_encoder.sep_token
-            if cls_token is None:
-                cls_token = token_encoder.pad_token
-            if sep_token is None:
-                sep_token = token_encoder.pad_token
-            self.bos_token = token_encoder.bos_token
-            if self.bos_token is None:
-                self.bos_token = cls_token
-            self.eos_token = token_encoder.eos_token
-            if self.eos_token is None:
-                self.eos_token = sep_token
-        else: # use defined special tokens
-            self.padding_token = config.VOCAB.PAD_TOKEN
-            self.bos_token = config.VOCAB.BOS_TOKEN
-            self.eos_token = config.VOCAB.EOS_TOKEN
-            self.unk_token = config.VOCAB.UNK_TOKEN
-
+        self.padding_token = config.VOCAB.PAD_TOKEN
+        self.bos_token = config.VOCAB.BOS_TOKEN
+        self.eos_token = config.VOCAB.EOS_TOKEN
+        self.unk_token = config.VOCAB.UNK_TOKEN
         self.img_token = config.VOCAB.IMG_TOKEN
         self.feat_token = config.VOCAB.FEAT_TOKEN
         self.box_token = config.VOCAB.BOX_TOKEN
@@ -457,8 +403,8 @@ class MultilingualMultiModalVocab(MultiModalVocab):
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
-                answer = ann["answer"]
                 question = ann["question"]
+                answer = ann["answer"]
                 if is_japanese_sentence(question):
                     question = list(question)
                     answer = list(answer)
@@ -481,29 +427,10 @@ class OcrVocab(MultiModalVocab):
 
         self.tokenizer = config.VOCAB.TOKENIZER
 
-        if config.VOCAB.PRETRAINED_LANGUAGE_MODEL is not None: # use special tokens and vocab from pretrained language model
-            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
-            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
-            self.padding_token = token_encoder.pad_token
-            self.unk_token = token_encoder.unk_token
-            cls_token = token_encoder.cls_token
-            sep_token = token_encoder.sep_token
-            if cls_token is None:
-                cls_token = token_encoder.pad_token
-            if sep_token is None:
-                sep_token = token_encoder.pad_token
-            self.bos_token = token_encoder.bos_token
-            if self.bos_token is None:
-                self.bos_token = cls_token
-            self.eos_token = token_encoder.eos_token
-            if self.eos_token is None:
-                self.eos_token = sep_token
-        else: # use defined special tokens
-            self.padding_token = config.VOCAB.PAD_TOKEN
-            self.bos_token = config.VOCAB.BOS_TOKEN
-            self.eos_token = config.VOCAB.EOS_TOKEN
-            self.unk_token = config.VOCAB.UNK_TOKEN
-
+        self.padding_token = config.VOCAB.PAD_TOKEN
+        self.bos_token = config.VOCAB.BOS_TOKEN
+        self.eos_token = config.VOCAB.EOS_TOKEN
+        self.unk_token = config.VOCAB.UNK_TOKEN
         self.img_token = config.VOCAB.IMG_TOKEN
         self.feat_token = config.VOCAB.FEAT_TOKEN
         self.box_token = config.VOCAB.BOX_TOKEN
@@ -563,11 +490,17 @@ class OcrVocab(MultiModalVocab):
         if config.VOCAB.WORD_EMBEDDING is not None:
             self.load_word_embeddings(build_word_embedding(config))
 
-    def encode_answer(self, answer: str, ocr_ids_of: Dict[str, int]) -> torch.Tensor:
+    def encode_answer(self, answer: List[str], ocr_id_of: Dict[str, int]) -> torch.Tensor:
         """ Turn a answer into a vector of indices and a question length """
         vec = torch.ones(self.max_answer_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + answer + [self.eos_token]):
-            vec[i] = self.stoi[token] if token in self.stoi else ocr_ids_of[token]
+            if token in ocr_id_of:
+                id = ocr_id_of[token]
+            elif token in self.stoi:
+                id = self.stoi[token]
+            else:
+                id = self.unk_idx
+            vec[i] = id
         return vec
 
     def decode_answer(self, answer_vecs: torch.Tensor, ocr_token_of: Dict[int, str], join_words=True) -> List[str]:
@@ -589,35 +522,13 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
     def __init__(self, config) -> None:
         self.tokenizer = config.VOCAB.TOKENIZER
 
-        if config.VOCAB.PRETRAINED_LANGUAGE_MODEL is not None: # use special tokens and vocab from pretrained language model
-            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
-            token_encoder = AutoTokenizer.from_pretrained(config.VOCAB.PRETRAINED_LANGUAGE_MODEL)
-            self.padding_token = token_encoder.pad_token
-            self.unk_token = token_encoder.unk_token
-            cls_token = token_encoder.cls_token
-            sep_token = token_encoder.sep_token
-            if cls_token is None:
-                cls_token = token_encoder.pad_token
-            if sep_token is None:
-                sep_token = token_encoder.pad_token
-            self.bos_token = token_encoder.bos_token
-            if self.bos_token is None:
-                self.bos_token = cls_token
-            self.eos_token = token_encoder.eos_token
-            if self.eos_token is None:
-                self.eos_token = sep_token
-        else: # use defined special tokens
-            self.padding_token = config.VOCAB.PAD_TOKEN
-            self.bos_token = config.VOCAB.BOS_TOKEN
-            self.eos_token = config.VOCAB.EOS_TOKEN
-            self.unk_token = config.VOCAB.UNK_TOKEN
-
+        self.padding_token = config.VOCAB.PAD_TOKEN
+        self.bos_token = config.VOCAB.BOS_TOKEN
+        self.eos_token = config.VOCAB.EOS_TOKEN
+        self.unk_token = config.VOCAB.UNK_TOKEN
         self.img_token = config.VOCAB.IMG_TOKEN
         self.feat_token = config.VOCAB.FEAT_TOKEN
         self.box_token = config.VOCAB.BOX_TOKEN
-        self.ocr_token = config.VOCAB.OCR_TOKEN
-        self.ocr_det_token = config.VOCAB.OCR_DET_TOKEN
-        self.ocr_rec_token = config.VOCAB.OCR_REC_TOKEN
         self.question_token = config.VOCAB.QUESTION_TOKEN
         self.answer_token = config.VOCAB.ANSWER_TOKEN
 
@@ -630,8 +541,7 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
         min_freq = max(config.MIN_FREQ, 1)
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
-                    self.feat_token, self.box_token, self.ocr_token, self.ocr_det_token, self.ocr_rec_token, 
-                    self.question_token, self.answer_token]
+                    self.feat_token, self.box_token, self.question_token, self.answer_token]
         self.itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
@@ -658,9 +568,6 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
         self.img_idx = self.stoi[self.img_token]
         self.feat_idx = self.stoi[self.feat_token]
         self.box_idx = self.stoi[self.box_token]
-        self.ocr_idx = self.stoi[self.ocr_token]
-        self.ocr_det_idx = self.stoi[self.ocr_det_token]
-        self.ocr_rec_idx = self.stoi[self.ocr_rec_token]
         self.question_idx = self.stoi[self.question_token]
         self.answer_idx = self.stoi[self.answer_token]
 

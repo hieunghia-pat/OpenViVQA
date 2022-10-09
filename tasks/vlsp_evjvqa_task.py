@@ -31,16 +31,28 @@ class VlspEvjVqaTask(BaseTask):
     def load_feature_datasets(self, config):
         train_dataset = build_dataset(config.JSON_PATH.TRAIN, self.vocab, config.FEATURE_DATASET)
         dev_dataset = build_dataset(config.JSON_PATH.DEV, self.vocab, config.FEATURE_DATASET)
-        public_test_dataset = build_dataset(config.JSON_PATH.PUBLIC_TEST, self.vocab, config.FEATURE_DATASET)
-        private_test_dataset = build_dataset(config.JSON_PATH.PRIVATE_TEST, self.vocab, config.FEATURE_DATASET)
+        if config.JSON_PATH.PUBLIC_TEST is not None:
+            public_test_dataset = build_dataset(config.JSON_PATH.PUBLIC_TEST, self.vocab, config.FEATURE_DATASET)
+        else:
+            public_test_dataset = None
+        if config.JSON_PATH.PRIVATE_TEST is not None:
+            private_test_dataset = build_dataset(config.JSON_PATH.PRIVATE_TEST, self.vocab, config.FEATURE_DATASET)
+        else:
+            private_test_dataset = None
 
         return train_dataset, dev_dataset, public_test_dataset, private_test_dataset
 
     def load_dict_datasets(self, config):
         train_dataset = build_dataset(config.JSON_PATH.TRAIN, self.vocab, config.DICT_DATASET)
         dev_dataset = build_dataset(config.JSON_PATH.DEV, self.vocab, config.DICT_DATASET)
-        public_test_dataset = build_dataset(config.JSON_PATH.PUBLIC_TEST, self.vocab, config.DICT_DATASET)
-        private_test_dataset = build_dataset(config.JSON_PATH.PRIVATE_TEST, self.vocab, config.DICT_DATASET)
+        if config.JSON_PATH.PUBLIC_TEST is not None:
+            public_test_dataset = build_dataset(config.JSON_PATH.PUBLIC_TEST, self.vocab, config.DICT_DATASET)
+        else:
+            public_test_dataset = None
+        if config.JSON_PATH.PRIVATE_TEST is not None:
+            private_test_dataset = build_dataset(config.JSON_PATH.PRIVATE_TEST, self.vocab, config.DICT_DATASET)
+        else:
+            private_test_dataset = None
 
         return train_dataset, dev_dataset, public_test_dataset, private_test_dataset
 
@@ -89,19 +101,19 @@ class VlspEvjVqaTask(BaseTask):
         )
         self.dev_dict_dataloader = DataLoader(
             dataset=self.dev_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         )
         self.public_test_dict_dataloader = DataLoader(
             dataset=self.public_test_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         ) if self.public_test_dataset else None
         self.private_test_dict_dataloader = DataLoader(
             dataset=self.private_test_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         ) if self.private_test_dataset else None

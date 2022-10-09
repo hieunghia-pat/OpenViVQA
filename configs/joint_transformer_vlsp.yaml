@@ -3,7 +3,7 @@ TASK: VlspEvjVqaTask
 DATASET:
   FEATURE_DATASET:
     TYPE: MultilingualFeatureDataset
-    BATCH_SIZE: 15
+    BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
       FEATURES: features/EVJVQA/vinvl_vinvl

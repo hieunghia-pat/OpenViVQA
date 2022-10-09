@@ -49,8 +49,7 @@ class Decoder(Module):
         self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).bool())
         self.register_state('running_seq', torch.zeros((1,)).long())
 
-    def forward(self, input_features: Instances):
-        answer_tokens = input_features.answer_tokens
+    def forward(self, answer_tokens: torch.Tensor, encoder_features: torch.Tensor, encoder_attention_mask: torch.Tensor):
         b_s, seq_len = answer_tokens.shape
         answer_padding_masks = generate_padding_mask(answer_tokens, self.padding_idx).to(answer_tokens.device)
         answer_self_attention_masks = generate_sequential_mask(seq_len).to(answer_tokens.device)
@@ -65,9 +64,6 @@ class Decoder(Module):
         if self._is_stateful:
             self.running_seq.add_(1)
             seq = self.running_seq
-
-        encoder_features = input_features.encoder_features
-        encoder_attention_mask = input_features.encoder_attention_mask
 
         embedded_answers, _ = self.word_emb(answer_tokens)
         out = embedded_answers + self.pos_emb(seq)
@@ -106,8 +102,7 @@ class AdaptiveDecoder(Module):
         self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).byte())
         self.register_state('running_seq', torch.zeros((1,)).long())
 
-    def forward(self, input_features):
-        answer_tokens = input_features.answer_tokens
+    def forward(self, answer_tokens: torch.Tensor, encoder_features: torch.Tensor, encoder_attention_mask: torch.Tensor):
         b_s, seq_len = answer_tokens.shape
         answer_padding_masks = generate_padding_mask(answer_tokens, self.padding_idx).to(answer_tokens.device)
         answer_self_attention_masks = generate_sequential_mask(seq_len).to(answer_tokens.device)
@@ -122,9 +117,6 @@ class AdaptiveDecoder(Module):
         if self._is_stateful:
             self.running_seq.add_(1)
             seq = self.running_seq
-
-        encoder_features = input_features.encoder_features
-        encoder_attention_mask = input_features.encoder_attention_mask
 
         # get the language_signals
         _, language_signals = self.language_model(answer_tokens)

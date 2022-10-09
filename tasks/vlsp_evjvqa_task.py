@@ -89,19 +89,19 @@ class VlspEvjVqaTask(BaseTask):
         )
         self.dev_dict_dataloader = DataLoader(
             dataset=self.dev_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         )
         self.public_test_dict_dataloader = DataLoader(
             dataset=self.public_test_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         ) if self.public_test_dataset else None
         self.private_test_dict_dataloader = DataLoader(
             dataset=self.private_test_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         ) if self.private_test_dataset else None

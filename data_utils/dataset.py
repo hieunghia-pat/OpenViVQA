@@ -131,7 +131,7 @@ class MultilingualDictionaryDataset(DictionaryDataset):
             # find the appropriate image
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
-                    answer = [preprocess_sentence(ann["answer"], self.vocab.tokenizer)]
+                    answer = preprocess_sentence(ann["answer"], self.vocab.tokenizer)
                     annotation = {
                         "question_id": ann["id"],
                         # "type": ann["QA-type"],

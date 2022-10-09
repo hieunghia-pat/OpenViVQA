@@ -44,10 +44,14 @@ from models.unique_transformer import UniqueTransformer
 from models.m4c import M4C
 from data_utils.dataset import (
     DictionaryDataset,
+    RawQuestionDictionaryDataset,
+    RawQuestionMultilingualDictionaryDataset,
     ImageQuestionDictionaryDataset,
     MultilingualImageQuestionDictionaryDataset,
     ImageDataset,
     FeatureDataset,
+    RawQuestionFeatureDataset,
+    RawQuestionMultilingualFeatureDataset,
     ImageQuestionDataset,
     MultilingualImageQuestionDataset,
     FeatureClassificationDataset,

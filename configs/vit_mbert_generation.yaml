@@ -2,24 +2,20 @@ TASK: VlspEvjVqaTask
 
 DATASET:
   FEATURE_DATASET:
-    TYPE: MultilingualImageQuestionDataset
+    TYPE: RawQuestionMultilingualFeatureDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
       FEATURES: null
-      SCENE_TEXT: null
-      IMAGE: features/EVJVQA/images
-    SCENE_TEXT_THRESHOLD: 0.3
+      IMAGE: features/EVJVQA/vit
   DICT_DATASET:
-    TYPE: MultilingualImageQuestionDictionaryDataset
+    TYPE: RawQuestionMultilingualDictionaryDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
       FEATURES: null
-      SCENE_TEXT: null
-      IMAGE: features/EVJVQA/images
-    SCENE_TEXT_THRESHOLD: 0.3
-  MIN_FREQ: 1
+      IMAGE: features/EVJVQA/vit
+  MIN_FREQ: 5
   VOCAB:
     TYPE: VlspEvjVqaVocab
     TOKENIZER: null
@@ -29,7 +25,6 @@ DATASET:
     EOS_TOKEN: <eos>
     PAD_TOKEN: <pad>
     UNK_TOKEN: <unk>
-    USE_MAPPING: False
   JSON_PATH:
     TRAIN: features/EVJVQA/annotations/evjvqa_train.json
     DEV: features/EVJVQA/annotations/evjvqa_dev.json
@@ -38,7 +33,7 @@ DATASET:
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
-  LEARNING_RATE: 0.001
+  LEARNING_RATE: 1
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
   SCORE: CIDEr
@@ -51,10 +46,9 @@ MODEL:
   NAME: vit_mbert_generation
   DEVICE: cuda
   VISION_EMBEDDING:
-    ARCHITECTURE: ViTEmbedding
-    PRETRAINED_NAME: google/vit-base-patch16-224-in21k
+    ARCHITECTURE: FeatureEmbedding
     DEVICE: cuda
-    D_PRETRAINED_FEATURE: 768
+    D_FEATURE: 768
     D_MODEL: 512
     DROPOUT: .1
   TEXT_EMBEDDING:

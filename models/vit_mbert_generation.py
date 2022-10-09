@@ -27,16 +27,7 @@ class ViTmBERTGeneration(BaseTransformer):
         self.decoder = build_decoder(config.DECODER, vocab)
 
     def forward(self, inputs: Instances):
-        images = inputs.image
-        questions = inputs.question
-
-        vision_features, vision_padding_mask = self.vision_encoder(images)
-        text_features, text_padding_mask = self.text_embedding(questions)
-
-        fused_features = torch.cat([vision_features, text_features], dim=1)
-        fused_features = self.gelu(self.fusion(fused_features))
-        fused_features = self.dropout(fused_features)
-        fused_padding_mask = torch.cat([vision_padding_mask, text_padding_mask], dim=-1)
+        fused_features, fused_padding_mask = self.encoder_forward(inputs)
         
         answer_tokens = inputs.answer_tokens
         out = self.decoder(
@@ -48,10 +39,10 @@ class ViTmBERTGeneration(BaseTransformer):
         return F.log_softmax(out, dim=-1)
 
     def encoder_forward(self, inputs: Instances):
-        images = inputs.image
+        features = inputs.grid_features
         questions = inputs.question
 
-        vision_features, vision_padding_mask = self.vision_encoder(images)
+        vision_features, vision_padding_mask = self.vision_encoder(features)
         text_features, text_padding_mask = self.text_embedding(questions)
 
         fused_features = torch.cat([vision_features, text_features], dim=1)

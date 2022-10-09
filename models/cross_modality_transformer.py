@@ -33,11 +33,11 @@ class CrossModalityTransformer(BaseTransformer):
         encoder_features, encoder_padding_mask = self.encoder_forward(input_features)
 
         answer_tokens = input_features.answer_tokens
-        output = self.decoder(Instances(
+        output = self.decoder(
             answer_tokens=answer_tokens,
             encoder_features=encoder_features,
             encoder_attention_mask=encoder_padding_mask
-        ))
+        )
 
         return output
 
@@ -73,13 +73,13 @@ class CrossModalityTransformer(BaseTransformer):
         text_features, (text_padding_mask, _) = self.text_embedding(question_tokens)
 
         # Cross-Modality attention
-        vision_features, language_features = self.encoder(Instances(
+        vision_features, language_features = self.encoder(
             vision_features=vision_features,
             vision_padding_mask=vision_padding_mask,
             boxes=input_features.boxes,
             language_features=text_features,
             language_padding_mask=text_padding_mask
-        ))
+        )
 
         # Multimodal fusion
         encoder_features = self.fusion(

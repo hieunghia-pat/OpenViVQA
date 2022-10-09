@@ -60,10 +60,10 @@ class BaseUniqueTransformer(Module):
             it = prev_output
 
         self.encoder_features, self.encoder_padding_mask = self.append_answer(self.encoder_features, self.encoder_padding_mask, it)
-        out = self.encoder(Instances(
+        out = self.encoder(
             features=self.encoder_features,
             features_attention_mask=self.encoder_padding_mask
-        ))
+        )
 
         return out
 

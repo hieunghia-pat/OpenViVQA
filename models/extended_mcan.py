@@ -35,11 +35,11 @@ class ExtendedMCAN(BaseTransformer):
         encoder_features, encoder_padding_mask = self.encoder_forward(input_features)
 
         answer_tokens = input_features.answer_tokens
-        output = self.decoder(Instances(
+        output = self.decoder(
             answer_tokens=answer_tokens,
             encoder_features=encoder_features,
             encoder_attention_mask=encoder_padding_mask
-        ))
+        )
 
         return output
 
@@ -75,18 +75,18 @@ class ExtendedMCAN(BaseTransformer):
         text_features, (text_padding_mask, _) = self.text_embedding(question_tokens)
 
         # SA
-        text_features = self.self_encoder(Instances(
+        text_features = self.self_encoder(
             features=text_features,
             features_padding_mask=text_padding_mask
-        ))
+        )
 
         # GSA
-        vision_features = self.guided_encoder(Instances(
+        vision_features = self.guided_encoder(
             vision_features=vision_features,
             vision_padding_mask=vision_padding_mask,
             language_features=text_features,
             language_padding_mask=text_padding_mask
-        ))
+        )
 
         # Multimodal fusion
         encoder_features = torch.cat([vision_features, text_features], dim=1)
@@ -118,11 +118,11 @@ class ExtendedMCANUsingRegion(BaseTransformer):
         encoder_features, encoder_padding_mask = self.encoder_forward(input_features)
 
         answer_tokens = input_features.answer_tokens
-        output = self.decoder(Instances(
+        output = self.decoder(
             answer_tokens=answer_tokens,
             encoder_features=encoder_features,
             encoder_attention_mask=encoder_padding_mask
-        ))
+        )
 
         return output
 
@@ -134,18 +134,18 @@ class ExtendedMCANUsingRegion(BaseTransformer):
         text_features, (text_padding_mask, _) = self.text_embedding(question_tokens)
 
         # SA
-        text_features = self.self_encoder(Instances(
+        text_features = self.self_encoder(
             features=text_features,
             features_padding_mask=text_padding_mask
-        ))
+        )
 
         # GSA
-        vision_features = self.guided_encoder(Instances(
+        vision_features = self.guided_encoder(
             vision_features=vision_features,
             vision_padding_mask=vision_padding_mask,
             language_features=text_features,
             language_padding_mask=text_padding_mask
-        ))
+        )
 
         # Multimodal fusion
         encoder_features = torch.cat([vision_features, text_features], dim=1)

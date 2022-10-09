@@ -56,6 +56,7 @@ MODEL:
   ARCHITECTURE: M4C
   NAME: m4c_x152++_faster_rcnn
   DEVICE: cuda
+  D_MODEL: 512
   REGION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
     DEVICE: cuda
@@ -86,13 +87,29 @@ MODEL:
     D_FEATURE: 256
     D_MODEL: 512
     DROPOUT: .1
-  TEXT_EMBEDDING:
-    ARCHITECTURE: AlbertEmbedding
+  OCR_TEXT_EMBEDDING:
+    ARCHITECTURE: OcrBertEmbedding
     PRETRAINED_NAME: vinai/phobert-base
     DEVICE: cuda
     D_PRETRAINED_FEATURE: 768
     D_MODEL: 512
     DROPOUT: .1
+  QUESTION_EMBEDDING:
+    ARCHITECTURE: UsualEmbedding
+    DEVICE: cuda
+    D_EMBEDDING: 300
+    D_MODEL: 512
+    DROPOUT: .1
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
+  ANSWER_EMBEDDING:
+    ARCHITECTURE: DynamicEmbedding
+    DEVICE: cuda
+    D_EMBEDDING: 300
+    D_MODEL: 512
+    DROPOUT: .1
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
   ENCODER:
     ARCHITECTURE: Encoder
     D_MODEL: 512

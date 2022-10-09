@@ -73,11 +73,11 @@ class UniqueTransformer(BaseUniqueTransformer):
         answer_tokens = input_features.answer_tokens
         joint_features, (joint_padding_mask, joint_attention_mask) = self.append_answer(joint_features, (joint_padding_mask, joint_attention_mask), answer_tokens)
 
-        out = self.encoder(Instances(
+        out = self.encoder(
             features=joint_features,
             features_padding_mask=joint_padding_mask,
             features_attention_mask=joint_attention_mask
-        ))
+        )
         out = out[:, joint_features_len:]
         out = self.fc(out)
 

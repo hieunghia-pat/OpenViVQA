@@ -79,14 +79,14 @@ class Vocab(object):
                     if len(answer) + 2 > self.max_answer_length:
                         self.max_answer_length = len(answer) + 2
 
-    def encode_question(self, question: str) -> torch.Tensor:
+    def encode_question(self, question: List[str]) -> torch.Tensor:
         """ Turn a question into a vector of indices and a question length """
         vec = torch.ones(self.max_question_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + question + [self.eos_token]):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
         return vec
 
-    def encode_answer(self, answer: str) -> torch.Tensor:
+    def encode_answer(self, answer: List[str]) -> torch.Tensor:
         """ Turn a answer into a vector of indices and a question length """
         vec = torch.ones(self.max_answer_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + answer + [self.eos_token]):
@@ -493,18 +493,14 @@ class OcrVocab(MultiModalVocab):
     def encode_answer(self, answer: List[str], ocr_id_of: Dict[str, int]) -> torch.Tensor:
         """ Turn a answer into a vector of indices and a question length """
         vec = torch.ones(self.max_answer_length).long() * self.padding_idx
-        print(answer)
-        print(ocr_id_of)
         for i, token in enumerate([self.bos_token] + answer + [self.eos_token]):
             if token in ocr_id_of:
                 id = ocr_id_of[token]
-                print(token)
             elif token in self.stoi:
                 id = self.stoi[token]
             else:
                 id = self.unk_idx
             vec[i] = id
-        print("+"*10)
         return vec
 
     def decode_answer(self, answer_vecs: torch.Tensor, ocr_token_of: Dict[int, str], join_words=True) -> List[str]:

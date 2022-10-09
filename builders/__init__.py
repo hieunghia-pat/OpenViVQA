@@ -25,10 +25,12 @@ from models.modules.vision_embeddings import (
 )
 from models.modules.text_embeddings import (
     UsualEmbedding,
+    OcrUsualEmbedding,
     LSTMTextEmbedding,
+    OcrLSTMEmbedding,
     BertEmbedding,
-    T5Embedding,
-    AlbertEmbedding
+    OcrBertEmbedding,
+    T5Embedding
 )
 from models.vit_mbert_classification import ViTmBERTClassification
 from models.vit_mbert_generation import ViTmBERTGeneration

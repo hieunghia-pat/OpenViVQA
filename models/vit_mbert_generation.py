@@ -39,11 +39,11 @@ class ViTmBERTGeneration(BaseTransformer):
         fused_padding_mask = torch.cat([vision_padding_mask, text_padding_mask], dim=-1)
         
         answer_tokens = inputs.answer_tokens
-        out = self.decoder(Instances(
+        out = self.decoder(
             answer_tokens=answer_tokens,
             encoder_features=fused_features,
             encoder_attention_mask=fused_padding_mask
-        ))
+        )
 
         return F.log_softmax(out, dim=-1)
 

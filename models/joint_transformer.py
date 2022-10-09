@@ -29,11 +29,11 @@ class JointTransformer(BaseTransformer):
         encoder_features, encoder_padding_mask = self.encoder_forward(input_features)
 
         answer_tokens = input_features.answer_tokens
-        output = self.decoder(Instances(
+        output = self.decoder(
             answer_tokens=answer_tokens,
             encoder_features=encoder_features,
             encoder_attention_mask=encoder_padding_mask
-        ))
+        )
 
         return output
 
@@ -75,9 +75,9 @@ class JointTransformer(BaseTransformer):
         joint_padding_mask = torch.cat([vision_padding_mask, text_padding_mask], dim=-1)
 
         # Joint-Modality attention
-        encoder_features = self.encoder(Instances(
+        encoder_features = self.encoder(
             features=joint_features,
             features_padding_mask=joint_padding_mask
-        ))
+        )
 
         return encoder_features, joint_padding_mask

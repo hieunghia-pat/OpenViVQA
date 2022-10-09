@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
@@ -117,10 +118,7 @@ class Encoder(nn.Module):
         self.d_model = config.D_MODEL
         self.layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
 
-    def forward(self, input_features: Instances):
-        features = input_features.features
-        padding_mask = input_features.features_padding_mask
-        
+    def forward(self, features: torch.Tensor, padding_mask: torch.Tensor):
         out = self.layer_norm(features) + self.pos_embedding(features)
         for layer in self.layers:
             out = layer(queries=out, keys=out, values=out, padding_mask=padding_mask, attention_mask=padding_mask)
@@ -132,11 +130,7 @@ class MultiModalEncoder(Encoder):
     def __init__(self, config) -> None:
         super().__init__(config)
 
-    def forward(self, input_features: Instances):
-        features = input_features.features
-        padding_mask = input_features.features_padding_mask
-        attention_mask = input_features.features_attention_mask
-        
+    def forward(self, features: torch.Tensor, padding_mask: torch.Tensor, attention_mask: torch.Tensor):
         out = self.layer_norm(features) + self.pos_embedding(features)
         for layer in self.layers:
             out = layer(queries=out, keys=out, values=out, padding_mask=padding_mask, attention_mask=attention_mask)
@@ -154,11 +148,7 @@ class GeometricEncoder(nn.Module):
         self.d_model = config.D_MODEL
         self.layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
 
-    def forward(self, input_features: Instances):
-        features = input_features.features
-        boxes = input_features.boxes
-        padding_mask = input_features.features_padding_mask
-        
+    def forward(self, features: torch.Tensor, boxes: torch.Tensor, padding_mask: torch.Tensor):
         out = self.layer_norm(features) + self.pos_embedding(features)
         for layer in self.layers:
             out = layer(queries=out, keys=out, values=out, boxes=boxes, padding_mask=padding_mask, attention_mask=padding_mask)
@@ -180,14 +170,8 @@ class GuidedAttentionEncoder(nn.Module):
 
         self.guided_attn_layers = nn.ModuleList([GuidedEncoderLayer(config.GUIDED_ATTENTION) for _ in range(config.LAYERS)])
 
-    def forward(self, input_features: Instances):
-        vision_features = input_features.vision_features
-        boxes = input_features.boxes
-        vision_padding_mask = input_features.vision_padding_mask
-
-        language_features = input_features.language_features
-        language_padding_mask = input_features.language_padding_mask
-
+    def forward(self, vision_features: torch.Tensor, boxes: torch.Tensor, vision_padding_mask: torch.Tensor,
+                language_features: torch.Tensor, language_padding_mask: torch.Tensor):
         out = self.layer_norm(vision_features) + self.pos_embedding(vision_features)
         for guided_attn_layer in self.guided_attn_layers:
             out = guided_attn_layer(
@@ -224,14 +208,8 @@ class CoAttentionEncoder(nn.Module):
         self.vision_self_attn_layers = nn.ModuleList([EncoderLayer(config.VISION_SELF_ATTENTION) for _ in range(config.LAYERS)])
         self.language_self_attn_layers = nn.ModuleList([EncoderLayer(config.LANGUAGE_SELF_ATTENTION) for _ in range(config.LAYERS)])
 
-    def forward(self, input_features):
-        vision_features = input_features.vision_features
-        boxes = input_features.boxes
-        vision_padding_mask = input_features.vision_padding_mask
-
-        language_features = input_features.language_features
-        language_padding_mask = input_features.language_padding_mask
-
+    def forward(self, vision_features: torch.Tensor, boxes: torch.Tensor, vision_padding_mask: torch.Tensor,
+                language_features: torch.Tensor, language_padding_mask: torch.Tensor):
         vision_features = self.vision_layer_norm(vision_features) + self.pos_embedding(vision_features)
         language_features = self.language_layer_norm(language_features) + self.pos_embedding(language_features)
         for layers in zip(self.vision_language_attn_layers, 
@@ -289,14 +267,8 @@ class CrossModalityEncoder(nn.Module):
         self.d_model = config.D_MODEL
         self.layers = nn.ModuleList([CrossModalityEncoderLayer(config) for _ in range(config.LAYERS)])
 
-    def forward(self, input_features: Instances):
-        vision_features = input_features.vision_features
-        boxes = input_features.boxes
-        vision_padding_mask = input_features.vision_padding_mask
-
-        language_features = input_features.language_features
-        language_padding_mask = input_features.language_padding_mask
-
+    def forward(self, vision_features: torch.Tensor, boxes: torch.Tensor, vision_padding_mask: torch.Tensor,
+                language_features: torch.Tensor, language_padding_mask: torch.Tensor):
         vision_features = self.vision_layer_norm(vision_features) + self.pos_embedding(vision_features)
         language_features = self.language_layer_norm(language_features) + self.pos_embedding(language_features)
         for layer in self.layers:

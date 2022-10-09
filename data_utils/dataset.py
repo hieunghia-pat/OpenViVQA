@@ -97,7 +97,7 @@ class DictionaryDataset(BaseDataset):
 @META_DATASET.register()
 class RawQuestionDictionaryDataset(BaseDataset):
     def __init__(self, json_path: str, vocab, config) -> None:
-        super().__init__(self, json_path, vocab)
+        super().__init__(json_path, vocab, config)
 
     def load_annotations(self, json_data: Dict) -> List[Dict]:
         annotations = []
@@ -142,7 +142,7 @@ class RawQuestionDictionaryDataset(BaseDataset):
 @META_DATASET.register()
 class RawQuestionMultilingualDictionaryDataset(BaseDataset):
     def __init__(self, json_path: str, vocab, config) -> None:
-        super().__init__(self, json_path, vocab)
+        super().__init__(json_path, vocab, config)
 
     def load_annotations(self, json_data: Dict) -> List[Dict]:
         annotations = []

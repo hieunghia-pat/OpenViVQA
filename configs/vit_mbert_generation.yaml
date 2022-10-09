@@ -6,15 +6,15 @@ DATASET:
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: null
-      IMAGE: features/EVJVQA/vit
+      FEATURES: features/EVJVQA/vit
+      IMAGE: null
   DICT_DATASET:
     TYPE: RawQuestionMultilingualDictionaryDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: null
-      IMAGE: features/EVJVQA/vit
+      FEATURES: features/EVJVQA/vit
+      IMAGE: null
   MIN_FREQ: 5
   VOCAB:
     TYPE: VlspEvjVqaVocab

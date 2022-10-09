@@ -55,18 +55,15 @@ class DictionaryDataset(BaseDataset):
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
-                    answers = [preprocess_sentence(answer, self.vocab.tokenizer) for answer in ann["answers"]]
-                    answers = [" ".join(answer) for answer in answers]
+                    answer = preprocess_sentence(ann["answer"], self.vocab.tokenizer)
                     annotation = {
                         "question_id": ann["id"],
-                        "type": ann["QA-type"],
+                        # "type": ann["QA-type"],
                         "question": question,
-                        "answers": answers,
+                        "answer": answer,
                         "image_id": ann["image_id"],
                         "filename": image["filename"]
                     }
-                    break
-
             annotations.append(annotation)
 
         return annotations
@@ -78,7 +75,7 @@ class DictionaryDataset(BaseDataset):
         features = self.load_features(image_id)
         question = item["question"]
         question_tokens = self.vocab.encode_question(question)
-        answers = item["answers"]
+        answers = item["answer"]
 
         return Instances(
             question_id=item["question_id"],
@@ -134,18 +131,15 @@ class MultilingualDictionaryDataset(DictionaryDataset):
             # find the appropriate image
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
-                    answers = [preprocess_sentence(answer, self.vocab.tokenizer) for answer in ann["answers"]]
-                    answers = [" ".join(answer) for answer in answers]
+                    answer = [preprocess_sentence(ann["answer"], self.vocab.tokenizer)]
                     annotation = {
                         "question_id": ann["id"],
-                        "type": ann["QA-type"],
+                        # "type": ann["QA-type"],
                         "question": ann["question"],
-                        "answers": answers,
+                        "answer": answer,
                         "image_id": ann["image_id"],
                         "filename": image["filename"]
                     }
-                    break
-
             annotations.append(annotation)
 
         return annotations    
@@ -163,18 +157,15 @@ class ImageQuestionDictionaryDataset(DictionaryDataset):
             # find the appropriate image
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
-                    answers = [preprocess_sentence(answer, self.vocab.tokenizer) for answer in ann["answers"]]
-                    answers = [" ".join(answer) for answer in answers]
+                    answer = preprocess_sentence(ann["answer"], self.vocab.tokenizer)
                     annotation = {
                         "question_id": ann["id"],
-                        "type": ann["QA-type"],
+                        # "type": ann["QA-type"],
                         "question": ann["question"],
-                        "answers": answers,
+                        "answer": answers,
                         "image_id": ann["image_id"],
                         "filename": image["filename"]
                     }
-                    break
-
             annotations.append(annotation)
 
         return annotations
@@ -186,7 +177,7 @@ class ImageQuestionDictionaryDataset(DictionaryDataset):
         
         image = Image.open(os.path.join(self.image_path, filename)).convert("RGB")
         question = item["question"]
-        answers = item["answers"]
+        answers = item["answer"]
 
         return Instances(
             question_id=item["question_id"],
@@ -211,22 +202,17 @@ class MultilingualImageQuestionDictionaryDataset(ImageQuestionDictionaryDataset)
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     question = ann["question"]
-                    answers = []
-                    for answer in ann["answers"]:
-                        if not is_japanese_sentence(question):
-                            answer = " ".join(preprocess_sentence(answer, self.vocab.tokenizer))
-                        else:
-                            answer = " ".join(list(answer))
-                        answers.append(answer)
-                    annotations.append({
-                        "question_id": ann["id"],
-                        "question": ann["question"],
-                        "answers": answers,
-                        "image_id": ann["image_id"],
-                        "filename": image["filename"]
-                    })
-                    break
-
+                    if not is_japanese_sentence(question):
+                        answer = " ".join(preprocess_sentence(answer, self.vocab.tokenizer))
+                    else:
+                        answer = ann["answer"]
+                annotations.append({
+                    "question_id": ann["id"],
+                    "question": ann["question"],
+                    "answer": answer,
+                    "image_id": ann["image_id"],
+                    "filename": image["filename"]
+                })
         return annotations
 
 @META_DATASET.register()
@@ -244,17 +230,13 @@ class ImageDataset(BaseDataset):
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
-                    answers = [preprocess_sentence(answer, self.vocab.tokenizer) for answer in ann["answers"]]
-                    answers = [" ".join(answer) for answer in answers]
-                    for answer in answers:
-                        annotations.append({
-                            "question": question,
-                            "answer": answer,
-                            "image_id": ann["image_id"],
-                            "filename": image["filename"]
-                        })
-                    break
-
+                    answer = preprocess_sentence(ann["answer"], self.vocab.tokenizer)
+                    annotations.append({
+                        "question": question,
+                        "answer": answer,
+                        "image_id": ann["image_id"],
+                        "filename": image["filename"]
+                    })
         return annotations
 
     def __getitem__(self, idx: int):
@@ -293,18 +275,15 @@ class FeatureDataset(BaseDataset):
             # find the appropriate image
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
-                    for answer in ann["answers"]:
-                        question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
-                        answer = preprocess_sentence(answer, self.vocab.tokenizer)
-                        annotation = {
-                            "question": question,
-                            "answer": answer,
-                            "image_id": ann["image_id"],
-                            "filename": image["filename"]
-                        }
-                        annotations.append(annotation)
-                    break
-
+                    question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
+                    answer = preprocess_sentence(ann["answer"], self.vocab.tokenizer)
+                    annotation = {
+                        "question": question,
+                        "answer": answer,
+                        "image_id": ann["image_id"],
+                        "filename": image["filename"]
+                    }
+                    annotations.append(annotation)
         return annotations
 
     def __getitem__(self, idx: int):
@@ -400,21 +379,20 @@ class MultilingualFeatureDataset(FeatureDataset):
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     question = ann["question"]
-                    for answer in ann["answers"]:
-                        if is_japanese_sentence(question):
-                            question = list(question)
-                            answer = list(answer)
-                        else:
-                            question = preprocess_sentence(question, self.vocab.tokenizer)
-                            answer = preprocess_sentence(answer, self.vocab.tokenizer)
-                        annotation = {
-                            "question": question,
-                            "answer": answer,
-                            "image_id": ann["image_id"],
-                            "filename": image["filename"]
-                        }
-                        annotations.append(annotation)
-                    break
+                    answer = ann["answer"]
+                    if is_japanese_sentence(question):
+                        question = list(question)
+                        answer = list(answer)
+                    else:
+                        question = preprocess_sentence(question, self.vocab.tokenizer)
+                        answer = preprocess_sentence(answer, self.vocab.tokenizer)
+                    annotation = {
+                        "question": question,
+                        "answer": answer,
+                        "image_id": ann["image_id"],
+                        "filename": image["filename"]
+                    }
+                    annotations.append(annotation)
 
         return annotations
 
@@ -431,16 +409,14 @@ class ImageQuestionDataset(FeatureDataset):
             # find the appropriate image
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
-                    for answer in ann["answers"]:
-                        answer = preprocess_sentence(answer, self.vocab.tokenizer)
-                        annotation = {
-                            "question": ann["question"],
-                            "answer": answer,
-                            "image_id": ann["image_id"],
-                            "filename": image["filename"]
-                        }
-                        annotations.append(annotation)
-                    break
+                  answer = preprocess_sentence(ann["answer"], self.vocab.tokenizer)
+                  annotation = {
+                      "question": ann["question"],
+                      "answer": answer,
+                      "image_id": ann["image_id"],
+                      "filename": image["filename"]
+                  }
+                  annotations.append(annotation)
 
         return annotations
 
@@ -479,20 +455,17 @@ class MultilingualImageQuestionDataset(ImageQuestionDataset):
             # find the appropriate image
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
-                    for answer in ann["answers"]:
-                        if not is_japanese_sentence(answer):
-                            answer = preprocess_sentence(answer, self.vocab.tokenizer)
-                        else:
-                            answer = list(answer)
-                        annotation = {
-                            "question": ann["question"],
-                            "answer": answer,
-                            "image_id": ann["image_id"],
-                            "filename": image["filename"]
-                        }
-                        annotations.append(annotation)
-                    break
-
+                  if not is_japanese_sentence(ann["answer"]):
+                      answer = preprocess_sentence(ann["answer"], self.vocab.tokenizer)
+                  else:
+                      answer = ann["answer"]
+                  annotation = {
+                      "question": ann["question"],
+                      "answer": answer,
+                      "image_id": ann["image_id"],
+                      "filename": image["filename"]
+                  }
+                  annotations.append(annotation)
         return annotations
 
 @META_DATASET.register()
@@ -517,19 +490,15 @@ class FeatureClassificationDataset(BaseDataset):
             # find the appropriate image
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
-                    for answer in ann["answers"]:
-                        question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
-                        answer = preprocess_sentence(answer, self.vocab.tokenizer)
-                        answer = "_".join(answer)
-                        annotation = {
-                            "question": question,
-                            "answer": answer,
-                            "image_id": ann["image_id"],
-                            "filename": image["filename"]
-                        }
-                        annotations.append(annotation)
-                    break
-
+                  question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
+                  answer = preprocess_sentence(ann["answer"], self.vocab.tokenizer)
+                  annotation = {
+                      "question": question,
+                      "answer": answer,
+                      "image_id": ann["image_id"],
+                      "filename": image["filename"]
+                  }
+                  annotations.append(annotation)
         return annotations
 
     def __getitem__(self, idx: int):
@@ -582,17 +551,16 @@ class MultilingualImageQuestionClassificationDataset(ImageQuestionClassification
             # find the appropriate image
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
-                    for answer in ann["answers"]:
-                        if not is_japanese_sentence(answer):
-                            answer = preprocess_sentence(answer, self.vocab.tokenizer)
-                            answer = "_".join(answer)
-                        annotation = {
-                            "question": ann["question"],
-                            "answer": answer,
-                            "image_id": ann["image_id"],
-                            "filename": image["filename"]
-                        }
-                        annotations.append(annotation)
-                    break
+                  answer=ann["answer"]
+                  if not is_japanese_sentence(ann["answer"]):
+                      answer = preprocess_sentence(ann["answer"], self.vocab.tokenizer)
+                  annotation = {
+                      "question": ann["question"],
+                      "answer": answer,
+                      "image_id": ann["image_id"],
+                      "filename": image["filename"]
+                  }
+                  annotations.append(annotation)
+ 
 
         return annotations

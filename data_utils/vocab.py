@@ -403,20 +403,20 @@ class MultilingualMultiModalVocab(MultiModalVocab):
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
-                for answer in ann["answers"]:
-                    question = ann["question"]
-                    if is_japanese_sentence(question):
-                        question = list(question)
-                        answer = list(answer)
-                    else: # This is Vietnamese or English annotation
-                        question = preprocess_sentence(ann["question"], self.tokenizer)
-                        answer = preprocess_sentence(answer, self.tokenizer)
-                    self.freqs.update(question)
-                    self.freqs.update(answer)
-                    if len(question) + 2 > self.max_question_length:
-                            self.max_question_length = len(question) + 2
-                    if len(answer) + 2 > self.max_answer_length:
-                        self.max_answer_length = len(answer) + 2
+                question = ann["question"]
+                answer = ann["answer"]
+                if is_japanese_sentence(question):
+                    question = list(question)
+                    answer = list(answer)
+                else: # This is Vietnamese or English annotation
+                    question = preprocess_sentence(ann["question"], self.tokenizer)
+                    answer = preprocess_sentence(answer, self.tokenizer)
+                self.freqs.update(question)
+                self.freqs.update(answer)
+                if len(question) + 2 > self.max_question_length:
+                        self.max_question_length = len(question) + 2
+                if len(answer) + 2 > self.max_answer_length:
+                    self.max_answer_length = len(answer) + 2
 
 @META_VOCAB.register()
 class OcrVocab(MultiModalVocab):
@@ -529,9 +529,6 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
         self.img_token = config.VOCAB.IMG_TOKEN
         self.feat_token = config.VOCAB.FEAT_TOKEN
         self.box_token = config.VOCAB.BOX_TOKEN
-        self.ocr_token = config.VOCAB.OCR_TOKEN
-        self.ocr_det_token = config.VOCAB.OCR_DET_TOKEN
-        self.ocr_rec_token = config.VOCAB.OCR_REC_TOKEN
         self.question_token = config.VOCAB.QUESTION_TOKEN
         self.answer_token = config.VOCAB.ANSWER_TOKEN
 
@@ -544,8 +541,7 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
         min_freq = max(config.MIN_FREQ, 1)
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
-                    self.feat_token, self.box_token, self.ocr_token, self.ocr_det_token, self.ocr_rec_token, 
-                    self.question_token, self.answer_token]
+                    self.feat_token, self.box_token, self.question_token, self.answer_token]
         self.itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
@@ -572,9 +568,6 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
         self.img_idx = self.stoi[self.img_token]
         self.feat_idx = self.stoi[self.feat_token]
         self.box_idx = self.stoi[self.box_token]
-        self.ocr_idx = self.stoi[self.ocr_token]
-        self.ocr_det_idx = self.stoi[self.ocr_det_token]
-        self.ocr_rec_idx = self.stoi[self.ocr_rec_token]
         self.question_idx = self.stoi[self.question_token]
         self.answer_idx = self.stoi[self.answer_token]
 

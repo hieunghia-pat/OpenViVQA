@@ -256,10 +256,11 @@ class VlspEvjVqaTask(BaseTask):
             patience = 0
 
         while True:
-            if not use_rl:
-                self.train()
-            else:
-                self.train_scst()
+            # if not use_rl:
+            #     self.train()
+            # else:
+            #     self.train_scst()
+            self.train()
 
             self.evaluate_loss(self.dev_dataloader)
 

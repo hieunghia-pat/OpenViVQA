@@ -32,7 +32,8 @@ class Vocab(object):
         min_freq = max(config.MIN_FREQ, 1)
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
-        self.itos = specials
+        specials1=specials.copy()
+        self.itos = specials1
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         for tok in specials:
@@ -105,6 +106,7 @@ class Vocab(object):
         questions = []
         for vec in question_vecs:
             question = " ".join([self.itos[idx] for idx in vec.tolist() if self.itos[idx] not in self.specials])
+            #question = " ".join([self.itos[idx] for idx in vec.tolist()])
             if join_words:
                 questions.append(question)
             else:
@@ -119,6 +121,8 @@ class Vocab(object):
         answers = []
         for vec in answer_vecs:
             answer = " ".join([self.itos[idx] for idx in vec.tolist() if self.itos[idx] not in self.specials])
+            #answer = " ".join([self.itos[idx] for idx in vec.tolist()])
+
             if join_words:
                 answers.append(answer)
             else:
@@ -547,7 +551,8 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
                     self.feat_token, self.box_token, self.question_token, self.answer_token]
-        self.itos = specials
+        
+        self.itos = specials.copy()
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         for tok in specials:

@@ -9,6 +9,7 @@ from .base_task import BaseTask
 from builders.task_builder import META_TASK
 from builders.dataset_builder import build_dataset
 import evaluation
+from data_utils import vocab
 from evaluation import Cider
 
 import os
@@ -164,9 +165,11 @@ class VlspEvjVqaTask(BaseTask):
                 items = items.to(self.device)
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
-
+  
                 answers_gt = items.answer
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
+                #print('\n',len(answers_gt),"gt: ",answers_gt)
+                #print(len(answers_gen),"gen: ",answers_gen)
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]

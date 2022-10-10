@@ -110,8 +110,6 @@ class Vocab(object):
         '''
             answer_vecs: (bs, max_length)
         '''
-        print(self.specials)
-        raise
         answers = []
         for vec in answer_vecs:
             answer = " ".join([self.itos[idx] for idx in vec.tolist() if self.itos[idx] not in self.specials])

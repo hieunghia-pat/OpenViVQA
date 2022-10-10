@@ -32,7 +32,7 @@ class Vocab(object):
         min_freq = max(config.MIN_FREQ, 1)
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
-        self.itos = specials
+        itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         for tok in specials:
@@ -45,18 +45,17 @@ class Vocab(object):
         for word, freq in words_and_frequencies:
             if freq < min_freq:
                 break
-            self.itos.append(word)
+            itos.append(word)
 
-        self.stoi = defaultdict()
-        # stoi is simply a reverse dict for itos
-        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
+        self.itos = {i: tok for i, tok in enumerate(itos)}
+        self.stoi = {tok: i for i, tok in enumerate(itos)}
+
+        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
         self.eos_idx = self.stoi[self.eos_token]
         self.unk_idx = self.stoi[self.unk_token]
-
-        self.specials = specials
 
         self.word_embeddings = None
         if config.VOCAB.WORD_EMBEDDING is not None:
@@ -226,7 +225,7 @@ class VlspEvjVqaVocab(MultilingualVocab):
         min_freq = max(config.MIN_FREQ, 1)
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
-        self.itos = specials
+        itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         for tok in specials:
@@ -239,18 +238,17 @@ class VlspEvjVqaVocab(MultilingualVocab):
         for word, freq in words_and_frequencies:
             if freq < min_freq:
                 break
-            self.itos.append(word)
+            itos.append(word)
 
-        self.stoi = defaultdict()
-        # stoi is simply a reverse dict for itos
-        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
+        self.itos = {i: tok for i, tok in enumerate(itos)}
+        self.stoi = {tok: i for i, tok in enumerate(itos)}
+
+        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
         self.eos_idx = self.stoi[self.eos_token]
         self.unk_idx = self.stoi[self.unk_token]
-
-        self.specials = specials
 
         self.word_embeddings = None
         if config.VOCAB.WORD_EMBEDDING is not None:
@@ -356,7 +354,7 @@ class MultiModalVocab(Vocab):
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
                     self.feat_token, self.box_token, self.question_token, self.answer_token]
-        self.itos = specials
+        itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         for tok in specials:
@@ -369,11 +367,13 @@ class MultiModalVocab(Vocab):
         for word, freq in words_and_frequencies:
             if freq < min_freq:
                 break
-            self.itos.append(word)
+            itos.append(word)
 
-        self.stoi = defaultdict()
-        # stoi is simply a reverse dict for itos
-        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
+        self.itos = {i: tok for i, tok in enumerate(itos)}
+        self.stoi = {tok: i for i, tok in enumerate(itos)}
+
+        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
+                    self.feat_token, self.box_token, self.question_token, self.answer_token]
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
@@ -384,8 +384,6 @@ class MultiModalVocab(Vocab):
         self.box_idx = self.stoi[self.box_token]
         self.question_idx = self.stoi[self.question_token]
         self.answer_idx = self.stoi[self.answer_token]
-
-        self.specials = specials
 
         self.word_embeddings = None
         if config.VOCAB.WORD_EMBEDDING is not None:
@@ -419,7 +417,7 @@ class MultilingualMultiModalVocab(MultiModalVocab):
                     self.max_answer_length = len(answer) + 2
 
 @META_VOCAB.register()
-class OcrVocab(MultiModalVocab):
+class OcrVocab(Vocab):
     '''
         This class is designed especially for VQA with reading comprehension
     '''
@@ -452,7 +450,7 @@ class OcrVocab(MultiModalVocab):
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
                     self.feat_token, self.box_token, self.ocr_token, self.ocr_det_token, self.ocr_rec_token, 
                     self.question_token, self.answer_token]
-        self.itos = specials
+        itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         for tok in specials:
@@ -465,11 +463,14 @@ class OcrVocab(MultiModalVocab):
         for word, freq in words_and_frequencies:
             if freq < min_freq:
                 break
-            self.itos.append(word)
+            itos.append(word)
 
-        self.stoi = defaultdict()
-        # stoi is simply a reverse dict for itos
-        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
+        self.itos = {i: tok for i, tok in enumerate(itos)}
+        self.stoi = {tok: i for i, tok in enumerate(itos)}
+
+        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
+                    self.feat_token, self.box_token, self.ocr_token, self.ocr_det_token, self.ocr_rec_token, 
+                    self.question_token, self.answer_token]
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
@@ -483,8 +484,6 @@ class OcrVocab(MultiModalVocab):
         self.ocr_rec_idx = self.stoi[self.ocr_rec_token]
         self.question_idx = self.stoi[self.question_token]
         self.answer_idx = self.stoi[self.answer_token]
-
-        self.specials = specials
 
         self.word_embeddings = None
         if config.VOCAB.WORD_EMBEDDING is not None:
@@ -542,7 +541,7 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
                     self.feat_token, self.box_token, self.question_token, self.answer_token]
-        self.itos = specials
+        itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         for tok in specials:
@@ -555,11 +554,13 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
         for word, freq in words_and_frequencies:
             if freq < min_freq:
                 break
-            self.itos.append(word)
+            itos.append(word)
 
-        self.stoi = defaultdict()
-        # stoi is simply a reverse dict for itos
-        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
+        self.itos = {i: tok for i, tok in enumerate(itos)}
+        self.stoi = {tok: i for i, tok in enumerate(itos)}
+
+        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
+                    self.feat_token, self.box_token, self.question_token, self.answer_token]
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
@@ -570,8 +571,6 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
         self.box_idx = self.stoi[self.box_token]
         self.question_idx = self.stoi[self.question_token]
         self.answer_idx = self.stoi[self.answer_token]
-
-        self.specials = specials
 
         self.word_embeddings = None
         if config.VOCAB.WORD_EMBEDDING is not None:

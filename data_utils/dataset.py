@@ -648,7 +648,7 @@ class OcrFeatureDataset(FeatureDataset):
             ocr_tokens=ocr_tokens,
             question=question,
             question_tokens=question_tokens,
-            answer_tokens=answer,
+            answer=answer,
             shifted_right_answer_tokens=shifted_right_answer
         )
 

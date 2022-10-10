@@ -39,7 +39,8 @@ class M4C(BaseUniqueTransformer):
         self.box_embedding = build_vision_embedding(config.BOX_EMBEDDING)
         self.ocr_det_embedding = build_vision_embedding(config.OCR_DET_EMBEDDING)
         self.ocr_rec_embedding = build_vision_embedding(config.OCR_REC_EMBEDDING)
-        self.text_embedding = build_text_embedding(config.TEXT_EMBEDDING, vocab)
+        self.text_embedding = build_text_embedding(config.QUESTION_EMBEDDING, vocab)
+        self.answer_embedding = build_text_embedding(config.ANSWER_EMBEDDING, vocab)
 
         self.self_encoder = build_encoder(config.ENCODER)
 
@@ -132,9 +133,17 @@ class M4C(BaseUniqueTransformer):
 
         return question_features, question_padding_mask
 
+    def forward_answer(self, answer_tokens, ocr_tokens, ocr_features):
+        answer_features, (answer_padding_mask, answer_sequential_mask) = self.answer_embedding(answer_tokens, ocr_tokens, ocr_features)
+        a_tokens = torch.ones((answer_features.shape[0], answer_features.shape[1])).long().to(answer_features.device) * self.vocab.answer_idx
+        a_embeded, _ = self.text_embedding(a_tokens)
+        question_features += a_embeded
+
+        return answer_features, (answer_padding_mask, answer_sequential_mask)
+
     def forward(self, input_features: Instances):
         joint_features, (joint_padding_mask, joint_attention_mask) = self.embed_features(input_features)
-        answer_tokens = input_features.answer_tokens
+        answer_tokens = input_features.answer
         joint_features, (joint_padding_mask, joint_attention_mask) = self.append_answer(joint_features, (joint_padding_mask, joint_attention_mask), answer_tokens)
 
         encoder_features = self.encoder(Instances(

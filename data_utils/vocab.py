@@ -69,9 +69,14 @@ class Vocab(object):
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
-                for answer in ann["answers"]:
-                    question = preprocess_sentence(ann["question"], self.tokenizer)
-                    answer = preprocess_sentence(answer, self.tokenizer)
+                    question = ann["question"]
+                    answer = ann["answer"]
+                    if is_japanese_sentence(question):
+                        question = list(question)
+                        answer = list(answer)
+                    else:
+                        question = preprocess_sentence(question, self.tokenizer)
+                        answer = preprocess_sentence(answer, self.tokenizer)
                     self.freqs.update(question)
                     self.freqs.update(answer)
                     if len(question) + 2 > self.max_question_length:
@@ -188,13 +193,13 @@ class MultilingualVocab(Vocab):
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
-                for answer in ann["answers"]:
+                    answer = ann["answer"]
                     question = ann["question"]
                     if is_japanese_sentence(question):
                         question = list(question)
                         answer = list(answer)
                     else: # This is Vietnamese or English annotation
-                        question = preprocess_sentence(ann["question"], self.tokenizer)
+                        question = preprocess_sentence(question, self.tokenizer)
                         answer = preprocess_sentence(answer, self.tokenizer)
                     self.freqs.update(question)
                     self.freqs.update(answer)
@@ -312,14 +317,14 @@ class MultilingualClassificationVocab(ClassificationVocab):
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
                 question = ann["question"]
-                for answer in ann["answers"]:
-                    if is_japanese_sentence(question): # This is Japanese annotation
-                        question = list(question)
-                    else: # This is Vietnamese or English annotation
-                        question = preprocess_sentence(question, self.tokenizer)
-                        answer = preprocess_sentence(answer, self.tokenizer)
-                        answer = "_".join(answer)
-                    itoa.add(answer)
+                answer = ann["answer"]
+                if is_japanese_sentence(question): # This is Japanese annotation
+                    question = list(question)
+                    answer=list(answer)
+                else: # This is Vietnamese or English annotation
+                    question = preprocess_sentence(question, self.tokenizer)
+                    answer = preprocess_sentence(answer, self.tokenizer)
+                itoa.add(answer)
                 self.freqs.update(question)
                 if len(question) + 2 > self.max_question_length:
                         self.max_question_length = len(question) + 2

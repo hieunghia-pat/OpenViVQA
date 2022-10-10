@@ -5,7 +5,6 @@ from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.attentions import MultiHeadAttention
 from models.modules.pos_embeddings import SinusoidPositionalEmbedding
 from builders.encoder_builder import META_ENCODER
-from utils.instances import Instances
 
 class EncoderLayer(nn.Module):
     def __init__(self, config):

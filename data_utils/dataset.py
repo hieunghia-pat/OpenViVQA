@@ -151,10 +151,11 @@ class RawQuestionMultilingualDictionaryDataset(BaseDataset):
             for image in json_data["images"]:
                 if image["id"] == ann["image_id"]:
                     question = ann["question"]
+                    answers = ann["answers"]
                     if is_japanese_sentence(question):
                         answers = [" ".join(list(answer)) for answer in answers]
                     else:
-                        answers = [preprocess_sentence(answer, self.vocab.tokenizer) for answer in ann["answers"]]
+                        answers = [preprocess_sentence(answer, self.vocab.tokenizer) for answer in answers]
                         answers = [" ".join(answer) for answer in answers]
                     annotation = {
                         "question_id": ann["id"],

@@ -10,7 +10,6 @@ from builders.decoder_builder import META_DECODER
 from builders.text_embedding_builder import build_text_embedding
 from builders.pretrained_language_model_builder import build_pretrained_language_model
 from data_utils.vocab import Vocab
-from utils.instances import Instances
 
 class DecoderLayer(Module):
     def __init__(self, config):

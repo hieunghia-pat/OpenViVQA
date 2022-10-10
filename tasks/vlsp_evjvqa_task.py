@@ -95,13 +95,13 @@ class VlspEvjVqaTask(BaseTask):
         )
         self.public_test_dict_dataloader = DataLoader(
             dataset=self.public_test_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
+            batch_size=1,
             shuffle=True,
             collate_fn=collate_fn
         ) if self.public_test_dataset else None
         self.private_test_dict_dataloader = DataLoader(
             dataset=self.private_test_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
+            batch_size=1,
             shuffle=True,
             collate_fn=collate_fn
         ) if self.private_test_dataset else None
@@ -204,7 +204,7 @@ class VlspEvjVqaTask(BaseTask):
                 self.optim.zero_grad()
 
                 # Rewards
-                bs = items.question_tokens.shape[0]
+                bs = items.batch_size
                 answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
                 answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
@@ -307,9 +307,8 @@ class VlspEvjVqaTask(BaseTask):
             results = []
             overall_gens = {}
             overall_gts = {}
-            with tqdm(desc='Getting predictions on public test: ', unit='it', total=len(self.public_test_dict_dataset)) as pbar:
-                for it, items in enumerate(self.public_test_dict_dataset):
-                    items = Instances.cat([items])
+            with tqdm(desc='Getting predictions on public test: ', unit='it', total=len(self.public_test_dict_dataloader)) as pbar:
+                for it, items in enumerate(self.public_test_dict_dataloader):
                     items = items.to(self.device)
                     with torch.no_grad():
                         outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
@@ -323,7 +322,7 @@ class VlspEvjVqaTask(BaseTask):
                         gens['%d_%d' % (it, i)] = gen_i
                         gts['%d_%d' % (it, i)] = gts_i
                         overall_gens['%d_%d' % (it, i)] = [gen_i, ]
-                        overall_gts['%d_%d' % (it, i)] = [gts_i, ]
+                        overall_gts['%d_%d' % (it, i)] = gts_i
                     pbar.update()
 
                     results.append({
@@ -348,9 +347,8 @@ class VlspEvjVqaTask(BaseTask):
             results = []
             overall_gens = {}
             overall_gts = {}
-            with tqdm(desc='Getting predictions on private test: ', unit='it', total=len(self.private_test_dict_dataset)) as pbar:
-                for it, items in enumerate(self.private_test_dict_dataset):
-                    items = items.unsqueeze(dim=0)
+            with tqdm(desc='Getting predictions on private test: ', unit='it', total=len(self.private_test_dict_dataloader)) as pbar:
+                for it, items in enumerate(self.private_test_dict_dataloader):
                     items = items.to(self.device)
                     with torch.no_grad():
                         outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)

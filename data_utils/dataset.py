@@ -248,13 +248,9 @@ class OcrDictionaryDataset(DictionaryDataset):
         question = item["question"]
         question_tokens = self.vocab.encode_question(question)
         answers = item["answers"]
-        map_tokens_to_ids = {}
-        ith = 0
+        ocr_tokens = []
         for text in features["ocr_texts"]:
-            if text not in map_tokens_to_ids:
-                map_tokens_to_ids[text] = len(self.vocab) + ith
-                ith += 1
-        map_ids_to_tokens = {id: token for token, id in map_tokens_to_ids.items()}
+            ocr_tokens.append(text)
 
         return Instances(
             **features,
@@ -264,9 +260,7 @@ class OcrDictionaryDataset(DictionaryDataset):
             filename=filename,
             question=question,
             question_tokens=question_tokens,
-            answers=answers,
-            map_tokens_to_ids=map_tokens_to_ids,
-            map_ids_to_tokens=map_ids_to_tokens
+            answers=answers
         )
 
 @META_DATASET.register()
@@ -637,15 +631,13 @@ class OcrFeatureDataset(FeatureDataset):
         features = self.load_features(self.annotations[idx]["image_id"])
 
         item = self.annotations[idx]
-        question = self.vocab.encode_question(item["question"])
-        map_tokens_to_ids = {}
-        ith = 0
+        question = item["question"]
+        question_tokens = self.vocab.encode_question(question)
+        answer = item["answer"]
+
+        ocr_tokens = []
         for text in features["ocr_texts"]:
-            if text not in map_tokens_to_ids:
-                map_tokens_to_ids[text] = len(self.vocab) + ith
-                ith += 1
-        map_ids_to_tokens = {id: token for token, id in map_tokens_to_ids.items()}
-        answer = self.vocab.encode_answer(item["answer"], map_tokens_to_ids)
+            ocr_tokens.append(text)
 
         shifted_right_answer = torch.zeros_like(answer).fill_(self.vocab.padding_idx)
         shifted_right_answer[:-1] = answer[1:]
@@ -653,11 +645,11 @@ class OcrFeatureDataset(FeatureDataset):
 
         return Instances(
             **features,
-            question_tokens=question,
+            ocr_tokens=ocr_tokens,
+            question=question,
+            question_tokens=question_tokens,
             answer_tokens=answer,
-            shifted_right_answer_tokens=shifted_right_answer,
-            map_tokens_to_ids=map_tokens_to_ids,
-            map_ids_to_tokens=map_ids_to_tokens
+            shifted_right_answer_tokens=shifted_right_answer
         )
 
 @META_DATASET.register()

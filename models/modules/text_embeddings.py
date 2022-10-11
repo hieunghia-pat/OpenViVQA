@@ -122,10 +122,11 @@ class DynamicEmbedding(nn.Module):
 
     def encode_sequence(self, list_of_text: List[List[str]], padding_token):
         padded_list_of_text = []
-        max_len = max([len(text) for text in list_of_text])
+        max_len = max([len(text)+2 for text in list_of_text])
         for text in list_of_text:
             text = [self.vocab.bos_token] + text + [self.vocab.eos_token]
-            text.extend([padding_token] * (max_len - len(text)))
+            if max_len - len(text) > 0:
+                text.extend([padding_token] * (max_len - len(text)))
             padded_list_of_text.append(text)
 
         return padded_list_of_text
@@ -145,17 +146,18 @@ class DynamicEmbedding(nn.Module):
         
         # randomly select representation for texts
         selected_text_inds = [matched_ids[np.random.choice(len(matched_ids))] for matched_ids in text_inds]
+
         tokens = torch.tensor(selected_text_inds).long().to(oov_features.device)
         shifted_right_tokens = tokens[:, 1:]
         tokens = tokens[:, :-1]
-        padding_mask = generate_padding_mask(tokens, padding_idx=self.vocab.padding_ids).to(oov_features.device)
+        padding_mask = generate_padding_mask(tokens, padding_idx=self.vocab.padding_idx).to(oov_features.device)
         seq_len = tokens.shape[1]
         sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
 
         # construct the dynamic embeding weights
         weights = torch.cat([self.fixed_weights, flattened_oov_features], dim=0) # (vocab_len + ocr_len, d_model)
 
-        features = F.embedding(tokens, weights, padding_idx=self.vocab.padding_ids)
+        features = F.embedding(tokens, weights, padding_idx=self.vocab.padding_idx)
 
         return shifted_right_tokens, features, (padding_mask, sequential_mask)
 

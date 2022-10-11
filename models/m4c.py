@@ -46,7 +46,7 @@ class M4C(BaseUniqueTransformer):
         self.ocr_embedding = build_text_embedding(config.OCR_TEXT_EMBEDDING, vocab)
         self.dynamic_embedding = build_text_embedding(config.DYNAMIC_EMBEDDING, vocab)
 
-        self.self_encoder = build_encoder(config.ENCODER)
+        self.encoder = build_encoder(config.ENCODER)
 
         self.dynamic_network = DynamicPointerNetwork(config)
         self.vocab_proj = nn.Linear(config.D_MODEL, len(vocab))

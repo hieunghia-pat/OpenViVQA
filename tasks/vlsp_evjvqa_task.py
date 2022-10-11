@@ -159,7 +159,9 @@ class VlspEvjVqaTask(BaseTask):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
-
+                print(gens)
+                print(gts)
+                raise
                 pbar.update()
 
         scores, _ = evaluation.compute_scores(gts, gens)
@@ -227,8 +229,8 @@ class VlspEvjVqaTask(BaseTask):
                 pbar.update()
 
     def start(self):
-        if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
-            checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
+        if os.path.isfile(os.path.join(self.checkpoint_path, "best_model.pth")):
+            checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
             use_rl = checkpoint["use_rl"]
             best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]
@@ -241,17 +243,18 @@ class VlspEvjVqaTask(BaseTask):
             patience = 0
 
         while True:
-            if not use_rl:
-                self.train()
-            else:
-                self.train_scst()
+            # if not use_rl:
+            #     self.train()
+            # else:
+            #     self.train_scst()
 
-            self.evaluate_loss(self.dev_dataloader)
+            # self.evaluate_loss(self.dev_dataloader)
 
             # val scores
             scores = self.evaluate_metrics(self.dev_dict_dataloader)
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
+            raise
 
             # Prepare for next epoch
             best = False

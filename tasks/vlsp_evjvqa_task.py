@@ -260,7 +260,7 @@ class VlspEvjVqaTask(BaseTask):
             #     self.train()
             # else:
             #     self.train_scst()
-            self.train()
+            self.train() #khi dừng train muốn predict thì cmt từ dòng này tới 279
 
             self.evaluate_loss(self.dev_dataloader)
 
@@ -269,8 +269,8 @@ class VlspEvjVqaTask(BaseTask):
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
-            # Prepare for next epoch
-            best = False
+            # # Prepare for next epoch
+            best = False # đừng cmt dòng này
             if val_score >= best_val_score:
                 best_val_score = val_score
                 patience = 0
@@ -305,7 +305,7 @@ class VlspEvjVqaTask(BaseTask):
                 copyfile(os.path.join(self.checkpoint_path, "last_model.pth"), 
                         os.path.join(self.checkpoint_path, "best_model.pth"))
 
-            if exit_train:
+            if exit_train: #sửa chữ exit_train thành 1(if 1:)
                 break
 
             self.epoch += 1
@@ -344,20 +344,19 @@ class VlspEvjVqaTask(BaseTask):
 
                     results.append({
                         "id": items.question_id,
-                        "image_id": items.image_id,
-                        "filename": items.filename,
+                        # "image_id": items.image_id,
+                        # "filename": items.filename,
                         "gens": gens,
-                        "gts": gts
+                        # "gts": gts
                     })
 
                     pbar.update()
 
-            scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
-            logger.info("Evaluation score on public test: %s", scores)
+            # scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+            # logger.info("Evaluation score on public test: %s", scores)
 
             json.dump({
-                "results": results,
-                **scores
+                "results": results
             }, open(os.path.join(self.checkpoint_path, "public_test_results.json"), "w+"), ensure_ascii=False)
 
         if self.private_test_dict_dataset is not None:

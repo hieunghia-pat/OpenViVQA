@@ -3,7 +3,6 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 
 from utils.logging_utils import setup_logger
-from utils.instances import Instances
 from data_utils.utils import collate_fn
 from .base_task import BaseTask
 from builders.task_builder import META_TASK
@@ -159,9 +158,6 @@ class VlspEvjVqaTask(BaseTask):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
-                print(gens)
-                print(gts)
-                raise
                 pbar.update()
 
         scores, _ = evaluation.compute_scores(gts, gens)
@@ -243,18 +239,17 @@ class VlspEvjVqaTask(BaseTask):
             patience = 0
 
         while True:
-            # if not use_rl:
-            #     self.train()
-            # else:
-            #     self.train_scst()
+            if not use_rl:
+                self.train()
+            else:
+                self.train_scst()
 
-            # self.evaluate_loss(self.dev_dataloader)
+            self.evaluate_loss(self.dev_dataloader)
 
             # val scores
             scores = self.evaluate_metrics(self.dev_dict_dataloader)
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
-            raise
 
             # Prepare for next epoch
             best = False

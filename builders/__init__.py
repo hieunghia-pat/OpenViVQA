@@ -3,6 +3,7 @@ from tasks.open_ended_task import OpenEndedTask
 from tasks.training_saaa_task import TrainingSAAATask
 from tasks.classification_task import ClassificationTask
 from tasks.vlsp_evjvqa_task import VlspEvjVqaTask
+from tasks.ocr_open_ended_task import OcrOpenEndedTask
 from models.modules.attentions import (
     ScaledDotProductAttention,
     AugmentedGeometryScaledDotProductAttention,

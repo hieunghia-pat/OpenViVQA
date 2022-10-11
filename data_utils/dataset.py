@@ -639,17 +639,12 @@ class OcrFeatureDataset(FeatureDataset):
         for text in features["ocr_texts"]:
             ocr_tokens.append(text)
 
-        shifted_right_answer = torch.zeros_like(answer).fill_(self.vocab.padding_idx)
-        shifted_right_answer[:-1] = answer[1:]
-        answer = torch.where(answer == self.vocab.eos_idx, self.vocab.padding_idx, answer) # remove eos_token in answer
-
         return Instances(
             **features,
             ocr_tokens=ocr_tokens,
             question=question,
             question_tokens=question_tokens,
-            answer=answer,
-            shifted_right_answer_tokens=shifted_right_answer
+            answer=answer
         )
 
 @META_DATASET.register()

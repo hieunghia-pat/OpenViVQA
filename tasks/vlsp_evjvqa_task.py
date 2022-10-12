@@ -270,7 +270,7 @@ class VlspEvjVqaTask(BaseTask):
             val_score = scores[self.score]
 
             # # Prepare for next epoch
-            best = Fause_rllse # đừng cmt dòng này
+            best = False # đừng cmt dòng này
             if val_score >= best_val_score:
                 best_val_score = val_score
                 patience = 0

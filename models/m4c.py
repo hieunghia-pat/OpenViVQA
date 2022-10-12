@@ -24,8 +24,8 @@ class DynamicPointerNetwork(nn.Module):
     def forward(self, query_inputs, key_inputs, query_attention_mask):
         queries = self.query(query_inputs)
         keys = self.key(key_inputs)
-        scores = torch.matmul(queries, keys.transpose((-1, -2))) / math.sqrt(self.d_model)
-        scores = scores.masked_fill(query_attention_mask.squeeze(1).squeeze(1), value=-np.inf)
+        scores = torch.matmul(queries, keys.transpose(-1, -2)) / math.sqrt(self.d_model)
+        scores = scores.masked_fill(query_attention_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=-np.inf)
 
         return scores
 
@@ -153,28 +153,27 @@ class M4C(BaseUniqueTransformer):
         joint_features, (joint_padding_mask, joint_attention_mask) = self.append_answer(joint_features, (joint_padding_mask, joint_attention_mask),
                                                                                         answer_features, answer_masks)
 
-        encoder_features = self.encoder(Instances(
+        encoder_features = self.encoder(
             features=joint_features,
-            features_padding_mask=joint_padding_mask,
-            features_attention_mask=joint_attention_mask
-        ))
+            padding_mask=joint_padding_mask,
+            attention_mask=joint_attention_mask
+        )
 
         region_features_len = input_features.region_features.shape[1]
         grid_features_len = input_features.grid_features.shape[1]
-        ocr_tokens_len = input_features.ocr_tokens.shape[1]
+        ocr_tokens_len = input_features.ocr_boxes.shape[1]
         questions_len = input_features.question_tokens.shape[1]
         joint_features_len = joint_features.shape[1]
         answer_len = shifted_right_answer_tokens.shape[1]
-        assert joint_features_len == region_features_len + grid_features_len + ocr_tokens_len + questions_len
+        assert joint_features_len == region_features_len + grid_features_len + ocr_tokens_len + questions_len + answer_len
 
-        ocr_features = encoder_features[:, region_features_len+grid_features_len:region_features_len+grid_features_len+ocr_tokens_len]
-        ocr_padding_mask = joint_padding_mask[:, region_features_len+grid_features_len:region_features_len+grid_features_len+ocr_tokens_len]
-        answer_features = encoder_features[:, joint_features_len:]
-        assert answer_len == answer_features.shape[1]
+        answer_features = encoder_features[:, -answer_len:]
+        ocr_features = encoder_features[:, (region_features_len+grid_features_len):(region_features_len+grid_features_len+ocr_tokens_len)]
+        ocr_padding_mask = joint_padding_mask[:, :, :, region_features_len+grid_features_len:region_features_len+grid_features_len+ocr_tokens_len]
 
-        answer_features = self.vocab_proj(answer_features) # (bs, answer_len, num_vocab)
-        ocr_features = self.dynamic_network(answer_features, ocr_features, ocr_padding_mask) # (bs, answer_len, ocr_len)
-        out = torch.cat([answer_features, ocr_features], dim=-1) # (bs, answer_len, num_vocab + ocr_len)
+        vocab_features = self.vocab_proj(answer_features) # (bs, answer_len, num_vocab)
+        ocr_features = self.dynamic_network(ocr_features, answer_features, ocr_padding_mask).transpose(-2, -1) # (bs, answer_len, ocr_len)
+        out = torch.cat([vocab_features, ocr_features], dim=-1) # (bs, answer_len, num_vocab + ocr_len)
         out = F.log_softmax(out, dim=-1)
         loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
 

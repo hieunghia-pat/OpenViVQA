@@ -307,6 +307,7 @@ class VlspEvjVqaTask(BaseTask):
 
             if exit_train: #sửa chữ exit_train thành 1(if 1:)
                 break
+            
             torch.save(os.path.join('/content/drive/MyDrive/', "last_model.pth"))
             torch.save(os.path.join('/content/drive/MyDrive/', "best_model.pth"))
             self.epoch += 1

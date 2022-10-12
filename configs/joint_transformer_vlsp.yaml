@@ -15,7 +15,7 @@ DATASET:
     FEATURE_PATH:
       FEATURES: /content/vinvl_vinvl
       IMAGE: /content/train-images
-  MIN_FREQ: 1
+  MIN_FREQ: 2
   VOCAB:
     TYPE: VlspVqaMultiModalVocab
     TOKENIZER: null
@@ -44,7 +44,7 @@ TRAINING:
   WARMUP: 10000
   SCORE: Accuracy
   TRAINING_BEAM_SIZE: 5
-  EVALUATING_BEAM_SIZE: 1
+  EVALUATING_BEAM_SIZE: 3
   PATIENCE: 5
 
 MODEL:
@@ -82,7 +82,7 @@ MODEL:
   ENCODER:
     ARCHITECTURE: Encoder
     D_MODEL: 512
-    LAYERS: 3
+    LAYERS: 6
     SELF_ATTENTION:
       ARCHITECTURE: ScaledDotProductAttention
       HEAD: 8
@@ -97,7 +97,7 @@ MODEL:
   DECODER:
     ARCHITECTURE: Decoder
     D_MODEL: 512
-    LAYERS: 3
+    LAYERS: 6
     ATTENTION:
       SELF_ATTENTION:
         ARCHITECTURE: ScaledDotProductAttention

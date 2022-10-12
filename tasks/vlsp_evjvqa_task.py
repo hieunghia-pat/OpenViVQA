@@ -270,7 +270,7 @@ class VlspEvjVqaTask(BaseTask):
             val_score = scores[self.score]
 
             # # Prepare for next epoch
-            best = False # đừng cmt dòng này
+            best = Fause_rllse # đừng cmt dòng này
             if val_score >= best_val_score:
                 best_val_score = val_score
                 patience = 0
@@ -308,8 +308,6 @@ class VlspEvjVqaTask(BaseTask):
             if exit_train: #sửa chữ exit_train thành 1(if 1:)
                 break
             
-            torch.save(os.path.join('/content/drive/MyDrive/', "last_model.pth"))
-            torch.save(os.path.join('/content/drive/MyDrive/', "best_model.pth"))
             self.epoch += 1
 
     def get_predictions(self):

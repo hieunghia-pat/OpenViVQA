@@ -304,6 +304,8 @@ class VlspEvjVqaTask(BaseTask):
             if best:
                 copyfile(os.path.join(self.checkpoint_path, "last_model.pth"), 
                         os.path.join(self.checkpoint_path, "best_model.pth"))
+                copyfile(os.path.join(self.checkpoint_path, "last_model.pth"), 
+                        os.path.join('/content/drive/MyDrive/', "best_model.pth"))
 
             if exit_train: #sửa chữ exit_train thành 1(if 1:)
                 break

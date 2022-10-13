@@ -248,9 +248,7 @@ class OcrDictionaryDataset(DictionaryDataset):
         question = item["question"]
         question_tokens = self.vocab.encode_question(question)
         answers = item["answers"]
-        ocr_tokens = []
-        for text in features["ocr_texts"]:
-            ocr_tokens.append(text)
+        ocr_tokens = [text for text in features["ocr_texts"]] if len(features["ocr_texts"]) > 0 else [self.vocab.ocr_token]
 
         return Instances(
             **features,
@@ -636,9 +634,7 @@ class OcrFeatureDataset(FeatureDataset):
         question_tokens = self.vocab.encode_question(question)
         answer = item["answer"]
 
-        ocr_tokens = []
-        for text in features["ocr_texts"]:
-            ocr_tokens.append(text)
+        ocr_tokens = [text for text in features["ocr_texts"]] if len(features["ocr_texts"]) > 0 else [self.vocab.ocr_token]
 
         return Instances(
             **features,

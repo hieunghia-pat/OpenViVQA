@@ -203,7 +203,7 @@ class M4C(BaseUniqueTransformer):
                                                         (self.region_features_len+self.grid_features_len+self.ocr_tokens_len)]
 
         answer = it
-        shifted_right_answer_tokens, answer_features, answer_masks = self.forward_answer(answer, self.ocr_tokens, embedded_ocr_features)
+        _, answer_features, answer_masks = self.forward_answer(answer, self.ocr_tokens, embedded_ocr_features)
         self.encoder_features, (self.encoder_padding_mask, self.encoder_attention_mask) = self.append_answer(self.encoder_features, 
                                                                                                         (self.encoder_padding_mask, self.encoder_attention_mask),
                                                                                                         answer_features, answer_masks)

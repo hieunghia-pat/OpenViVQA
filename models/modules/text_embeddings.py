@@ -14,6 +14,7 @@ import numpy as np
 from typing import List, Union
 import itertools
 from collections import defaultdict
+from copy import deepcopy
 
 @META_TEXT_EMBEDDING.register()
 class UsualEmbedding(nn.Module):
@@ -48,47 +49,62 @@ class OcrEmbedding(nn.Module):
 
         self.padding_idx = 0
         self.device = config.DEVICE
+        self.ocr_token = vocab.ocr_token
+
+        ocr_texts = []
+        for file in os.listdir(config.OCR_PATH):
+            ocr_features = np.load(os.path.join(config.OCR_PATH, file), allow_pickle=True)[()]
+            ocr_texts.extend(itertools.chain(*[text.split() for text in ocr_features["texts"]]))
+        ocr_texts = set(ocr_texts)
+        self.stoi = {token: i for i, token in enumerate(ocr_texts)}
+        self.stoi.update({self.ocr_token: len(self.stoi)})
+        self.itos = {i: token for token, i in self.stoi.items()}
 
         if config.WORD_EMBEDDING is None: # define the customized vocab
-            ocr_texts = []
-            for file in os.listdir(config.OCR_PATH):
-                ocr_features = np.load(os.path.join(config.OCR_PATH, file), allow_pickle=True)[()]
-                ocr_texts.extend(ocr_features["texts"])
-            ocr_texts = set(ocr_texts)
-            self.stoi = {token: i for i, token in enumerate(ocr_texts)}
-            self.stoi.update({vocab.ocr_token: len(self.stoi)})
-            self.itos = {i: token for token, i in self.stoi.items()}
-            self.word_embedding = None
-            self.components = nn.Embedding(len(ocr_texts), config.D_MODEL, self.padding_idx)
+            self.components = nn.Embedding(len(self.itos), config.D_MODEL, self.padding_idx)
         else:
-            self.word_embedding = build_word_embedding(config)
-            self.stoi = self.word_embedding.stoi
-            self.stoi.update({vocab.ocr_token: len(self.stoi)})
-            self.itos = self.word_embedding.itos
-            self.itos.update({len(self.stoi): vocab.ocr_token})
+            self.load_word_embeddings(build_word_embedding(config))
             self.components = nn.Sequential(
-                nn.Embedding.from_pretrained(embeddings=self.word_embedding.vectors, freeze=True, padding_idx=self.padding_idx),
+                nn.Embedding.from_pretrained(embeddings=self.word_embeddings, freeze=True, padding_idx=self.padding_idx),
                 nn.Linear(config.D_EMBEDDING, config.D_MODEL),
                 nn.Dropout(config.DROPOUT)
             )
+    
+    def load_word_embeddings(self, word_embeddings):
+        if not isinstance(word_embeddings, list):
+            word_embeddings = [word_embeddings]
+
+        tot_dim = sum(embedding.dim for embedding in word_embeddings)
+        self.word_embeddings = torch.Tensor(len(self), tot_dim)
+        for i, token in enumerate(self.itos):
+            start_dim = 0
+            for v in word_embeddings:
+                end_dim = start_dim + v.dim
+                self.word_embeddings[i][start_dim:end_dim] = v[token.strip()]
+                start_dim = end_dim
+            assert(start_dim == tot_dim)
 
     def forward(self, texts: List[List[str]]):
-        bs = len(texts)
         max_len = max([len(text) for text in texts])
-        tokens = torch.zeros((bs, max_len)).long().to(self.device)
+        for idx, text in enumerate(texts):
+            if len(text) < max_len:
+                text.extend([self.ocr_token] * (max_len-len(text)))
+            texts[idx] = text
+        '''
+            features: List[List[torch.Tensor]] - a batch of list of embedded features,
+                                in which each each features is the sum of embedded features of sub-tokens splitted from token
+        '''
+        features = deepcopy(texts)
         for batch, text in enumerate(texts):
-            for idx, token in enumerate(text):
-                if token in self.stoi:
-                    tokens[batch][idx] = self.stoi[token]
-                else:
-                    tokens[batch][idx] = self.stoi["ocr"]
-        padding_masks = generate_padding_mask(tokens, padding_idx=self.padding_idx).to(tokens.device)
-        seq_len = tokens.shape[-1]
-        sequential_masks = generate_sequential_mask(seq_len).to(tokens.device)
+            for idx, tokens in enumerate(text):
+                token = [self.stoi[token] if token in self.stoi else self.stoi[self.ocr_token] for token in tokens.split()]
+                token = torch.tensor(token).unsqueeze(0).to(self.device)
+                feature = self.components(token).sum(dim=1)
+                features[batch][idx] = feature
+            features[batch] = torch.cat(features[batch], dim=0).unsqueeze(0)
+        features = torch.cat(features, dim=0)
 
-        features = self.components(tokens)
-
-        return features, (padding_masks, sequential_masks)
+        return features, None
 
 @META_TEXT_EMBEDDING.register()
 class DynamicEmbedding(nn.Module):
@@ -110,13 +126,13 @@ class DynamicEmbedding(nn.Module):
         for word in text:
             # match word to fixed vocabulary
             matched_inds = []
-            if word in vocab2idx:
-                matched_inds.append(vocab2idx[word])
+            matched_inds.append(vocab2idx[word])
             # match answer word to OOV
             if word in oov2inds:
                 matched_inds.extend(oov2inds[word])
             if matched_inds == []:
                 print(word)
+                print(vocab2idx.keys())
                 raise
             answer_word_matches.append(matched_inds)
 
@@ -157,6 +173,7 @@ class DynamicEmbedding(nn.Module):
             oov_tokens = self.pad_oov_tokens(oov_tokens, padding_token=self.vocab.ocr_token)
             flattened_oov_tokens = {len(self.vocab) + idx: token for idx, token in enumerate(itertools.chain(*oov_tokens))}
             flattened_oov_features = torch.cat([feature for feature in oov_features], dim=0) # (ocr_len, d_model)
+            assert len(flattened_oov_tokens) == flattened_oov_features.shape[0], "length of flattened_oov_features must be equal shape of flattened_oov_features at dim 0"
             
             # match answers to fixed vocabulary and OCR tokens
             oov2inds = defaultdict(list)

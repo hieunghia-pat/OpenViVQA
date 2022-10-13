@@ -17,6 +17,7 @@ class BaseUniqueTransformer(Module):
 
         self.register_state('encoder_features', None)
         self.register_state('encoder_padding_mask', None)
+        self.register_state("encoder_attention_mask", None)
 
     def init_weights(self):
         for p in self.parameters():
@@ -61,7 +62,8 @@ class BaseUniqueTransformer(Module):
         self.encoder_features, self.encoder_padding_mask = self.append_answer(self.encoder_features, self.encoder_padding_mask, it)
         out = self.encoder(
             features=self.encoder_features,
-            features_attention_mask=self.encoder_padding_mask
+            padding_mask=self.encoder_padding_mask,
+            attention_mask=self.encoder_attention_mask
         )
 
         return out
@@ -71,7 +73,7 @@ class BaseUniqueTransformer(Module):
                             b_s=batch_size, device=self.device)
 
         with self.statefulness(batch_size):
-            self.encoder_features, self.encoder_padding_mask = self.embed_features(input_features)
+            self.encoder_features, (self.encoder_padding_mask, self.encoder_attention_mask) = self.embed_features(input_features)
             self.join_feature_len = self.encoder_features.shape[1]
             output =  beam_search.apply(out_size, return_probs, **kwargs)
 

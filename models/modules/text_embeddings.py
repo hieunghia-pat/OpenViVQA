@@ -11,7 +11,7 @@ from transformers import BertTokenizer, BertModel, AlbertTokenizer, AlbertModel,
 
 import os
 import numpy as np
-from typing import List
+from typing import List, Union
 import itertools
 from collections import defaultdict
 
@@ -131,35 +131,51 @@ class DynamicEmbedding(nn.Module):
 
         return padded_list_of_text
 
-    def forward(self, list_of_texts: List[List[str]], oov_tokens: List[List[str]], oov_features: torch.Tensor):
-        list_of_texts = self.encode_sequence(list_of_texts, self.vocab.padding_token)
-        flattened_oov_tokens = {idx: token for idx, token in enumerate(itertools.chain(*oov_tokens))}
-        flattened_oov_features = torch.cat([feature for feature in oov_features], dim=0) # (ocr_len, d_model)
-        
-        # match answers to fixed vocabulary and OCR tokens.
-        oov2inds = defaultdict(list)
-        for idx, token in flattened_oov_tokens.items():
-            oov2inds[token].append(idx)
+    def forward(self, list_of_texts: Union[List[List[str]], torch.Tensor], oov_tokens: List[List[str]], oov_features: torch.Tensor):
+        if isinstance(list_of_texts, list): # is we have not encode the texts
+            list_of_texts = self.encode_sequence(list_of_texts, self.vocab.padding_token)
+            flattened_oov_tokens = {idx: token for idx, token in enumerate(itertools.chain(*oov_tokens))}
+            flattened_oov_features = torch.cat([feature for feature in oov_features], dim=0) # (ocr_len, d_model)
+            
+            # match answers to fixed vocabulary and OCR tokens.
+            oov2inds = defaultdict(list)
+            for idx, token in flattened_oov_tokens.items():
+                oov2inds[token].append(idx)
 
-        # get all possible sequences of indices of texts
-        text_inds = [self.match_text_to_indices(text, self.vocab.stoi, oov2inds) for text in list_of_texts]
-        
-        # randomly select representation for texts
-        selected_text_inds = [matched_ids[np.random.choice(len(matched_ids))] for matched_ids in text_inds]
+            # get all possible sequences of indices of texts
+            text_inds = [self.match_text_to_indices(text, self.vocab.stoi, oov2inds) for text in list_of_texts]
+            
+            # randomly select representation for texts
+            selected_text_inds = [matched_ids[np.random.choice(len(matched_ids))] for matched_ids in text_inds]
 
-        tokens = torch.tensor(selected_text_inds).long().to(oov_features.device)
-        shifted_right_tokens = tokens[:, 1:]
-        tokens = tokens[:, :-1]
-        padding_mask = generate_padding_mask(tokens, padding_idx=self.vocab.padding_idx).to(oov_features.device)
-        seq_len = tokens.shape[1]
-        sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
+            tokens = torch.tensor(selected_text_inds).long().to(oov_features.device)
+            shifted_right_tokens = tokens[:, 1:]
+            tokens = tokens[:, :-1]
+            padding_mask = generate_padding_mask(tokens, padding_idx=self.vocab.padding_idx).to(oov_features.device)
+            seq_len = tokens.shape[1]
+            sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
 
-        # construct the dynamic embeding weights
-        weights = torch.cat([self.fixed_weights, flattened_oov_features], dim=0) # (vocab_len + ocr_len, d_model)
+            # construct the dynamic embeding weights
+            weights = torch.cat([self.fixed_weights, flattened_oov_features], dim=0) # (vocab_len + ocr_len, d_model)
 
-        features = F.embedding(tokens, weights, padding_idx=self.vocab.padding_idx)
+            features = F.embedding(tokens, weights, padding_idx=self.vocab.padding_idx)
 
-        return shifted_right_tokens, features, (padding_mask, sequential_mask)
+            return shifted_right_tokens, features, (padding_mask, sequential_mask)
+        else:
+            assert isinstance(list_of_texts, torch.Tensor), "passed list_of_text must be list or tensor"
+            flattened_oov_tokens = {idx: token for idx, token in enumerate(itertools.chain(*oov_tokens))}
+            flattened_oov_features = torch.cat([feature for feature in oov_features], dim=0) # (ocr_len, d_model)
+            
+            tokens = list_of_texts
+            padding_mask = generate_padding_mask(tokens, padding_idx=self.vocab.padding_idx).to(oov_features.device)
+            seq_len = tokens.shape[1]
+            sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
+
+            weights = torch.cat([self.fixed_weights, flattened_oov_features], dim=0) # (vocab_len + ocr_len, d_model)
+
+            features = F.embedding(tokens, weights, padding_idx=self.vocab.padding_idx)
+
+            return None, features, (padding_mask, sequential_mask)
 
 @META_TEXT_EMBEDDING.register()
 class LSTMTextEmbedding(nn.Module):

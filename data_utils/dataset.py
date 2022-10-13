@@ -258,6 +258,7 @@ class OcrDictionaryDataset(DictionaryDataset):
             type=item["type"],
             image_id=image_id,
             filename=filename,
+            ocr_tokens=ocr_tokens,
             question=question,
             question_tokens=question_tokens,
             answers=answers

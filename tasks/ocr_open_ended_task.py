@@ -47,7 +47,7 @@ class OcrOpenEndedTask(OpenEndedTask):
                     outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
 
                 answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
+                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), items.ocr_tokens, join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
@@ -65,7 +65,7 @@ class OcrOpenEndedTask(OpenEndedTask):
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, items in enumerate(self.train_dataloader):
                 items = items.to(self.device)
-                loss = self.model(items).contiguous()
+                loss = self.model(items)
                 loss.backward()
 
                 self.optim.step()
@@ -95,7 +95,7 @@ class OcrOpenEndedTask(OpenEndedTask):
                 # Rewards
                 bs = items.question_tokens.shape[0]
                 answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
+                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), items.ocr_tokens, join_words=True)
                 answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
                 gens = {f"{idx}": [answer_gen, ] for idx, answer_gen in enumerate(answers_gen)}
                 gts = {f"{idx}": answer_gt for idx, answer_gt in enumerate(answers_gt)}

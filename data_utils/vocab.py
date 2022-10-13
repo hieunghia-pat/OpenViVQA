@@ -7,6 +7,7 @@ from builders.vocab_builder import META_VOCAB
 from collections import defaultdict, Counter
 import json
 from typing import Dict, List
+import itertools
 
 @META_VOCAB.register()
 class Vocab(object):
@@ -491,6 +492,7 @@ class OcrVocab(Vocab):
 
     def encode_answer(self, answer: List[str], ocr_id_of: Dict[str, int]) -> torch.Tensor:
         """ Turn a answer into a vector of indices and a question length """
+        ocr_id_of = {token: idx for idx, token in enumerate(itertools.chain(*ocr_id_of))}
         vec = torch.ones(self.max_answer_length).long() * self.padding_idx
         for i, token in enumerate([self.bos_token] + answer + [self.eos_token]):
             if token in ocr_id_of:
@@ -502,13 +504,24 @@ class OcrVocab(Vocab):
             vec[i] = id
         return vec
 
-    def decode_answer(self, answer_vecs: torch.Tensor, ocr_token_of: Dict[int, str], join_words=True) -> List[str]:
+    def decode_answer(self, answer_vecs: torch.Tensor, ocr_token_of: List[List[str]], join_words=True) -> List[str]:
         '''
             answer_vecs: (bs, max_length)
         '''
+        ocr_token_of = {idx: token for idx, token in enumerate(itertools.chain(*ocr_token_of))}
         answers = []
         for vec in answer_vecs:
-            answer = " ".join([self.itos[idx] if self.itos[idx] not in self.specials and idx in self.itos else ocr_token_of[idx] for idx in vec.tolist()])
+            answer = []
+            for idx in vec.tolist():
+                if idx in self.specials:
+                    continue
+                if idx in self.itos:
+                    answer.append(self.itos[idx])
+                    continue
+                if idx in ocr_token_of:
+                    answer.append(ocr_token_of[idx])
+                    continue
+            answer = " ".join(answer)
             if join_words:
                 answers.append(answer)
             else:

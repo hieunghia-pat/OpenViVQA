@@ -2,9 +2,7 @@ import torch
 from torch import nn
 
 from .base_transformer import BaseTransformer
-from data_utils.vocab import Vocab
 from utils.instances import Instances
-from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from builders.decoder_builder import build_decoder
 from builders.text_embedding_builder import build_text_embedding
 from builders.vision_embedding_builder import build_vision_embedding
@@ -12,7 +10,7 @@ from builders.model_builder import META_ARCHITECTURE
 
 @META_ARCHITECTURE.register()
 class ViTmT5(BaseTransformer):
-    def __init__(self, config, vocab: Vocab):
+    def __init__(self, config, vocab):
         super().__init__(config, vocab)
 
         self.device = torch.device(config.DEVICE)

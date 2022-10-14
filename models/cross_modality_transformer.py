@@ -1,7 +1,6 @@
 import torch
 
 from .base_transformer import BaseTransformer
-from data_utils.vocab import Vocab
 from utils.instances import Instances
 from models.modules.encoders import EncoderLayer
 from builders.encoder_builder import build_encoder
@@ -15,7 +14,7 @@ class CrossModalityTransformer(BaseTransformer):
     '''
         This model is designed follow the idea of LXMERT (https://arxiv.org/pdf/1908.07490.pdf).
     '''
-    def __init__(self, config, vocab: Vocab):
+    def __init__(self, config, vocab):
         super().__init__(config, vocab)
 
         self.device = torch.device(config.DEVICE)

@@ -9,7 +9,6 @@ from models.modules.containers import Module, ModuleList
 from builders.decoder_builder import META_DECODER
 from builders.text_embedding_builder import build_text_embedding
 from builders.pretrained_language_model_builder import build_pretrained_language_model
-from data_utils.vocab import Vocab
 
 class DecoderLayer(Module):
     def __init__(self, config):
@@ -31,7 +30,7 @@ class DecoderLayer(Module):
 @META_DECODER.register()
 class Decoder(Module):
     "Generic N layer decoder with masking."
-    def __init__(self, config, vocab: Vocab):
+    def __init__(self, config, vocab):
         super(Decoder, self).__init__()
         
         self.d_model = config.D_MODEL
@@ -80,7 +79,7 @@ class Decoder(Module):
 
 @META_DECODER.register()
 class AdaptiveDecoder(Module):
-    def __init__(self, config, vocab: Vocab):
+    def __init__(self, config, vocab):
         super(AdaptiveDecoder, self).__init__()
 
         self.d_model = config.D_MODEL

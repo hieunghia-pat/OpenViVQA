@@ -1,4 +1,4 @@
-TASK: OpenEndedTask
+TASK: OcrOpenEndedTask
 
 DATASET:
   FEATURE_DATASET:
@@ -88,13 +88,14 @@ MODEL:
     D_MODEL: 512
     DROPOUT: .1
   OCR_TEXT_EMBEDDING:
-    ARCHITECTURE: OcrBertEmbedding
-    PRETRAINED_NAME: vinai/phobert-base
+    ARCHITECTURE: OcrEmbedding
     DEVICE: cuda
-    D_PRETRAINED_FEATURE: 768
+    OCR_PATH: features/OpenViVQA/features/swintextspotter
+    WORD_EMBEDDING: null
+    D_EMBEDDING: 300
     D_MODEL: 512
     DROPOUT: .1
-  QUESTION_EMBEDDING:
+  TEXT_EMBEDDING:
     ARCHITECTURE: UsualEmbedding
     DEVICE: cuda
     D_EMBEDDING: 300
@@ -102,16 +103,13 @@ MODEL:
     DROPOUT: .1
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
-  ANSWER_EMBEDDING:
+  DYNAMIC_EMBEDDING:
     ARCHITECTURE: DynamicEmbedding
     DEVICE: cuda
-    D_EMBEDDING: 300
     D_MODEL: 512
     DROPOUT: .1
-    WORD_EMBEDDING: null
-    WORD_EMBEDDING_CACHE: null
   ENCODER:
-    ARCHITECTURE: Encoder
+    ARCHITECTURE: MultiModalEncoder
     D_MODEL: 512
     LAYERS: 3
     SELF_ATTENTION:

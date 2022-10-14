@@ -1,17 +1,23 @@
+import torch
 from torch import nn
+from torch.nn import functional as F
 
-from data_utils.vocab import Vocab
 from builders.text_embedding_builder import META_TEXT_EMBEDDING
 from builders.word_embedding_builder import build_word_embedding
 from models.utils import generate_sequential_mask, generate_padding_mask
 
 from transformers import BertTokenizer, BertModel, AlbertTokenizer, AlbertModel, T5Tokenizer, T5EncoderModel
 
-from typing import List
+import os
+import numpy as np
+from typing import Dict, List, Union
+import itertools
+from collections import defaultdict
+from copy import deepcopy
 
 @META_TEXT_EMBEDDING.register()
 class UsualEmbedding(nn.Module):
-    def __init__(self, config, vocab: Vocab):
+    def __init__(self, config, vocab):
         super(UsualEmbedding, self).__init__()
 
         self.padding_idx = vocab.padding_idx
@@ -36,8 +42,163 @@ class UsualEmbedding(nn.Module):
         return features, (padding_masks, sequential_masks)
 
 @META_TEXT_EMBEDDING.register()
+class OcrEmbedding(nn.Module):
+    def __init__(self, config, vocab):
+        super().__init__()
+
+        self.padding_idx = 0
+        self.device = config.DEVICE
+        self.ocr_token = vocab.ocr_token
+
+        ocr_texts = []
+        for file in os.listdir(config.OCR_PATH):
+            ocr_features = np.load(os.path.join(config.OCR_PATH, file), allow_pickle=True)[()]
+            ocr_texts.extend(itertools.chain(*[text.split() for text in ocr_features["texts"]]))
+        ocr_texts = set(ocr_texts)
+        self.stoi = {token: i for i, token in enumerate(ocr_texts)}
+        self.stoi.update({self.ocr_token: len(self.stoi)})
+        self.itos = {i: token for token, i in self.stoi.items()}
+
+        if config.WORD_EMBEDDING is None: # define the customized vocab
+            self.components = nn.Embedding(len(self.itos), config.D_MODEL, self.padding_idx)
+        else:
+            self.load_word_embeddings(build_word_embedding(config))
+            self.components = nn.Sequential(
+                nn.Embedding.from_pretrained(embeddings=self.word_embeddings, freeze=True, padding_idx=self.padding_idx),
+                nn.Linear(config.D_EMBEDDING, config.D_MODEL),
+                nn.Dropout(config.DROPOUT)
+            )
+    
+    def load_word_embeddings(self, word_embeddings):
+        if not isinstance(word_embeddings, list):
+            word_embeddings = [word_embeddings]
+
+        tot_dim = sum(embedding.dim for embedding in word_embeddings)
+        self.word_embeddings = torch.Tensor(len(self), tot_dim)
+        for i, token in enumerate(self.itos):
+            start_dim = 0
+            for v in word_embeddings:
+                end_dim = start_dim + v.dim
+                self.word_embeddings[i][start_dim:end_dim] = v[token.strip()]
+                start_dim = end_dim
+            assert(start_dim == tot_dim)
+
+    def forward(self, texts: List[List[str]]):
+        max_len = max([len(text) for text in texts])
+        for idx, text in enumerate(texts):
+            if len(text) < max_len:
+                text.extend([self.ocr_token] * (max_len-len(text)))
+            texts[idx] = text
+        '''
+            features: List[List[torch.Tensor]] - a batch of list of embedded features,
+                                in which each each features is the sum of embedded features of sub-tokens splitted from token
+        '''
+        features = deepcopy(texts)
+        for batch, text in enumerate(texts):
+            for idx, tokens in enumerate(text):
+                token = [self.stoi[token] if token in self.stoi else self.stoi[self.ocr_token] for token in tokens.split()]
+                token = torch.tensor(token).unsqueeze(0).to(self.device)
+                feature = self.components(token).sum(dim=1)
+                features[batch][idx] = feature
+            features[batch] = torch.cat(features[batch], dim=0).unsqueeze(0)
+        features = torch.cat(features, dim=0)
+
+        return features, None
+
+@META_TEXT_EMBEDDING.register()
+class DynamicEmbedding(nn.Module):
+    def __init__(self, config, vocab):
+        super().__init__()
+
+        self.d_model = config.D_MODEL
+        self.vocab = vocab
+
+        self.register_parameter("fixed_weights", nn.parameter.Parameter(nn.init.xavier_uniform_(torch.ones((len(vocab), self.d_model)))))
+
+    def match_text_to_indices(self, text: List[str], vocab2idx, oov2inds):
+        """
+            Match an text to a list of sequences of indices
+            each index corresponds to either a fixed vocabulary or an OOV token
+            (in the index address space, the OOV tokens are after the fixed vocab)
+        """
+        answer_word_matches = []
+        for word in text:
+            # match word to fixed vocabulary
+            matched_inds = []
+            matched_inds.append(vocab2idx[word])
+            # match answer word to OOV
+            if word in oov2inds:
+                matched_inds.extend(oov2inds[word])
+            answer_word_matches.append(matched_inds)
+
+        # expand per-word matched indices into the list of matched sequences
+        idx_seq_list = [()]
+        for matched_inds in answer_word_matches:
+            idx_seq_list = [
+                seq + (idx,)
+                for seq in idx_seq_list for idx in matched_inds
+            ]
+
+        return idx_seq_list
+
+    def encode_sequence(self, list_of_text: List[List[str]], padding_token):
+        padded_list_of_text = []
+        max_len = max([len(text)+2 for text in list_of_text])
+        for text in list_of_text:
+            text = [self.vocab.bos_token] + text + [self.vocab.eos_token]
+            if max_len - len(text) > 0:
+                text.extend([padding_token] * (max_len - len(text)))
+            padded_list_of_text.append(text)
+
+        return padded_list_of_text
+
+    def forward(self, list_of_texts: Union[List[List[str]], torch.Tensor], oov_tokens: Dict[int, str], oov_features: torch.Tensor):
+        if isinstance(list_of_texts, list): # if we have not encode the texts
+            list_of_texts = self.encode_sequence(list_of_texts, self.vocab.padding_token)
+            assert len(oov_tokens) == oov_features.shape[0], f"length of oov_tokens {len(oov_tokens)} must be equal shape of oov_features {oov_features.shape[0]} at dim 0"
+            
+            # match answers to fixed vocabulary and OCR tokens
+            oov2inds = defaultdict(list)
+            for idx, token in oov_tokens.items():
+                oov2inds[token].append(idx)
+
+            # get all possible sequences of indices of texts
+            text_inds = [self.match_text_to_indices(text, self.vocab.stoi, oov2inds) for text in list_of_texts]
+            
+            # randomly select representation for texts
+            selected_text_inds = [matched_ids[np.random.choice(len(matched_ids))] for matched_ids in text_inds]
+
+            tokens = torch.tensor(selected_text_inds).long().to(oov_features.device)
+            shifted_right_tokens = tokens[:, 1:]
+            tokens = tokens[:, :-1]
+            padding_mask = generate_padding_mask(tokens, padding_idx=self.vocab.padding_idx).to(oov_features.device)
+            seq_len = tokens.shape[1]
+            sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
+
+            # construct the dynamic embeding weights
+            weights = torch.cat([self.fixed_weights, oov_features], dim=0) # (vocab_len + ocr_len, d_model)
+
+            features = F.embedding(tokens, weights, padding_idx=self.vocab.padding_idx)
+
+            return shifted_right_tokens, features, (padding_mask, sequential_mask)
+        else:
+            assert isinstance(list_of_texts, torch.Tensor), "passed list_of_text must be list or tensor"
+            
+            tokens = list_of_texts
+            padding_mask = generate_padding_mask(tokens, padding_idx=self.vocab.padding_idx).to(oov_features.device)
+            seq_len = tokens.shape[1]
+            sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
+
+            # construct the dynamic embeding weights
+            weights = torch.cat([self.fixed_weights, oov_features], dim=0) # (vocab_len + ocr_len, d_model)
+
+            features = F.embedding(tokens, weights, padding_idx=self.vocab.padding_idx)
+
+            return None, features, (padding_mask, sequential_mask)
+
+@META_TEXT_EMBEDDING.register()
 class LSTMTextEmbedding(nn.Module):
-    def __init__(self, config, vocab: Vocab):
+    def __init__(self, config, vocab):
         super(LSTMTextEmbedding, self).__init__()
 
         self.embedding = nn.Embedding(len(vocab), config.D_EMBEDDING, padding_idx=vocab.padding_idx)

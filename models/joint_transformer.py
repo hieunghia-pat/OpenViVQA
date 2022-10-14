@@ -1,7 +1,6 @@
 import torch
 
 from .base_transformer import BaseTransformer
-from data_utils.vocab import Vocab
 from utils.instances import Instances
 from builders.encoder_builder import build_encoder
 from builders.decoder_builder import build_decoder
@@ -11,7 +10,7 @@ from builders.model_builder import META_ARCHITECTURE
 
 @META_ARCHITECTURE.register()
 class JointTransformer(BaseTransformer):
-    def __init__(self, config, vocab: Vocab):
+    def __init__(self, config, vocab):
         super().__init__(config, vocab)
 
         self.device = torch.device(config.DEVICE)

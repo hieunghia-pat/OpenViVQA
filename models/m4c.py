@@ -249,7 +249,7 @@ class M4C(BaseUniqueTransformer):
         else:
             it = prev_output
 
-        embedded_ocr_features = self.encoder_features[:, (self.region_len+self.grid_len):
+        embedded_ocr_features = self.encoder_features[0, (self.region_len+self.grid_len):
                                                         (self.region_len+self.grid_len+self.ocr_len)]
 
         answer = it
@@ -284,7 +284,7 @@ class M4C(BaseUniqueTransformer):
         with self.statefulness(batch_size):
             embedded_results = self.embed_features(input_features)
             # get some neccessary information for later usage
-            self.encoder_features = embedded_results["join_features"]
+            self.encoder_features = embedded_results["joint_features"]
             self.encoder_padding_mask = embedded_results["joint_padding_mask"]
             self.encoder_attention_mask = embedded_results["joint_attention_mask"]
             self.region_len = embedded_results["region_len"]

@@ -10,7 +10,7 @@ from transformers import BertTokenizer, BertModel, AlbertTokenizer, AlbertModel,
 
 import os
 import numpy as np
-from typing import List, Union
+from typing import Dict, List, Union
 import itertools
 from collections import defaultdict
 from copy import deepcopy
@@ -141,16 +141,6 @@ class DynamicEmbedding(nn.Module):
 
         return idx_seq_list
 
-    def pad_oov_tokens(self, oov_tokens: List[List[str]], padding_token):
-        padded_oov_tokens = []
-        max_len = max([len(oov) for oov in oov_tokens])
-        for oov in oov_tokens:
-            if max_len > len(oov):
-                oov.extend([padding_token]*(max_len - len(oov)))
-            padded_oov_tokens.append(oov)
-
-        return padded_oov_tokens
-
     def encode_sequence(self, list_of_text: List[List[str]], padding_token):
         padded_list_of_text = []
         max_len = max([len(text)+2 for text in list_of_text])
@@ -162,17 +152,14 @@ class DynamicEmbedding(nn.Module):
 
         return padded_list_of_text
 
-    def forward(self, list_of_texts: Union[List[List[str]], torch.Tensor], oov_tokens: List[List[str]], oov_features: torch.Tensor):
+    def forward(self, list_of_texts: Union[List[List[str]], torch.Tensor], oov_tokens: Dict[int, str], oov_features: torch.Tensor):
         if isinstance(list_of_texts, list): # if we have not encode the texts
             list_of_texts = self.encode_sequence(list_of_texts, self.vocab.padding_token)
-            oov_tokens = self.pad_oov_tokens(oov_tokens, padding_token=self.vocab.ocr_token)
-            flattened_oov_tokens = {len(self.vocab) + idx: token for idx, token in enumerate(itertools.chain(*oov_tokens))}
-            flattened_oov_features = torch.cat([feature for feature in oov_features], dim=0) # (ocr_len, d_model)
-            assert len(flattened_oov_tokens) == flattened_oov_features.shape[0], "length of flattened_oov_features must be equal shape of flattened_oov_features at dim 0"
+            assert len(oov_tokens) == oov_features.shape[0], f"length of oov_tokens {len(oov_tokens)} must be equal shape of oov_features {oov_features.shape[0]} at dim 0"
             
             # match answers to fixed vocabulary and OCR tokens
             oov2inds = defaultdict(list)
-            for idx, token in flattened_oov_tokens.items():
+            for idx, token in oov_tokens.items():
                 oov2inds[token].append(idx)
 
             # get all possible sequences of indices of texts
@@ -189,15 +176,13 @@ class DynamicEmbedding(nn.Module):
             sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
 
             # construct the dynamic embeding weights
-            weights = torch.cat([self.fixed_weights, flattened_oov_features], dim=0) # (vocab_len + ocr_len, d_model)
+            weights = torch.cat([self.fixed_weights, oov_features], dim=0) # (vocab_len + ocr_len, d_model)
 
             features = F.embedding(tokens, weights, padding_idx=self.vocab.padding_idx)
 
             return shifted_right_tokens, features, (padding_mask, sequential_mask)
         else:
             assert isinstance(list_of_texts, torch.Tensor), "passed list_of_text must be list or tensor"
-            flattened_oov_tokens = {len(self.vocab) + idx: token for idx, token in enumerate(itertools.chain(*oov_tokens))}
-            flattened_oov_features = torch.cat([feature for feature in oov_features], dim=0) # (ocr_len, d_model)
             
             tokens = list_of_texts
             padding_mask = generate_padding_mask(tokens, padding_idx=self.vocab.padding_idx).to(oov_features.device)
@@ -205,7 +190,7 @@ class DynamicEmbedding(nn.Module):
             sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
 
             # construct the dynamic embeding weights
-            weights = torch.cat([self.fixed_weights, flattened_oov_features], dim=0) # (vocab_len + ocr_len, d_model)
+            weights = torch.cat([self.fixed_weights, oov_features], dim=0) # (vocab_len + ocr_len, d_model)
 
             features = F.embedding(tokens, weights, padding_idx=self.vocab.padding_idx)
 

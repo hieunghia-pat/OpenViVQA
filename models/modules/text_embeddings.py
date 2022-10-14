@@ -2,7 +2,6 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from data_utils.vocab import Vocab
 from builders.text_embedding_builder import META_TEXT_EMBEDDING
 from builders.word_embedding_builder import build_word_embedding
 from models.utils import generate_sequential_mask, generate_padding_mask
@@ -18,7 +17,7 @@ from copy import deepcopy
 
 @META_TEXT_EMBEDDING.register()
 class UsualEmbedding(nn.Module):
-    def __init__(self, config, vocab: Vocab):
+    def __init__(self, config, vocab):
         super(UsualEmbedding, self).__init__()
 
         self.padding_idx = vocab.padding_idx
@@ -130,10 +129,6 @@ class DynamicEmbedding(nn.Module):
             # match answer word to OOV
             if word in oov2inds:
                 matched_inds.extend(oov2inds[word])
-            if matched_inds == []:
-                print(word)
-                print(vocab2idx.keys())
-                raise
             answer_word_matches.append(matched_inds)
 
         # expand per-word matched indices into the list of matched sequences
@@ -168,7 +163,7 @@ class DynamicEmbedding(nn.Module):
         return padded_list_of_text
 
     def forward(self, list_of_texts: Union[List[List[str]], torch.Tensor], oov_tokens: List[List[str]], oov_features: torch.Tensor):
-        if isinstance(list_of_texts, list): # is we have not encode the texts
+        if isinstance(list_of_texts, list): # if we have not encode the texts
             list_of_texts = self.encode_sequence(list_of_texts, self.vocab.padding_token)
             oov_tokens = self.pad_oov_tokens(oov_tokens, padding_token=self.vocab.ocr_token)
             flattened_oov_tokens = {len(self.vocab) + idx: token for idx, token in enumerate(itertools.chain(*oov_tokens))}
@@ -209,6 +204,7 @@ class DynamicEmbedding(nn.Module):
             seq_len = tokens.shape[1]
             sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
 
+            # construct the dynamic embeding weights
             weights = torch.cat([self.fixed_weights, flattened_oov_features], dim=0) # (vocab_len + ocr_len, d_model)
 
             features = F.embedding(tokens, weights, padding_idx=self.vocab.padding_idx)
@@ -217,7 +213,7 @@ class DynamicEmbedding(nn.Module):
 
 @META_TEXT_EMBEDDING.register()
 class LSTMTextEmbedding(nn.Module):
-    def __init__(self, config, vocab: Vocab):
+    def __init__(self, config, vocab):
         super(LSTMTextEmbedding, self).__init__()
 
         self.embedding = nn.Embedding(len(vocab), config.D_EMBEDDING, padding_idx=vocab.padding_idx)

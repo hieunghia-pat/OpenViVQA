@@ -13,6 +13,7 @@ from models.modules.beam_search import BeamSearch
 
 import numpy as np
 import math
+from typing import List
 
 class DynamicPointerNetwork(nn.Module):
     def __init__(self, config):
@@ -57,6 +58,27 @@ class M4C(BaseUniqueTransformer):
         self.vocab_proj = nn.Linear(config.D_MODEL, len(vocab))
 
         self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
+
+    def pad_oov_tokens(self, oov_tokens: List[List[str]], padding_token):
+        padded_oov_tokens = []
+        max_len = max([len(oov) for oov in oov_tokens])
+        for oov in oov_tokens:
+            if max_len > len(oov):
+                oov.extend([padding_token]*(max_len - len(oov)))
+            padded_oov_tokens.append(oov)
+
+        return padded_oov_tokens
+
+    def encode_sequence(self, list_of_text: List[List[str]], padding_token):
+        padded_list_of_text = []
+        max_len = max([len(text)+2 for text in list_of_text])
+        for text in list_of_text:
+            text = [self.vocab.bos_token] + text + [self.vocab.eos_token]
+            if max_len - len(text) > 0:
+                text.extend([padding_token] * (max_len - len(text)))
+            padded_list_of_text.append(text)
+
+        return padded_list_of_text
 
     def forward_region_features(self, features, boxes):
         features, padding_mask = self.region_embedding(features)

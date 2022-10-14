@@ -1,13 +1,12 @@
 import torch
 from torch import nn
 
-from data_utils.vocab import Vocab
 from models.modules.containers import Module
 from models.modules.beam_search import BeamSearch
 from utils.instances import Instances
 
 class BaseUniqueTransformer(Module):
-    def __init__(self, config, vocab: Vocab):
+    def __init__(self, config, vocab):
         super(BaseUniqueTransformer, self).__init__()
 
         self.vocab = vocab

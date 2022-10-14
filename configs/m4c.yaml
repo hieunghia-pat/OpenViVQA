@@ -19,7 +19,7 @@ DATASET:
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.3
-  MIN_FREQ: 5
+  MIN_FREQ: 1
   VOCAB:
     TYPE: OcrVocab
     TOKENIZER: null

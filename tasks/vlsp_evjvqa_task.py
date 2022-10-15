@@ -225,8 +225,8 @@ class VlspEvjVqaTask(BaseTask):
                 pbar.update()
 
     def start(self):
-        if os.path.isfile(os.path.join(self.checkpoint_path, "best_model.pth")):
-            checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
+        if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
+            checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
             use_rl = checkpoint["use_rl"]
             best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]

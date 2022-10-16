@@ -128,23 +128,9 @@ class M4C(BaseUniqueTransformer):
         ocr_embedded, _ = self.text_embedding(ocr_embedding_tokens)
         ocr_word_features += ocr_embedded
 
-        # flatten all ocr features for the ease of using dynamic embedding
         ocr_features = det_features + rec_features + boxes + ocr_word_features
-        bs, ocr_len, d_model = ocr_features.shape
-        flattened_ocr_features = ocr_features.reshape(1, bs*ocr_len, d_model).expand(bs, -1, -1)
-        
-        flattened_padding_mask = torch.zeros((1, bs*ocr_len)).bool().to(self.device) # (1, bs*ocr_len)
-        flattened_padding_mask = flattened_padding_mask.expand(bs, -1) # (bs, bs*ocr_len)
-        padding_mask = padding_mask.squeeze(1).squeeze(1)
-        for batch in range(bs):
-            # only ocr features respective to each batch are allowed
-            flattened_padding_mask[batch, batch*ocr_len:(batch+1)*ocr_len] = padding_mask[batch]
-        flattened_padding_mask = flattened_padding_mask.unsqueeze(1).unsqueeze(1) # (bs, 1, 1, bs*ocr_len)
-        
-        ocr_tokens = self.pad_oov_tokens(ocr_tokens, padding_token=self.vocab.ocr_token)
-        flattened_ocr_tokens = {len(self.vocab) + idx: token for idx, token in enumerate(itertools.chain(*ocr_tokens))}
 
-        return flattened_ocr_features, flattened_ocr_tokens, flattened_padding_mask
+        return ocr_features, padding_mask
 
     def forward_questions(self, question_tokens):
         q_tokens = torch.ones((question_tokens.shape[0], question_tokens.shape[1])).long().to(question_tokens.device) * self.vocab.question_idx
@@ -154,13 +140,13 @@ class M4C(BaseUniqueTransformer):
 
         return question_features, question_padding_mask
 
-    def forward_answer(self, answers, ocr_tokens, ocr_features):
-        shifted_right_answer_tokens, answer_features, answer_masks = self.dynamic_embedding(answers, ocr_tokens, ocr_features)
+    def forward_answer(self, answers, ocr_features):
+        answer_features, answer_masks = self.dynamic_embedding(answers, ocr_features)
         a_tokens = torch.ones((answer_features.shape[0], answer_features.shape[1])).long().to(answer_features.device) * self.vocab.answer_idx
         a_embeded, _ = self.text_embedding(a_tokens)
         answer_features += a_embeded
 
-        return shifted_right_answer_tokens, answer_features, answer_masks
+        return answer_features, answer_masks
 
     def embed_features(self, input_features: Instances):
         region_features = input_features.region_features
@@ -175,7 +161,7 @@ class M4C(BaseUniqueTransformer):
         ocr_det_features = input_features.ocr_det_features
         ocr_rec_features = input_features.ocr_rec_features
         ocr_boxes = input_features.ocr_boxes
-        ocr_features, flattened_ocr_tokens, ocr_padding_mask = self.forward_ocr_features(ocr_tokens, ocr_det_features, ocr_rec_features, ocr_boxes)
+        ocr_features, ocr_padding_mask = self.forward_ocr_features(ocr_tokens, ocr_det_features, ocr_rec_features, ocr_boxes)
 
         question_tokens = input_features.question_tokens
         question_features, question_padding_mask = self.forward_questions(question_tokens)
@@ -197,7 +183,7 @@ class M4C(BaseUniqueTransformer):
             "joint_features": joint_features,
             "joint_padding_mask": joint_padding_mask,
             "joint_attention_mask": joint_attention_mask,
-            "ocr_tokens": flattened_ocr_tokens
+            "ocr_tokens": ocr_tokens
         }
 
         return results
@@ -211,11 +197,10 @@ class M4C(BaseUniqueTransformer):
         joint_features = embedded_results["joint_features"]
         joint_padding_mask = embedded_results["joint_padding_mask"]
         joint_attention_mask = embedded_results["joint_attention_mask"]
-        embedded_ocr_features = joint_features[0, (region_len+grid_len):(region_len+grid_len+ocr_len)]
+        embedded_ocr_features = joint_features[:, (region_len+grid_len):(region_len+grid_len+ocr_len)]
 
-        ocr_tokens = embedded_results["ocr_tokens"]
-        answers = input_features.answer
-        shifted_right_answer_tokens, answer_features, answer_masks = self.forward_answer(answers, ocr_tokens, embedded_ocr_features)
+        answer_tokens = input_features.answer_tokens
+        answer_features, answer_masks = self.forward_answer(answer_tokens, embedded_ocr_features)
         joint_features, (joint_padding_mask, joint_attention_mask) = self.append_answer(joint_features, (joint_padding_mask, joint_attention_mask),
                                                                                         answer_features, answer_masks)
 
@@ -238,9 +223,8 @@ class M4C(BaseUniqueTransformer):
         ocr_features = self.dynamic_network(ocr_features, answer_features, ocr_padding_mask).transpose(-2, -1) # (bs, answer_len, ocr_len)
         out = torch.cat([vocab_features, ocr_features], dim=-1) # (bs, answer_len, num_vocab + ocr_len)
         out = F.log_softmax(out, dim=-1)
-        loss = self.loss_fn(out.reshape(-1, out.shape[-1]), shifted_right_answer_tokens.reshape(-1))
 
-        return loss
+        return out
 
     def step(self, t, prev_output):
         bs = self.encoder_features.shape[0]
@@ -249,11 +233,11 @@ class M4C(BaseUniqueTransformer):
         else:
             it = prev_output
 
-        embedded_ocr_features = self.encoder_features[0, (self.region_len+self.grid_len):
+        embedded_ocr_features = self.encoder_features[:, (self.region_len+self.grid_len):
                                                         (self.region_len+self.grid_len+self.ocr_len)]
 
         answer = it
-        _, answer_features, answer_masks = self.forward_answer(answer, self.ocr_tokens, embedded_ocr_features)
+        answer_features, answer_masks = self.forward_answer(answer, embedded_ocr_features)
         self.encoder_features, (self.encoder_padding_mask, self.encoder_attention_mask) = self.append_answer(self.encoder_features, 
                                                                                                                 (self.encoder_padding_mask, self.encoder_attention_mask),
                                                                                                                 answer_features, answer_masks)
@@ -291,7 +275,6 @@ class M4C(BaseUniqueTransformer):
             self.grid_len = embedded_results["grid_len"]
             self.question_len = embedded_results["question_len"]
             self.ocr_len = embedded_results["ocr_len"]
-            self.ocr_tokens = embedded_results["ocr_tokens"]
             # apply beam search while decode the results
             output =  beam_search.apply(out_size, return_probs, **kwargs)
 

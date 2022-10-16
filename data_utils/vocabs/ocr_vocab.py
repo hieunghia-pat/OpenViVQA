@@ -4,8 +4,9 @@ from data_utils.vocabs.vocab import Vocab
 from builders.word_embedding_builder import build_word_embedding
 from builders.vocab_builder import META_VOCAB
 
-from typing import Dict, List
-import itertools
+from typing import List, Dict
+import numpy as np
+from collections import defaultdict
 
 @META_VOCAB.register()
 class OcrVocab(Vocab):
@@ -80,27 +81,59 @@ class OcrVocab(Vocab):
         if config.VOCAB.WORD_EMBEDDING is not None:
             self.load_word_embeddings(build_word_embedding(config))
 
-    def encode_answer(self, answer: List[str], ocr_id_of: Dict[str, int]) -> torch.Tensor:
-        """ Turn a answer into a vector of indices and a question length """
-        ocr_id_of = {token: idx for idx, token in enumerate(itertools.chain(*ocr_id_of))}
+    def match_text_to_indices(self, text: List[str], oov2inds: Dict[str, int]):
+        '''
+            Match an text to a list of sequences of indices
+            each index corresponds to either a fixed vocabulary or an OOV token
+            (in the index address space, the OOV tokens are after the fixed vocab)
+        '''
+        answer_word_matches = []
+        for word in text:
+            # match word to fixed vocabulary
+            matched_inds = []
+            matched_inds.append(self.stoi[word])
+            # match answer word to OOV
+            if word in oov2inds:
+                matched_inds.extend(oov2inds[word])
+            answer_word_matches.append(matched_inds)
+
+        # expand per-word matched indices into the list of matched sequences
+        idx_seq_list = [[]]
+        for matched_inds in answer_word_matches:
+            idx_seq_list = [
+                seq + [idx, ]
+                for seq in idx_seq_list for idx in matched_inds
+            ]
+
+        return idx_seq_list
+
+    def encode_answer(self, answer: List[str], ocr_tokens: List[str]) -> torch.Tensor:
+        '''
+            Turn a answer into a vector of indices and a question length
+        '''
+        assert isinstance(answer, list), f"answer must be a list of strings, get answer is of type {type(answer)}"
+
+        # match answers to fixed vocabulary and OCR tokens
+        ocr_tokens = {token: len(self.stoi)+idx for idx, token in enumerate(ocr_tokens)}
+        ocr2inds = defaultdict(list)
+        for idx, token in ocr_tokens.items():
+            ocr2inds[token].append(idx)
+        matched_ids = self.match_text_to_indices(answer, ocr2inds)
+        answer = matched_ids[np.random.choice(len(matched_ids))]
+
         vec = torch.ones(self.max_answer_length).long() * self.padding_idx
-        for i, token in enumerate([self.bos_token] + answer + [self.eos_token]):
-            if token in ocr_id_of:
-                id = ocr_id_of[token]
-            elif token in self.stoi:
-                id = self.stoi[token]
-            else:
-                id = self.unk_idx
-            vec[i] = id
+        for ith, idx in enumerate([self.bos_idx] + answer + [self.eos_idx]):
+            vec[ith] = idx
+
         return vec
 
-    def decode_answer(self, answer_vecs: torch.Tensor, ocr_token_of: List[List[str]], join_words=True) -> List[str]:
+    def decode_answer(self, answer_vecs: torch.Tensor, list_ocr_tokens: List[List[str]], join_words=True) -> List[str]:
         '''
             answer_vecs: (bs, max_length)
         '''
-        ocr_token_of = {idx: token for idx, token in enumerate(itertools.chain(*ocr_token_of))}
+        ocr_token_of = [{len(self.stoi)+idx: token for idx, token in enumerate(ocr_tokens)} for ocr_tokens in list_ocr_tokens]
         answers = []
-        for vec in answer_vecs:
+        for batch, vec in enumerate(answer_vecs):
             answer = []
             for idx in vec.tolist():
                 if idx in self.specials:
@@ -109,7 +142,7 @@ class OcrVocab(Vocab):
                     answer.append(self.itos[idx])
                     continue
                 if idx in ocr_token_of:
-                    answer.append(ocr_token_of[idx])
+                    answer.append(ocr_token_of[batch][idx])
                     continue
             answer = " ".join(answer)
             if join_words:

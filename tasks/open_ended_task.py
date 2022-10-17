@@ -114,7 +114,7 @@ class OpenEndedTask(BaseTask):
                         out = self.model(items).contiguous()
                     
                     shifted_right_answer_tokens = items.shifted_right_answer_tokens
-                    loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
+                    loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
 
@@ -157,7 +157,7 @@ class OpenEndedTask(BaseTask):
                 out = self.model(items).contiguous()
                 shifted_right_answer_tokens = items.shifted_right_answer_tokens
                 self.optim.zero_grad()
-                loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
+                loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
                 loss.backward()
 
                 self.optim.step()

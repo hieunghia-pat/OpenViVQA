@@ -1,4 +1,4 @@
-TASK: OpenEndedTask
+TASK: OcrOpenEndedTask
 
 DATASET:
   FEATURE_DATASET:

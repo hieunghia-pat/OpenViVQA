@@ -69,13 +69,18 @@ class OcrFeatureDataset(FeatureDataset):
         answer = item["answer"]
 
         ocr_tokens = [text for text in features["ocr_texts"]] if len(features["ocr_texts"]) > 0 else [self.vocab.ocr_token]
+        answer_tokens = self.vocab.encode_answer(answer, ocr_tokens)
+        shifted_right_answer_tokens = answer_tokens[1:] # ignore the bos token
+        answer_tokens = answer_tokens[:-1] # ignore the eos token
 
         return Instances(
             **features,
             ocr_tokens=ocr_tokens,
             question=question,
             question_tokens=question_tokens,
-            answer=answer
+            answer=answer,
+            answer_tokens=answer_tokens,
+            shifted_right_answer_tokens=shifted_right_answer_tokens
         )
 
 @META_DATASET.register()

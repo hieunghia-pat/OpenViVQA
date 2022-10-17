@@ -74,8 +74,8 @@ class OcrEmbedding(nn.Module):
             word_embeddings = [word_embeddings]
 
         tot_dim = sum(embedding.dim for embedding in word_embeddings)
-        self.word_embeddings = torch.Tensor(len(self), tot_dim)
-        for i, token in enumerate(self.itos):
+        self.word_embeddings = torch.Tensor(len(self.stoi), tot_dim)
+        for i, token in self.itos.items():
             start_dim = 0
             for v in word_embeddings:
                 end_dim = start_dim + v.dim
@@ -115,86 +115,39 @@ class DynamicEmbedding(nn.Module):
 
         self.register_parameter("fixed_weights", nn.parameter.Parameter(nn.init.xavier_uniform_(torch.ones((len(vocab), self.d_model)))))
 
-    def match_text_to_indices(self, text: List[str], vocab2idx, oov2inds):
-        """
-            Match an text to a list of sequences of indices
-            each index corresponds to either a fixed vocabulary or an OOV token
-            (in the index address space, the OOV tokens are after the fixed vocab)
-        """
-        answer_word_matches = []
-        for word in text:
-            # match word to fixed vocabulary
-            matched_inds = []
-            matched_inds.append(vocab2idx[word])
-            # match answer word to OOV
-            if word in oov2inds:
-                matched_inds.extend(oov2inds[word])
-            answer_word_matches.append(matched_inds)
+    def batch_embedding(self, weights, tokens, padding_idx):
+        '''
+            weights: (bs, embedding_len, d_model)
+            tokens: (bs, seq_len)
+        '''
+        assert weights.dim() == 3
+        batch_size = weights.shape[0]
+        length = weights.shape[1]
+        d_model = weights.shape[-1]
+        assert d_model == self.d_model
+        flattened_weights = weights.view(batch_size*length, d_model)
 
-        # expand per-word matched indices into the list of matched sequences
-        idx_seq_list = [()]
-        for matched_inds in answer_word_matches:
-            idx_seq_list = [
-                seq + (idx,)
-                for seq in idx_seq_list for idx in matched_inds
-            ]
+        batch_offsets = torch.arange(batch_size, device=tokens.device) * length
+        batch_offsets = batch_offsets.unsqueeze(-1)
+        assert batch_offsets.dim() == tokens.dim()
+        flattened_tokens = tokens + batch_offsets
+        results = F.embedding(flattened_tokens, flattened_weights, padding_idx=padding_idx)
+        
+        return results
 
-        return idx_seq_list
+    def forward(self, tokens: torch.Tensor, oov_features: torch.Tensor):
+        padding_mask = generate_padding_mask(tokens, padding_idx=self.vocab.padding_idx).to(oov_features.device)
+        seq_len = tokens.shape[1]
+        sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
 
-    def encode_sequence(self, list_of_text: List[List[str]], padding_token):
-        padded_list_of_text = []
-        max_len = max([len(text)+2 for text in list_of_text])
-        for text in list_of_text:
-            text = [self.vocab.bos_token] + text + [self.vocab.eos_token]
-            if max_len - len(text) > 0:
-                text.extend([padding_token] * (max_len - len(text)))
-            padded_list_of_text.append(text)
+        # construct the dynamic embeding weights
+        bs = tokens.shape[0]
+        fixed_weights = self.fixed_weights.unsqueeze(0).expand((bs, -1, -1)) # (bs, vocab_len, d_model)
+        weights = torch.cat([fixed_weights, oov_features], dim=1) # (bs, vocab_len + ocr_len, d_model)
 
-        return padded_list_of_text
+        features = self.batch_embedding(weights, tokens, self.vocab.padding_idx)
 
-    def forward(self, list_of_texts: Union[List[List[str]], torch.Tensor], oov_tokens: Dict[int, str], oov_features: torch.Tensor):
-        if isinstance(list_of_texts, list): # if we have not encode the texts
-            list_of_texts = self.encode_sequence(list_of_texts, self.vocab.padding_token)
-            assert len(oov_tokens) == oov_features.shape[0], f"length of oov_tokens {len(oov_tokens)} must be equal shape of oov_features {oov_features.shape[0]} at dim 0"
-            
-            # match answers to fixed vocabulary and OCR tokens
-            oov2inds = defaultdict(list)
-            for idx, token in oov_tokens.items():
-                oov2inds[token].append(idx)
-
-            # get all possible sequences of indices of texts
-            text_inds = [self.match_text_to_indices(text, self.vocab.stoi, oov2inds) for text in list_of_texts]
-            
-            # randomly select representation for texts
-            selected_text_inds = [matched_ids[np.random.choice(len(matched_ids))] for matched_ids in text_inds]
-
-            tokens = torch.tensor(selected_text_inds).long().to(oov_features.device)
-            shifted_right_tokens = tokens[:, 1:]
-            tokens = tokens[:, :-1]
-            padding_mask = generate_padding_mask(tokens, padding_idx=self.vocab.padding_idx).to(oov_features.device)
-            seq_len = tokens.shape[1]
-            sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
-
-            # construct the dynamic embeding weights
-            weights = torch.cat([self.fixed_weights, oov_features], dim=0) # (vocab_len + ocr_len, d_model)
-
-            features = F.embedding(tokens, weights, padding_idx=self.vocab.padding_idx)
-
-            return shifted_right_tokens, features, (padding_mask, sequential_mask)
-        else:
-            assert isinstance(list_of_texts, torch.Tensor), "passed list_of_text must be list or tensor"
-            
-            tokens = list_of_texts
-            padding_mask = generate_padding_mask(tokens, padding_idx=self.vocab.padding_idx).to(oov_features.device)
-            seq_len = tokens.shape[1]
-            sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
-
-            # construct the dynamic embeding weights
-            weights = torch.cat([self.fixed_weights, oov_features], dim=0) # (vocab_len + ocr_len, d_model)
-
-            features = F.embedding(tokens, weights, padding_idx=self.vocab.padding_idx)
-
-            return None, features, (padding_mask, sequential_mask)
+        return features, (padding_mask, sequential_mask)
 
 @META_TEXT_EMBEDDING.register()
 class LSTMTextEmbedding(nn.Module):

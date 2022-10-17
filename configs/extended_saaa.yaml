@@ -25,6 +25,10 @@ DATASET:
     BOX_TOKEN: <box>
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
+    JSON_PATH:
+      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
   JSON_PATH:
     TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
     DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json

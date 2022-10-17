@@ -42,48 +42,26 @@ class UsualEmbedding(nn.Module):
         return features, (padding_masks, sequential_masks)
 
 @META_TEXT_EMBEDDING.register()
-class OcrEmbedding(nn.Module):
+class OcrWordEmbedding(nn.Module):
     def __init__(self, config, vocab):
         super().__init__()
 
-        self.padding_idx = 0
         self.device = config.DEVICE
+        self.padding_idx = 0
         self.padding_token = vocab.padding_token
+        self.d_model = config.D_MODEL
+        self.d_embedding = config.D_EMBEDDING
+        self.word_embedding = build_word_embedding(config)
 
-        ocr_texts = []
-        for file in os.listdir(config.OCR_PATH):
-            ocr_features = np.load(os.path.join(config.OCR_PATH, file), allow_pickle=True)[()]
-            ocr_texts.extend(itertools.chain(*[text.split() for text in ocr_features["texts"]]))
-        if "" in ocr_texts:
-            ocr_texts.remove("")
-        ocr_texts = set(ocr_texts)
-        self.stoi = {token: i for i, token in enumerate(ocr_texts)}
-        self.stoi.update({self.padding_token: len(self.stoi)})
-        self.itos = {i: token for token, i in self.stoi.items()}
-
-        if config.WORD_EMBEDDING is None: # define the customized vocab
-            self.components = nn.Embedding(len(self.itos), config.D_MODEL, self.padding_idx)
-        else:
-            self.load_word_embeddings(build_word_embedding(config))
-            self.components = nn.Sequential(
-                nn.Embedding.from_pretrained(embeddings=self.word_embeddings, freeze=True, padding_idx=self.padding_idx),
-                nn.Linear(config.D_EMBEDDING, config.D_MODEL),
-                nn.Dropout(config.DROPOUT)
-            )
+        self.fc = nn.Linear(config.D_EMBEDDING, config.D_MODEL)
+        self.dropout = nn.Dropout(config.DROPOUT)
     
-    def load_word_embeddings(self, word_embeddings):
-        if not isinstance(word_embeddings, list):
-            word_embeddings = [word_embeddings]
+    def load_word_embedding(self, stoi: Dict[str, int]):
+        weights = torch.Tensor(len(stoi), self.word_embedding.dim).to(self.device)
+        for token, idx in stoi.items():
+            weights[idx] = self.word_embedding[token.strip()]
 
-        tot_dim = sum(embedding.dim for embedding in word_embeddings)
-        self.word_embeddings = torch.Tensor(len(self.stoi), tot_dim)
-        for i, token in self.itos.items():
-            start_dim = 0
-            for v in word_embeddings:
-                end_dim = start_dim + v.dim
-                self.word_embeddings[i][start_dim:end_dim] = v[token.strip()]
-                start_dim = end_dim
-            assert(start_dim == tot_dim)
+        return weights
 
     def forward(self, batch_of_texts: List[List[str]]):
         max_len = max([len(text) for text in batch_of_texts])
@@ -91,19 +69,30 @@ class OcrEmbedding(nn.Module):
             if len(texts) < max_len:
                 texts.extend([self.padding_token] * (max_len-len(texts)))
             batch_of_texts[batch] = texts
-        '''
-            features: List[List[torch.Tensor]] - a batch of list of embedded features,
-                                in which each each features is the sum of embedded features of sub-tokens splitted from token
-        '''
+
+        ocr_tokens = []
+        for texts in batch_of_texts:
+            ocr_tokens.extend(itertools.chain(*[text.split() for text in texts]))
+        if "" in ocr_tokens:
+            ocr_tokens.remove("")
+        ocr_tokens = set(ocr_tokens)
+        ocr2idx = {token: idx for idx, token in enumerate(ocr_tokens)}
+
+        weights = self.load_word_embedding(ocr2idx)
+        weights.requires_grad = False # freeze the embedding weights
+
         features = deepcopy(batch_of_texts)
         for batch, texts in enumerate(batch_of_texts):
             for idx, token in enumerate(texts):
-                token = [self.stoi[subtoken] for subtoken in token.split()]
+                token = [ocr2idx[subtoken] for subtoken in token.split()]
                 token = torch.tensor(token).unsqueeze(0).to(self.device)
-                feature = self.components(token).sum(dim=1)
+                feature = F.embedding(token, weights, padding_idx=self.padding_idx).sum(dim=1)
                 features[batch][idx] = feature
             features[batch] = torch.cat(features[batch], dim=0).unsqueeze(0)
         features = torch.cat(features, dim=0)
+
+        features = self.fc(features)
+        features = self.dropout(features)
 
         return features, None
 

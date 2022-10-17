@@ -66,7 +66,7 @@ class DictionaryDataset(BaseDataset):
                         question = preprocess_sentence(question, self.vocab.tokenizer)
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
                     annotation = {
-                        # "question_id": ann["id"],
+                        "question_id": ann["id"],
                         # "type": None,
                         "question": question,
                         "answer": answer,
@@ -197,7 +197,7 @@ class MultilingualDictionaryDataset(DictionaryDataset):
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
                     # answers = [" ".join(answer)]
                     annotation = {
-                        # "question_id": ann["id"],
+                        "question_id": ann["id"],
                         # "type": None,
                         "question": question,
                         "answer": answer,
@@ -233,7 +233,7 @@ class ImageQuestionDictionaryDataset(DictionaryDataset):
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
                     # answers = [" ".join(answer)]
                     annotation = {
-                        # "question_id": ann["id"],
+                        "question_id": ann["id"],
                         # "type": None,
                         "question": question,
                         "answer": answer,
@@ -287,7 +287,7 @@ class MultilingualImageQuestionDictionaryDataset(ImageQuestionDictionaryDataset)
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
                     # answers = [" ".join(answer)]
                     annotation = {
-                        # "question_id": ann["id"],
+                        "question_id": ann["id"],
                         # "type": None,
                         "question": question,
                         "answer": answer,
@@ -325,7 +325,7 @@ class ImageDataset(BaseDataset):
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
                     # answers = [" ".join(answer)]
                     annotation = {
-                        # "question_id": ann["id"],
+                        "question_id": ann["id"],
                         # "type": None,
                         "question": question,
                         "answer": answer,
@@ -550,7 +550,7 @@ class ImageQuestionDataset(FeatureDataset):
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
                     # answers = [" ".join(answer)]
                     annotation = {
-                        # "question_id": ann["id"],
+                        "question_id": ann["id"],
                         # "type": None,
                         "question": question,
                         "answer": answer,
@@ -609,7 +609,7 @@ class MultilingualImageQuestionDataset(ImageQuestionDataset):
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
                     # answers = [" ".join(answer)]
                     annotation = {
-                        # "question_id": ann["id"],
+                        "question_id": ann["id"],
                         # "type": None,
                         "question": question,
                         "answer": answer,
@@ -655,7 +655,7 @@ class FeatureClassificationDataset(BaseDataset):
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
                     # answers = [" ".join(answer)]
                     annotation = {
-                        # "question_id": ann["id"],
+                        "question_id": ann["id"],
                         # "type": None,
                         "question": question,
                         "answer": answer,
@@ -729,7 +729,7 @@ class MultilingualImageQuestionClassificationDataset(ImageQuestionClassification
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
                     # answers = [" ".join(answer)]
                     annotation = {
-                        # "question_id": ann["id"],
+                        "question_id": ann["id"],
                         # "type": None,
                         "question": question,
                         "answer": answer,

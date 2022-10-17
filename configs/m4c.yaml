@@ -92,7 +92,7 @@ MODEL:
     D_MODEL: 512
     DROPOUT: .1
   OCR_TEXT_EMBEDDING:
-    ARCHITECTURE: OcrEmbedding
+    ARCHITECTURE: OcrWordEmbedding
     DEVICE: cuda
     OCR_PATH: features/OpenViVQA/features/swintextspotter
     WORD_EMBEDDING: ViFastText

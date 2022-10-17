@@ -121,7 +121,7 @@ class WordEmbedding(object):
 
                 itos, vectors, dim = [], torch.zeros((max_vectors, dim)), None
 
-                for line in tqdm(f, total=max_vectors, desc="Loading word embedding"):
+                for line in tqdm(f, total=max_vectors, desc="Loading vectors"):
                     # Explicitly splitting on " " is important, so we don't
                     # get rid of Unicode non-breaking spaces in the vectors.
                     entries = line.rstrip().split(b" ")
@@ -130,8 +130,6 @@ class WordEmbedding(object):
                     if dim is None and len(entries) > 1:
                         dim = len(entries)
                     elif len(entries) == 1:
-                        logger.warning("Skipping token {} with 1-dimensional "
-                                       "vector {}; likely a header".format(word, entries))
                         continue
                     elif dim != len(entries):
                         raise RuntimeError(

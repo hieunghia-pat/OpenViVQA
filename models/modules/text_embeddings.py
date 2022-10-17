@@ -48,15 +48,17 @@ class OcrEmbedding(nn.Module):
 
         self.padding_idx = 0
         self.device = config.DEVICE
-        self.ocr_token = vocab.ocr_token
+        self.padding_token = vocab.padding_token
 
         ocr_texts = []
         for file in os.listdir(config.OCR_PATH):
             ocr_features = np.load(os.path.join(config.OCR_PATH, file), allow_pickle=True)[()]
             ocr_texts.extend(itertools.chain(*[text.split() for text in ocr_features["texts"]]))
+        if "" in ocr_texts:
+            ocr_texts.remove("")
         ocr_texts = set(ocr_texts)
         self.stoi = {token: i for i, token in enumerate(ocr_texts)}
-        self.stoi.update({self.ocr_token: len(self.stoi)})
+        self.stoi.update({self.padding_token: len(self.stoi)})
         self.itos = {i: token for token, i in self.stoi.items()}
 
         if config.WORD_EMBEDDING is None: # define the customized vocab
@@ -83,20 +85,20 @@ class OcrEmbedding(nn.Module):
                 start_dim = end_dim
             assert(start_dim == tot_dim)
 
-    def forward(self, texts: List[List[str]]):
-        max_len = max([len(text) for text in texts])
-        for idx, text in enumerate(texts):
-            if len(text) < max_len:
-                text.extend([self.ocr_token] * (max_len-len(text)))
-            texts[idx] = text
+    def forward(self, batch_of_texts: List[List[str]]):
+        max_len = max([len(text) for text in batch_of_texts])
+        for batch, texts in enumerate(batch_of_texts):
+            if len(texts) < max_len:
+                texts.extend([self.padding_token] * (max_len-len(texts)))
+            batch_of_texts[batch] = texts
         '''
             features: List[List[torch.Tensor]] - a batch of list of embedded features,
                                 in which each each features is the sum of embedded features of sub-tokens splitted from token
         '''
-        features = deepcopy(texts)
-        for batch, text in enumerate(texts):
-            for idx, tokens in enumerate(text):
-                token = [self.stoi[token] if token in self.stoi else self.stoi[self.ocr_token] for token in tokens.split()]
+        features = deepcopy(batch_of_texts)
+        for batch, texts in enumerate(batch_of_texts):
+            for idx, token in enumerate(texts):
+                token = [self.stoi[subtoken] for subtoken in token.split()]
                 token = torch.tensor(token).unsqueeze(0).to(self.device)
                 feature = self.components(token).sum(dim=1)
                 features[batch][idx] = feature

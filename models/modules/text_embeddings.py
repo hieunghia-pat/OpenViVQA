@@ -74,8 +74,8 @@ class OcrEmbedding(nn.Module):
             word_embeddings = [word_embeddings]
 
         tot_dim = sum(embedding.dim for embedding in word_embeddings)
-        self.word_embeddings = torch.Tensor(len(self), tot_dim)
-        for i, token in enumerate(self.itos):
+        self.word_embeddings = torch.Tensor(len(self.stoi), tot_dim)
+        for i, token in self.itos.items():
             start_dim = 0
             for v in word_embeddings:
                 end_dim = start_dim + v.dim

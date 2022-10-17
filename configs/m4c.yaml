@@ -1,4 +1,4 @@
-TASK: OcrOpenEndedTask
+TASK: OpenEndedTask
 
 DATASET:
   FEATURE_DATASET:
@@ -37,6 +37,10 @@ DATASET:
     OCR_REC_TOKEN: <ocr_rec>
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
+    JSON_PATH:
+      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
   JSON_PATH:
     TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
     DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
@@ -91,7 +95,8 @@ MODEL:
     ARCHITECTURE: OcrEmbedding
     DEVICE: cuda
     OCR_PATH: features/OpenViVQA/features/swintextspotter
-    WORD_EMBEDDING: null
+    WORD_EMBEDDING: ViFastText
+    WORD_EMBEDDING_CACHE: null
     D_EMBEDDING: 300
     D_MODEL: 512
     DROPOUT: .1

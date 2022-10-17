@@ -121,7 +121,7 @@ class WordEmbedding(object):
 
                 itos, vectors, dim = [], torch.zeros((max_vectors, dim)), None
 
-                for line in tqdm(f, total=max_vectors):
+                for line in tqdm(f, total=max_vectors, desc="Loading word embedding"):
                     # Explicitly splitting on " " is important, so we don't
                     # get rid of Unicode non-breaking spaces in the vectors.
                     entries = line.rstrip().split(b" ")

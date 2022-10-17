@@ -6,7 +6,7 @@ from builders.vocab_builder import META_VOCAB
 
 from collections import Counter
 import json
-from typing import Dict, List
+from typing import List
 
 @META_VOCAB.register()
 class Vocab(object):
@@ -15,12 +15,12 @@ class Vocab(object):
     """
     def __init__(self, config):
 
-        self.tokenizer = config.VOCAB.TOKENIZER
+        self.tokenizer = config.TOKENIZER
 
-        self.padding_token = config.VOCAB.PAD_TOKEN
-        self.bos_token = config.VOCAB.BOS_TOKEN
-        self.eos_token = config.VOCAB.EOS_TOKEN
-        self.unk_token = config.VOCAB.UNK_TOKEN
+        self.padding_token = config.PAD_TOKEN
+        self.bos_token = config.BOS_TOKEN
+        self.eos_token = config.EOS_TOKEN
+        self.unk_token = config.UNK_TOKEN
 
         self.make_vocab([
             config.JSON_PATH.TRAIN,
@@ -58,7 +58,7 @@ class Vocab(object):
         self.unk_idx = self.stoi[self.unk_token]
 
         self.word_embeddings = None
-        if config.VOCAB.WORD_EMBEDDING is not None:
+        if config.WORD_EMBEDDING is not None:
             self.load_word_embeddings(build_word_embedding(config))
 
     def make_vocab(self, json_dirs):
@@ -135,7 +135,7 @@ class Vocab(object):
         return len(self.itos)
 
     def extend(self, v, sort=False):
-        words = sorted(v.itos) if sort else v.itos
+        words = sorted(v.itos.values()) if sort else v.itos.values()
         for w in words:
             if w not in self.stoi:
                 self.itos.append(w)
@@ -147,7 +147,7 @@ class Vocab(object):
 
         tot_dim = sum(embedding.dim for embedding in word_embeddings)
         self.word_embeddings = torch.Tensor(len(self), tot_dim)
-        for i, token in enumerate(self.itos):
+        for i, token in self.itos.items():
             start_dim = 0
             for v in word_embeddings:
                 end_dim = start_dim + v.dim
@@ -168,7 +168,7 @@ class Vocab(object):
             dim: The dimensionality of the word_embeddings.
         """
         self.word_embeddings = torch.Tensor(len(self), dim)
-        for i, token in enumerate(self.itos):
+        for i, token in self.itos.items():
             we_index = stoi.get(token, None)
             if we_index is not None:
                 self.word_embeddings[i] = word_embeddings[we_index]

@@ -2,7 +2,7 @@ import torch
 
 from utils.logging_utils import setup_logger
 from utils.instances import Instances
-from .base_task import BaseTask
+from .open_ended_task import OpenEndedTask
 from builders.task_builder import META_TASK
 import evaluation
 
@@ -15,7 +15,7 @@ import json
 logger = setup_logger()
 
 @META_TASK.register()
-class OcrOpenEndedTask(BaseTask):
+class OcrOpenEndedTask(OpenEndedTask):
     def __init__(self, config):
         super().__init__(config)
 

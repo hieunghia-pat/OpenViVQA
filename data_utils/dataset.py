@@ -89,7 +89,7 @@ class DictionaryDataset(BaseDataset):
         answer = item["answer"]
 
         return Instances(
-            # question_id=item["question_id"],
+            question_id=item["question_id"],
             # type=item["type"],
             image_id=image_id,
             filename=filename,
@@ -168,7 +168,7 @@ class OcrDictionaryDataset(DictionaryDataset):
 
         return Instances(
             **features,
-            # question_id=item["question_id"],
+            question_id=item["question_id"],
             # type=item["type"],
             image_id=image_id,
             filename=filename,
@@ -256,7 +256,7 @@ class ImageQuestionDictionaryDataset(DictionaryDataset):
         answer = item["answer"]
 
         return Instances(
-            # question_id=item["question_id"],
+            question_id=item["question_id"],
             image_id=image_id,
             filename=filename,
             image=image,
@@ -517,6 +517,7 @@ class MultilingualFeatureDataset(FeatureDataset):
                         question = preprocess_sentence(question, self.vocab.tokenizer)
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
                     annotation = {
+                        "question_id": ann["id"],
                         "question": question,
                         "answer": answer,
                         "image_id": ann["image_id"],

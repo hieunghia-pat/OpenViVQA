@@ -49,9 +49,7 @@ class M4C(BaseUniqueTransformer):
         self.ocr_embedding = build_text_embedding(config.OCR_TEXT_EMBEDDING, vocab)
         self.dynamic_embedding = build_text_embedding(config.DYNAMIC_EMBEDDING, vocab)
 
-        self.proj_ocr_feat_to_model = nn.Linear(config.OCR_DET_FEATURES.D_FEATURE + 
-                                                config.OCR_REC_FEATURES.D_FEATURE +
-                                                config.OCR_TEXT_EMBEDDING.D_EMBEDDING, config.D_MODEL)
+        self.proj_ocr_feat_to_model = nn.Linear(config.D_MODEL*3, config.D_MODEL)
 
         self.encoder = build_encoder(config.ENCODER)
 
@@ -151,9 +149,6 @@ class M4C(BaseUniqueTransformer):
         joint_features = torch.cat([vision_features, question_features], dim=1)
         joint_padding_mask = torch.cat([vision_padding_mask, question_padding_mask], dim=-1)
 
-        joint_features_len = joint_features.shape[1]
-        joint_attention_mask = joint_padding_mask.expand((-1, -1, joint_features_len, -1)) # (bs, 1, joint_features_len, joint_features_len)
-
         results = {
             "region_len": region_features.shape[1],
             "grid_len": grid_features.shape[1],
@@ -161,7 +156,6 @@ class M4C(BaseUniqueTransformer):
             "question_len": question_features.shape[1],
             "joint_features": joint_features,
             "joint_padding_mask": joint_padding_mask,
-            "joint_attention_mask": joint_attention_mask,
             "ocr_tokens": ocr_tokens
         }
 
@@ -178,13 +172,11 @@ class M4C(BaseUniqueTransformer):
         
         joint_features = embedded_results["joint_features"]
         joint_padding_mask = embedded_results["joint_padding_mask"]
-        joint_attention_mask = embedded_results["joint_attention_mask"]
 
         answer_tokens = input_features.answer_tokens
         embedded_ocr_features = joint_features[:, ocr_start:ocr_end]
         answer_features, answer_masks = self.forward_answer(answer_tokens, embedded_ocr_features)
-        joint_features, (joint_padding_mask, joint_attention_mask) = self.append_answer(joint_features, (joint_padding_mask, joint_attention_mask),
-                                                                                        answer_features, answer_masks)
+        joint_features, (joint_padding_mask, joint_attention_mask) = self.append_answer(joint_features, joint_padding_mask, answer_features, answer_masks)
 
         encoder_features = self.encoder(
             features=joint_features,
@@ -221,7 +213,7 @@ class M4C(BaseUniqueTransformer):
         return out
     
     def inference(self, input_features: Instances):
-        answer_ids = torch.ones(input_features.batch_size, self.max_len).long() * self.vocab.padding_idx
+        answer_ids = torch.ones(input_features.batch_size, self.max_len).long().to(self.device) * self.vocab.padding_idx
         answer_ids[:, 0] = self.vocab.bos_idx
         logprob = None
         MAX_STEP = 12

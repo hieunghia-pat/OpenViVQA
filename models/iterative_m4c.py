@@ -32,7 +32,7 @@ class DynamicPointerNetwork(nn.Module):
         return scores
 
 @META_ARCHITECTURE.register()
-class M4C(BaseUniqueTransformer):
+class IterativeM4C(BaseUniqueTransformer):
     def __init__(self, config, vocab):
         super().__init__(config, vocab)
 

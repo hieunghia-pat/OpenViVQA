@@ -223,11 +223,13 @@ class M4C(BaseUniqueTransformer):
     def inference(self, input_features: Instances):
         answer_ids = torch.ones(input_features.batch_size, self.max_len).long() * self.vocab.padding_idx
         answer_ids[:, 0] = self.vocab.bos_idx
+        logprob = None
         MAX_STEP = 12
         for step in range(MAX_STEP):
             input_features.answer_tokens = answer_ids
             input_features = self.forward_mmt(input_features)
             output = self.forward_output(input_features)
+            logprob = F.log_softmax(output, dim=-1)
             answer_ids = output.argmax(dim=-1)
 
-        return answer_ids
+        return answer_ids, logprob

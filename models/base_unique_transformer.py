@@ -26,18 +26,15 @@ class BaseUniqueTransformer(Module):
     def embed_features(self, input_features: Instances):
         raise NotImplementedError
 
-    def append_answer(self, joint_features, joint_masks, answer_features, answer_masks):
+    def append_answer(self, joint_features, joint_padding_mask, answer_features, answer_masks):
         answer_padding_mask, answer_sequential_mask = answer_masks
         answer_self_attention_mask = torch.logical_or(answer_padding_mask, answer_sequential_mask) # (bs, 1, answer_len, answer_len)
         
         answer_len = answer_features.shape[1]
         joint_features = torch.cat([joint_features, answer_features], dim=1)
-        joint_padding_mask, joint_attention_mask = joint_masks
         joint_padding_mask = torch.cat([joint_padding_mask, answer_padding_mask], dim=-1)
-
-        joint_attention_mask = torch.cat([joint_masks, answer_padding_mask], dim=-1) # (bs, 1, joint_len + answer_len, joint_feature_len + answer_len)
-        joint_attention_mask = joint_attention_mask.repeat(-1, -1, joint_attention_mask.shape[-1], -1) # (bs, 1, joint_len + answer_len, joint_feature_len + answer_len)
-        joint_attention_mask[:, :, -answer_len:, -answer_len] = answer_self_attention_mask
+        joint_attention_mask = joint_padding_mask.repeat(1, 1, joint_padding_mask.shape[-1], 1) # (bs, 1, joint_len + answer_len, joint_feature_len + answer_len)
+        joint_attention_mask[:, :, -answer_len:, -answer_len:] = answer_self_attention_mask
         assert joint_attention_mask.shape[-1] == joint_attention_mask.shape[-2] == joint_features.shape[1]
 
         return joint_features, (joint_padding_mask, joint_attention_mask)

@@ -1,4 +1,4 @@
-TASK: TrainingM4C
+TASK: OcrOpenEndedTask
 
 DATASET:
   FEATURE_DATASET:

@@ -81,6 +81,18 @@ class OcrVocab(Vocab):
         if config.VOCAB.WORD_EMBEDDING is not None:
             self.load_word_embeddings(build_word_embedding(config))
 
+    def is_in_dict(self, token_to_search: str, dict: Dict[str, List[int]]):
+        for token in dict:
+            if token.find(token_to_search) != -1:
+                return True
+
+        return False
+
+    def get_word_in_dict(self, token_to_search: str, dict: Dict[str, List[int]]):
+        for token in dict:
+            if token.find(token_to_search) != -1:
+                return token
+
     def match_text_to_indices(self, text: List[str], oov2inds: Dict[str, int]):
         '''
             Match an text to a list of sequences of indices
@@ -89,12 +101,13 @@ class OcrVocab(Vocab):
         '''
         answer_word_matches = []
         for word in text:
-            # match word to fixed vocabulary
             matched_inds = []
-            matched_inds.append(self.stoi[word])
             # match answer word to OOV
-            if word in oov2inds:
-                matched_inds.extend(oov2inds[word])
+            if self.is_in_dict(word, oov2inds):
+                matched_inds.extend(oov2inds[self.get_word_in_dict(word, oov2inds)])
+            # match word to fixed vocabulary
+            else:
+                matched_inds.append(self.stoi[word])
             answer_word_matches.append(matched_inds)
 
         # expand per-word matched indices into the list of matched sequences
@@ -114,7 +127,7 @@ class OcrVocab(Vocab):
         assert isinstance(answer, list), f"answer must be a list of strings, get answer is of type {type(answer)}"
 
         # match answers to fixed vocabulary and OCR tokens
-        ocr_tokens = {token: len(self.stoi)+idx for idx, token in enumerate(ocr_tokens)}
+        ocr_tokens = {len(self.stoi)+idx: token for idx, token in enumerate(ocr_tokens)}
         ocr2inds = defaultdict(list)
         for idx, token in ocr_tokens.items():
             ocr2inds[token].append(idx)
@@ -141,7 +154,7 @@ class OcrVocab(Vocab):
                 if idx in self.itos:
                     answer.append(self.itos[idx])
                     continue
-                if idx in ocr_token_of:
+                if idx in ocr_token_of[batch]:
                     answer.append(ocr_token_of[batch][idx])
                     continue
             answer = " ".join(answer)

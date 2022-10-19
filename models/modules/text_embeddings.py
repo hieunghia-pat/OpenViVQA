@@ -8,11 +8,8 @@ from models.utils import generate_sequential_mask, generate_padding_mask
 
 from transformers import BertTokenizer, BertModel, AlbertTokenizer, AlbertModel, T5Tokenizer, T5EncoderModel
 
-import os
-import numpy as np
-from typing import Dict, List, Union
+from typing import Dict, List
 import itertools
-from collections import defaultdict
 from copy import deepcopy
 
 @META_TEXT_EMBEDDING.register()

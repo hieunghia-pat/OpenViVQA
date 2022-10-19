@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.nn import NLLLoss
 
 from .base_unique_transformer import BaseUniqueTransformer
 from utils.instances import Instances
@@ -8,9 +9,11 @@ from builders.encoder_builder import build_encoder
 from builders.text_embedding_builder import build_text_embedding
 from builders.vision_embedding_builder import build_vision_embedding
 from builders.model_builder import META_ARCHITECTURE
+from models.modules.beam_search import BeamSearch
 
 import numpy as np
 import math
+from typing import List
 
 class DynamicPointerNetwork(nn.Module):
     def __init__(self, config):
@@ -49,14 +52,33 @@ class M4C(BaseUniqueTransformer):
         self.ocr_embedding = build_text_embedding(config.OCR_TEXT_EMBEDDING, vocab)
         self.dynamic_embedding = build_text_embedding(config.DYNAMIC_EMBEDDING, vocab)
 
-        self.proj_ocr_feat_to_model = nn.Linear(config.OCR_DET_FEATURES.D_FEATURE + 
-                                                config.OCR_REC_FEATURES.D_FEATURE +
-                                                config.OCR_TEXT_EMBEDDING.D_EMBEDDING, config.D_MODEL)
-
         self.encoder = build_encoder(config.ENCODER)
 
         self.dynamic_network = DynamicPointerNetwork(config)
         self.vocab_proj = nn.Linear(config.D_MODEL, len(vocab))
+
+        self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
+
+    def pad_oov_tokens(self, oov_tokens: List[List[str]], padding_token):
+        padded_oov_tokens = []
+        max_len = max([len(oov) for oov in oov_tokens])
+        for oov in oov_tokens:
+            if max_len > len(oov):
+                oov.extend([padding_token]*(max_len - len(oov)))
+            padded_oov_tokens.append(oov)
+
+        return padded_oov_tokens
+
+    def encode_sequence(self, list_of_text: List[List[str]], padding_token):
+        padded_list_of_text = []
+        max_len = max([len(text)+2 for text in list_of_text])
+        for text in list_of_text:
+            text = [self.vocab.bos_token] + text + [self.vocab.eos_token]
+            if max_len - len(text) > 0:
+                text.extend([padding_token] * (max_len - len(text)))
+            padded_list_of_text.append(text)
+
+        return padded_list_of_text
 
     def forward_region_features(self, features, boxes):
         features, padding_mask = self.region_embedding(features)
@@ -105,9 +127,7 @@ class M4C(BaseUniqueTransformer):
         ocr_embedded, _ = self.text_embedding(ocr_embedding_tokens)
         ocr_word_features += ocr_embedded
 
-        ocr_features = torch.cat([det_features, rec_features, ocr_word_features], dim=-1)
-        ocr_features = F.dropout(self.proj_ocr_feat_to_model(ocr_features))
-        ocr_features += boxes
+        ocr_features = det_features + rec_features + boxes + ocr_word_features
 
         return ocr_features, padding_mask
 
@@ -167,21 +187,18 @@ class M4C(BaseUniqueTransformer):
 
         return results
 
-    def forward_mmt(self, input_features: Instances):
+    def forward(self, input_features: Instances):
         embedded_results = self.embed_features(input_features)
 
         region_len = embedded_results["region_len"]
         grid_len = embedded_results["grid_len"]
         ocr_len = embedded_results["ocr_len"]
-        ocr_start = region_len + grid_len
-        ocr_end = ocr_start + ocr_len
-        
         joint_features = embedded_results["joint_features"]
         joint_padding_mask = embedded_results["joint_padding_mask"]
         joint_attention_mask = embedded_results["joint_attention_mask"]
+        embedded_ocr_features = joint_features[:, (region_len+grid_len):(region_len+grid_len+ocr_len)]
 
         answer_tokens = input_features.answer_tokens
-        embedded_ocr_features = joint_features[:, ocr_start:ocr_end]
         answer_features, answer_masks = self.forward_answer(answer_tokens, embedded_ocr_features)
         joint_features, (joint_padding_mask, joint_attention_mask) = self.append_answer(joint_features, (joint_padding_mask, joint_attention_mask),
                                                                                         answer_features, answer_masks)
@@ -197,39 +214,67 @@ class M4C(BaseUniqueTransformer):
         answer_len = answer_features.shape[1]
         assert joint_features_len == region_len + grid_len + ocr_len + question_len + answer_len
 
-        input_features.answer_features = encoder_features[:, -answer_len:]
-        input_features.ocr_features = encoder_features[:, ocr_start:ocr_end]
-        input_features.ocr_padding_mask = joint_padding_mask[:, :, :, ocr_start:ocr_end]
+        answer_features = encoder_features[:, -answer_len:]
+        ocr_features = encoder_features[:, (region_len+grid_len):(region_len+grid_len+ocr_len)]
+        ocr_padding_mask = joint_padding_mask[:, :, :, region_len+grid_len:region_len+grid_len+ocr_len]
 
-        return input_features
-
-    def forward_output(self, input_features):
-        answer_features = input_features.answer_features
-        ocr_features = input_features.ocr_features
-        ocr_padding_mask = input_features.ocr_padding_mask
         vocab_features = self.vocab_proj(answer_features) # (bs, answer_len, num_vocab)
         ocr_features = self.dynamic_network(ocr_features, answer_features, ocr_padding_mask).transpose(-2, -1) # (bs, answer_len, ocr_len)
         out = torch.cat([vocab_features, ocr_features], dim=-1) # (bs, answer_len, num_vocab + ocr_len)
-
-        return out
-
-    def forward(self, input_features: Instances):
-        input_features = self.forward_mmt(input_features)
-        out = self.forward_output(input_features)
         out = F.log_softmax(out, dim=-1)
 
         return out
-    
-    def inference(self, input_features: Instances):
-        answer_ids = torch.ones(input_features.batch_size, self.max_len).long() * self.vocab.padding_idx
-        answer_ids[:, 0] = self.vocab.bos_idx
-        logprob = None
-        MAX_STEP = 12
-        for step in range(MAX_STEP):
-            input_features.answer_tokens = answer_ids
-            input_features = self.forward_mmt(input_features)
-            output = self.forward_output(input_features)
-            logprob = F.log_softmax(output, dim=-1)
-            answer_ids = output.argmax(dim=-1)
 
-        return answer_ids, logprob
+    def step(self, t, prev_output):
+        bs = self.encoder_features.shape[0]
+        if t == 0:
+            it = torch.zeros((bs, 1)).long().fill_(self.vocab.bos_idx).to(self.encoder_features.device)
+        else:
+            it = prev_output
+
+        embedded_ocr_features = self.encoder_features[:, (self.region_len+self.grid_len):
+                                                        (self.region_len+self.grid_len+self.ocr_len)]
+
+        answer = it
+        answer_features, answer_masks = self.forward_answer(answer, embedded_ocr_features)
+        self.encoder_features, (self.encoder_padding_mask, self.encoder_attention_mask) = self.append_answer(self.encoder_features, 
+                                                                                                                (self.encoder_padding_mask, self.encoder_attention_mask),
+                                                                                                                answer_features, answer_masks)
+
+        encoder_features = self.encoder(
+            features=self.encoder_features,
+            padding_mask=self.encoder_padding_mask,
+            attention_mask=self.encoder_attention_mask
+        )
+
+        answer_len = answer_features.shape[1]
+        answer_features = encoder_features[:, -answer_len:]
+        ocr_features = encoder_features[:, (self.region_len+self.grid_len):
+                                        (self.region_len+self.grid_len+self.ocr_len)]
+        ocr_padding_mask = self.encoder_padding_mask[:, :, :, (self.region_len+self.grid_len):(self.region_len+self.grid_len+self.ocr_len)]
+
+        vocab_features = self.vocab_proj(answer_features) # (bs, answer_len, num_vocab)
+        ocr_features = self.dynamic_network(ocr_features, answer_features, ocr_padding_mask).transpose(-2, -1) # (bs, answer_len, ocr_len)
+        out = torch.cat([vocab_features, ocr_features], dim=-1) # (bs, answer_len, num_vocab + ocr_len)
+        out = F.log_softmax(out, dim=-1)
+
+        return out
+
+    def beam_search(self, input_features: Instances, batch_size: int, beam_size: int, out_size=1, return_probs=False, **kwargs):
+        beam_search = BeamSearch(model=self, max_len=self.max_len, eos_idx=self.eos_idx, beam_size=beam_size, 
+                            b_s=batch_size, device=self.device)
+
+        with self.statefulness(batch_size):
+            embedded_results = self.embed_features(input_features)
+            # get some neccessary information for later usage
+            self.encoder_features = embedded_results["joint_features"]
+            self.encoder_padding_mask = embedded_results["joint_padding_mask"]
+            self.encoder_attention_mask = embedded_results["joint_attention_mask"]
+            self.region_len = embedded_results["region_len"]
+            self.grid_len = embedded_results["grid_len"]
+            self.question_len = embedded_results["question_len"]
+            self.ocr_len = embedded_results["ocr_len"]
+            # apply beam search while decode the results
+            output =  beam_search.apply(out_size, return_probs, **kwargs)
+
+        return output

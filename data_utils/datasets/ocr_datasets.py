@@ -68,7 +68,7 @@ class OcrFeatureDataset(FeatureDataset):
         question_tokens = self.vocab.encode_question(question)
         answer = item["answer"]
 
-        ocr_tokens = [text if text != "" else self.vocab.padding_token for text in features["ocr_texts"]]
+        ocr_tokens = [text if text.strip() != "" else self.vocab.padding_token for text in features["ocr_texts"]]
 
         answer_tokens = self.vocab.encode_answer(answer, ocr_tokens)
         shifted_right_answer_tokens = answer_tokens[1:] # ignore the bos token
@@ -144,7 +144,7 @@ class OcrDictionaryDataset(DictionaryDataset):
         question_tokens = self.vocab.encode_question(question)
         answers = item["answers"]
 
-        ocr_tokens = [text if text != "" else self.vocab.padding_token for text in features["ocr_texts"]]
+        ocr_tokens = [text if text.strip() != "" else self.vocab.padding_token for text in features["ocr_texts"]]
 
         return Instances(
             **features,

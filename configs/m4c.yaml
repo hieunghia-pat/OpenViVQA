@@ -10,6 +10,7 @@ DATASET:
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.3
+    MAX_SCENE_TEXT: 30
   DICT_DATASET:
     TYPE: OcrDictionaryDataset
     BATCH_SIZE: 60
@@ -19,6 +20,7 @@ DATASET:
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.3
+    MAX_SCENE_TEXT: 30
   MIN_FREQ: 1
   VOCAB:
     TYPE: OcrVocab

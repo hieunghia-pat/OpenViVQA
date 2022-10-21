@@ -81,18 +81,6 @@ class OcrVocab(Vocab):
         if config.VOCAB.WORD_EMBEDDING is not None:
             self.load_word_embeddings(build_word_embedding(config))
 
-    def is_in_dict(self, token_to_search: str, dict: Dict[str, List[int]]):
-        for token in dict:
-            if token.find(token_to_search) != -1:
-                return True
-
-        return False
-
-    def get_word_in_dict(self, token_to_search: str, dict: Dict[str, List[int]]):
-        for token in dict:
-            if token.find(token_to_search) != -1:
-                return token
-
     def match_text_to_indices(self, text: List[str], oov2inds: Dict[str, int]):
         '''
             Match an text to a list of sequences of indices
@@ -103,8 +91,8 @@ class OcrVocab(Vocab):
         for word in text:
             matched_inds = []
             # match answer word to OOV
-            if self.is_in_dict(word, oov2inds):
-                matched_inds.extend(oov2inds[self.get_word_in_dict(word, oov2inds)])
+            if word in oov2inds:
+                matched_inds.extend(oov2inds[word])
             # match word to fixed vocabulary
             else:
                 matched_inds.append(self.stoi[word])
@@ -149,14 +137,10 @@ class OcrVocab(Vocab):
         for batch, vec in enumerate(answer_vecs):
             answer = []
             for idx in vec.tolist():
-                if idx in self.specials:
-                    continue
-                if idx in self.itos:
-                    answer.append(self.itos[idx])
-                    continue
                 if idx in ocr_token_of[batch]:
                     answer.append(ocr_token_of[batch][idx])
-                    continue
+                elif self.itos[idx] not in self.specials:
+                    answer.append(self.itos[idx])
             answer = " ".join(answer)
             if join_words:
                 answers.append(answer)

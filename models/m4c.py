@@ -39,7 +39,6 @@ class M4C(BaseUniqueTransformer):
         self.max_len = vocab.max_answer_length
         self.eos_idx = vocab.eos_idx
         self.d_model = config.D_MODEL
-        self.max_decode_iter = config.DECODER.MAX_ITER
 
         self.region_embedding = build_vision_embedding(config.REGION_EMBEDDING)
         self.grid_embedding = build_vision_embedding(config.GRID_EMBEDDING)
@@ -216,13 +215,14 @@ class M4C(BaseUniqueTransformer):
     def inference(self, input_features: Instances):
         answer_ids = torch.ones(input_features.batch_size, self.max_len).long().to(self.device) * self.vocab.padding_idx
         answer_ids[:, 0] = self.vocab.bos_idx
+        input_features.answer_tokens = answer_ids
         logprob = None
-        MAX_STEP = self.max_decode_iter
+        MAX_STEP = self.max_len
         for step in range(MAX_STEP):
-            input_features.answer_tokens = answer_ids
             input_features = self.forward_mmt(input_features)
             output = self.forward_output(input_features)
             logprob = F.log_softmax(output, dim=-1)
             answer_ids = output.argmax(dim=-1)
+            input_features.answer_tokens[:, 1:] = answer_ids[:, :-1]
 
         return answer_ids, logprob

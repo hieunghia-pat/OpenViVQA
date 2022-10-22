@@ -138,9 +138,13 @@ class OcrVocab(Vocab):
             answer = []
             for idx in vec.tolist():
                 if idx in ocr_token_of[batch]:
-                    answer.append(ocr_token_of[batch][idx])
-                elif self.itos[idx] not in self.specials:
-                    answer.append(self.itos[idx])
+                    word = ocr_token_of[batch][idx]
+                else:
+                    word = self.itos[idx]
+                if word == self.eos_token:
+                    break
+                if word not in self.specials:
+                    answer.append(word)
             answer = " ".join(answer)
             if join_words:
                 answers.append(answer)

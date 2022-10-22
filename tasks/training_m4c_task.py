@@ -60,6 +60,11 @@ class TrainingM4C(OpenEndedTask):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
+                for key in gts:
+                    print(gts[key])
+                    print(gens[key])
+                    print("+"*10)
+                raise
                 pbar.update()
 
         scores, _ = evaluation.compute_scores(gts, gens)
@@ -100,8 +105,8 @@ class TrainingM4C(OpenEndedTask):
             patience = 0
 
         while True:
-            self.train()
-            self.evaluate_loss(self.dev_dataloader)
+            # self.train()
+            # self.evaluate_loss(self.dev_dataloader)
 
             # val scores
             scores = self.evaluate_metrics(self.dev_dict_dataloader)
@@ -153,7 +158,7 @@ class TrainingM4C(OpenEndedTask):
                 items = Instances.cat([items])
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs = self.model.inference(items)
+                    outs, _ = self.model.inference(items)
 
                 answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length),

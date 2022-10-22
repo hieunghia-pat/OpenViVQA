@@ -39,6 +39,7 @@ class M4C(BaseUniqueTransformer):
         self.max_len = vocab.max_answer_length
         self.eos_idx = vocab.eos_idx
         self.d_model = config.D_MODEL
+        self.max_decode_iter = config.DECODER.MAX_ITER
 
         self.region_embedding = build_vision_embedding(config.REGION_EMBEDDING)
         self.grid_embedding = build_vision_embedding(config.GRID_EMBEDDING)
@@ -216,7 +217,7 @@ class M4C(BaseUniqueTransformer):
         answer_ids = torch.ones(input_features.batch_size, self.max_len).long().to(self.device) * self.vocab.padding_idx
         answer_ids[:, 0] = self.vocab.bos_idx
         logprob = None
-        MAX_STEP = 12
+        MAX_STEP = self.max_decode_iter
         for step in range(MAX_STEP):
             input_features.answer_tokens = answer_ids
             input_features = self.forward_mmt(input_features)

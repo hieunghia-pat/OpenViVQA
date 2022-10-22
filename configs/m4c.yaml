@@ -130,3 +130,5 @@ MODEL:
       USE_AOA: False
       CAN_BE_STATEFUL: False
       DROPOUT: .1
+  DECODER:
+    MAX_ITER: 1

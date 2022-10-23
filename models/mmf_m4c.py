@@ -50,9 +50,10 @@ class MMF_M4C(nn.Module):
         TEXT_BERT_HIDDEN_SIZE = 768
 
         self.text_bert_config = BertConfig(num_hidden_layers=self.config.TEXT_BERT.NUM_HIDDEN_LAYERS)
-        self.text_bert = TextBert.from_pretrained(
-            "bert-base-uncased", config=self.text_bert_config
-        )
+        # self.text_bert = TextBert.from_pretrained(
+        #     "bert-base-uncased", config=self.text_bert_config
+        # )
+        self.text_bert = TextBert(self.text_bert_config)
 
         # if the text bert output dimension doesn't match the
         # multimodal transformer (mmt) hidden dimension,
@@ -89,7 +90,7 @@ class MMF_M4C(nn.Module):
         self.linear_ocr_bbox_to_mmt_in = nn.Linear(4, self.mmt_config.hidden_size)
 
         # OCR word embedding features
-        self.ocr_word_embedding = build_word_embedding(self.config.OCR_TEXT_EMBEDDING)
+        # self.ocr_word_embedding = build_word_embedding(self.config.OCR_TEXT_EMBEDDING)
 
         self.ocr_feat_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
         self.ocr_bbox_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)

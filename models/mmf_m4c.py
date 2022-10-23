@@ -108,7 +108,6 @@ class MMF_M4C(nn.Module):
         num_choices = len(self.vocab)
         # remove the OCR copying dimensions in LoRRA's classifier output
         # (OCR copying will be handled separately)
-        num_choices -= self.config.OCR_PTR_NET.OCR_MAX_NUM
         self.classifier = nn.Linear(self.mmt_config.hidden_size, num_choices)
 
     def forward(self, items):
@@ -149,8 +148,7 @@ class MMF_M4C(nn.Module):
 
     def _forward_ocr_encoding(self, items, fwd_results):
         # OCR FastText feature (300-dim)
-        ocr_texts = items.ocr_texts
-        ocr_fasttext = self.load_word_embeddings(self.ocr_word_embedding, ocr_texts)
+        ocr_fasttext = items.ocr_fasttext_features
         ocr_fasttext = F.normalize(ocr_fasttext, dim=-1)
         assert ocr_fasttext.size(-1) == 300
 

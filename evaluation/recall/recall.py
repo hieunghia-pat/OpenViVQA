@@ -1,9 +1,9 @@
 import numpy as np
 
-class Accuracy:
+class Recall:
     def compute_score(self, gts, res):
         """
-        Main function to compute Accuracy score
+        Main function to compute recall score
         :param  gts (dict) : dictionary with key <image> and value <tokenized hypothesis / candidate sentence>
                 res (dict)  : dictionary with key <image> and value <tokenized reference sentence>
         :return: accuracy (float) : computed Accuracy score for the corpus
@@ -15,16 +15,16 @@ class Accuracy:
             scores_per_res = []
             for gt in gts[key]:
                 gt = gt.split()
-                # if either the prediction or the truth is no-answer then f1 = 1 if they agree, 0 otherwise
+                # if either the prediction or the truth is no-answer then recall = 1 if they agree, 0 otherwise
                 if len(r) == 0 or len(gt) == 0:
                     scores_per_res.append(int(r == gt))
                 else:
                     common_tokens = set(r) & set(gt)
-                    # if there are no common tokens then f1 = 0
+                    # if there are no common tokens then recall = 0
                     if len(common_tokens) == 0:
                         scores_per_res.append(0)
                     else:
-                        scores_per_res.append(len(common_tokens)/len(r))
+                        scores_per_res.append(len(common_tokens)/len(gt))
 
             scores_per_res = np.array(scores_per_res).mean()
             scores.append(scores_per_res)
@@ -34,4 +34,4 @@ class Accuracy:
         return scores.mean(), scores
 
     def __str__(self) -> str:
-        return "Accuracy"
+        return "Recall"

@@ -34,6 +34,7 @@ class MMF_M4C(nn.Module):
         self.vocab = vocab
         self.d_model = self.mmt_config.hidden_size
         self.device = config.DEVICE
+        self.max_iter = vocab.max_answer_length
 
         self.build()
 
@@ -107,7 +108,6 @@ class MMF_M4C(nn.Module):
         num_choices = len(self.vocab)
         # remove the OCR copying dimensions in LoRRA's classifier output
         # (OCR copying will be handled separately)
-        num_choices -= self.config.OCR_PTR_NET.OCR_MAX_NUM
         self.classifier = nn.Linear(self.mmt_config.hidden_size, num_choices)
 
     def forward(self, items):
@@ -148,8 +148,7 @@ class MMF_M4C(nn.Module):
 
     def _forward_ocr_encoding(self, items, fwd_results):
         # OCR FastText feature (300-dim)
-        ocr_texts = items.ocr_texts
-        ocr_fasttext = self.load_word_embeddings(self.ocr_word_embedding, ocr_texts)
+        ocr_fasttext = items.ocr_fasttext_features
         ocr_fasttext = F.normalize(ocr_fasttext, dim=-1)
         assert ocr_fasttext.size(-1) == 300
 
@@ -211,13 +210,12 @@ class MMF_M4C(nn.Module):
             self._forward_mmt(items, fwd_results)
             self._forward_output(items, fwd_results)
         else:
-            dec_step_num = items.answer_tokens.size(1)
             # fill prev_inds with bos_idx at index 0, and zeros elsewhere
-            fwd_results["prev_inds"] = torch.zeros_like(items.answer_tokens)
+            fwd_results["prev_inds"] = torch.zeros((items.batch_size, self.max_iter))
             fwd_results["prev_inds"][:, 0] = self.vocab.bos_idx
 
             # greedy decoding at test time
-            for _ in range(dec_step_num):
+            for _ in range(self.max_iter):
                 self._forward_mmt(items, fwd_results)
                 self._forward_output(items, fwd_results)
 

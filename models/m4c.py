@@ -39,6 +39,7 @@ class M4C(BaseUniqueTransformer):
         self.max_len = vocab.max_answer_length
         self.eos_idx = vocab.eos_idx
         self.d_model = config.D_MODEL
+        self.max_iter = config.DECODER.MAX_ITER
 
         self.region_embedding = build_vision_embedding(config.REGION_EMBEDDING)
         self.grid_embedding = build_vision_embedding(config.GRID_EMBEDDING)
@@ -217,8 +218,7 @@ class M4C(BaseUniqueTransformer):
         answer_ids[:, 0] = self.vocab.bos_idx
         input_features.answer_tokens = answer_ids
         logprob = None
-        MAX_STEP = self.max_len
-        for step in range(MAX_STEP):
+        for step in range(self.max_iter):
             input_features = self.forward_mmt(input_features)
             output = self.forward_output(input_features)
             logprob = F.log_softmax(output, dim=-1)

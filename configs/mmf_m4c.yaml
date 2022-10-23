@@ -1,4 +1,4 @@
-TASK: TrainingM4C
+TASK: TrainingMMFM4C
 
 DATASET:
   FEATURE_DATASET:
@@ -9,8 +9,10 @@ DATASET:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.3
+    SCENE_TEXT_THRESHOLD: 0.7
     MAX_SCENE_TEXT: 30
+    WORD_EMBEDDING: ViFastText
+    WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
     TYPE: OcrDictionaryDataset
     BATCH_SIZE: 60
@@ -19,8 +21,10 @@ DATASET:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.3
+    SCENE_TEXT_THRESHOLD: 0.7
     MAX_SCENE_TEXT: 30
+    WORD_EMBEDDING: ViFastText
+    WORD_EMBEDDING_CACHE: null
   MIN_FREQ: 1
   VOCAB:
     TYPE: OcrVocab
@@ -59,76 +63,33 @@ TRAINING:
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: M4C
-  NAME: m4c_x152++_faster_rcnn
-  DEVICE: cuda
+  ARCHITECTURE: MMF_M4C
+  NAME: mmf_m4c_x152++_faster_rcnn
+  DEVICE: cpu
   D_MODEL: 512
-  REGION_EMBEDDING:
-    ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
+  OBJECT_EMBEDDING:
     D_FEATURE: 1024
-    D_MODEL: 512
-    DROPOUT: .1
-  GRID_EMBEDDING:
-    ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
-    D_FEATURE: 2048
-    D_MODEL: 512
     DROPOUT: .1
   BOX_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
+    DEVICE: cpu
     D_FEATURE: 4
-    D_MODEL: 512
-    DROPOUT: .1
-  OCR_DET_EMBEDDING:
-    ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
-    D_FEATURE: 256
-    D_MODEL: 512
-    DROPOUT: .1
-  OCR_REC_EMBEDDING:
-    ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
-    D_FEATURE: 256
-    D_MODEL: 512
+    D_MODEL: 768
     DROPOUT: .1
   OCR_TEXT_EMBEDDING:
-    ARCHITECTURE: OcrWordEmbedding
-    DEVICE: cuda
-    OCR_PATH: features/OpenViVQA/features/swintextspotter
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
-    D_EMBEDDING: 300
-    D_MODEL: 512
+  OCR_EMBEDDING:
+    D_FEATURE: 812 # 256 (det features) + 256 (rec features) + 300 (fasttext)
     DROPOUT: .1
-  TEXT_EMBEDDING:
-    ARCHITECTURE: UsualEmbedding
-    DEVICE: cuda
-    D_EMBEDDING: 300
-    D_MODEL: 512
-    DROPOUT: .1
-    WORD_EMBEDDING: null
-    WORD_EMBEDDING_CACHE: null
-  DYNAMIC_EMBEDDING:
-    ARCHITECTURE: DynamicEmbedding
-    DEVICE: cuda
-    D_MODEL: 512
-    DROPOUT: .1
-  ENCODER:
-    ARCHITECTURE: MultiModalEncoder
-    D_MODEL: 512
-    LAYERS: 4
-    SELF_ATTENTION:
-      ARCHITECTURE: ScaledDotProductAttention
-      HEAD: 8
-      D_MODEL: 512
-      D_KEY: 64
-      D_VALUE: 64
-      D_FF: 2048
-      D_FEATURE: 2048
-      USE_AOA: False
-      CAN_BE_STATEFUL: False
-      DROPOUT: .1
-  DECODER:
-    MAX_ITER: 1
+  OCR_PTR_NET:
+    HIDDEN_SIZE: 768
+    QUERY_KEY_SIZE: 768
+    OCR_MAX_NUM: 30
+  CLASSIFIER:
+    OCR_MAX_NUM: 30
+  MMT:
+    HIDDEN_SIZE: 768
+    NUM_HIDDEN_LAYERS: 4
+  TEXT_BERT:
+    NUM_HIDDEN_LAYERS: 3

@@ -69,9 +69,7 @@ class OcrWordEmbedding(nn.Module):
 
         ocr_tokens = []
         for texts in batch_of_texts:
-            ocr_tokens.extend(itertools.chain(*[text.split() for text in texts]))
-        if "" in ocr_tokens:
-            ocr_tokens.remove("")
+            ocr_tokens.extend(itertools.chain(*[text.strip().split() for text in texts]))
         ocr_tokens = set(ocr_tokens)
         ocr2idx = {token: idx for idx, token in enumerate(ocr_tokens)}
 

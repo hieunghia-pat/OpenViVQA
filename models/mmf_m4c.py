@@ -1,6 +1,8 @@
 import functools
 import math
 from typing import List
+import itertools
+from copy import deepcopy
 
 import torch
 from torch import nn
@@ -31,6 +33,7 @@ class MMF_M4C(nn.Module):
                                         num_hidden_layers=self.config.MMT.NUM_HIDDEN_LAYERS)
         self.vocab = vocab
         self.d_model = self.mmt_config.hidden_size
+        self.device = config.DEVICE
 
         self.build()
 
@@ -124,7 +127,7 @@ class MMF_M4C(nn.Module):
         fwd_results["txt_inds"] = items.question_tokens
 
         # binary mask of valid text (question words) vs padding
-        text_len = (items.question_tokens == self.vocab.padding_idx).sum(dim=-1)
+        text_len = (items.question_tokens != self.vocab.padding_idx).sum(dim=-1)
         fwd_results["txt_mask"] = _get_mask(
             text_len, items.question_tokens.size(1)
         )
@@ -140,13 +143,13 @@ class MMF_M4C(nn.Module):
         fwd_results["obj_mmt_in"] = obj_mmt_in
 
         # binary mask of valid object vs padding
-        obj_nums = (items.region_features == 0).sum(dim=-1)
+        obj_nums = (items.region_features.sum(dim=-1) != 0).sum(dim=-1)
         fwd_results["obj_mask"] = _get_mask(obj_nums, obj_mmt_in.size(1))
 
     def _forward_ocr_encoding(self, items, fwd_results):
         # OCR FastText feature (300-dim)
         ocr_texts = items.ocr_texts
-        ocr_fasttext = load_word_embeddings(self.ocr_word_embedding, ocr_texts)
+        ocr_fasttext = self.load_word_embeddings(self.ocr_word_embedding, ocr_texts)
         ocr_fasttext = F.normalize(ocr_fasttext, dim=-1)
         assert ocr_fasttext.size(-1) == 300
 
@@ -156,7 +159,7 @@ class MMF_M4C(nn.Module):
         assert ocr_phoc.size(-1) == 256
 
         # OCR appearance feature, extracted from swintextspotter
-        ocr_fc = self.ocr_det_features
+        ocr_fc = items.ocr_det_features
         ocr_fc = F.normalize(ocr_fc, dim=-1)
 
         ocr_feat = torch.cat(
@@ -170,7 +173,7 @@ class MMF_M4C(nn.Module):
         fwd_results["ocr_mmt_in"] = ocr_mmt_in
 
         # binary mask of valid OCR vs padding
-        ocr_nums = (items.ocr_det_features == 0).sum(dim=-1)
+        ocr_nums = (items.ocr_det_features.sum(dim=-1) != 0).sum(dim=-1)
         fwd_results["ocr_mask"] = _get_mask(ocr_nums, ocr_mmt_in.size(1))
 
     def _forward_mmt(self, items, fwd_results):
@@ -187,7 +190,7 @@ class MMF_M4C(nn.Module):
             obj_mask=fwd_results["obj_mask"],
             ocr_emb=fwd_results["ocr_mmt_in"],
             ocr_mask=fwd_results["ocr_mask"],
-            fixed_ans_emb=self.classifier.module.weight,
+            fixed_ans_emb=self.classifier.weight,
             prev_inds=fwd_results["prev_inds"],
         )
         fwd_results.update(mmt_results)
@@ -224,6 +227,36 @@ class MMF_M4C(nn.Module):
                 argmax_inds = fwd_results["scores"].argmax(dim=-1)
                 fwd_results["prev_inds"][:, 1:] = argmax_inds[:, :-1]
 
+    def load_word_embeddings(self, word_embeddings, batch_of_texts: List[List[str]]):
+        max_len = max([len(text) for text in batch_of_texts])
+        for batch, texts in enumerate(batch_of_texts):
+            if len(texts) < max_len:
+                texts.extend([self.vocab.padding_token] * (max_len-len(texts)))
+            batch_of_texts[batch] = texts
+
+        ocr_tokens = []
+        for texts in batch_of_texts:
+            ocr_tokens.extend(itertools.chain(*[text.strip().split() for text in texts]))
+        ocr_tokens = set(ocr_tokens)
+        ocr2idx = {token: idx for idx, token in enumerate(ocr_tokens)}
+        
+        weights = []
+        for token in ocr2idx:
+            weights.append(word_embeddings[token].unsqueeze(0))
+        weights = torch.cat(weights, dim=0).to(self.device)
+        weights.requires_grad = False # freeze the embedding weights
+
+        features = deepcopy(batch_of_texts)
+        for batch, texts in enumerate(batch_of_texts):
+            for idx, token in enumerate(texts):
+                token = [ocr2idx[subtoken] for subtoken in token.split()]
+                token = torch.tensor(token).unsqueeze(0).long().to(self.device)
+                feature = F.embedding(token, weights, padding_idx=self.vocab.padding_idx).sum(dim=1)
+                features[batch][idx] = feature
+            features[batch] = torch.cat(features[batch], dim=0).unsqueeze(0)
+        features = torch.cat(features, dim=0)
+
+        return features
 
 class TextBert(BertPreTrainedModel):
     def __init__(self, config):
@@ -449,10 +482,3 @@ def _batch_gather(x, inds):
     inds_flat = batch_offsets + inds
     results = F.embedding(inds_flat, x_flat)
     return results
-
-def load_word_embeddings(word_embeddings: torch.Tensor, tokens: List[str]):
-    embedding_weights = torch.Tensor(len(tokens), embedding_weights.dim())
-    for i, token in enumerate(tokens):
-        embedding_weights[i] = word_embeddings[token]
-
-    return embedding_weights

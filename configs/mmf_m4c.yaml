@@ -65,14 +65,14 @@ TRAINING:
 MODEL:
   ARCHITECTURE: MMF_M4C
   NAME: mmf_m4c_x152++_faster_rcnn
-  DEVICE: cuda
+  DEVICE: cpu
   D_MODEL: 512
   OBJECT_EMBEDDING:
     D_FEATURE: 1024
     DROPOUT: .1
   BOX_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
+    DEVICE: cpu
     D_FEATURE: 4
     D_MODEL: 768
     DROPOUT: .1

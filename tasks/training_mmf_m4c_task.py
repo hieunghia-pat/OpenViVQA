@@ -27,7 +27,9 @@ class TrainingMMFM4C(OpenEndedTask):
                 for it, items in enumerate(dataloader):
                     items = items.to(self.device)
                     with torch.no_grad():
-                        out = self.model(items).contiguous()
+                        results = self.model(items)
+
+                    out = results["scores"].continuous()
                     
                     shifted_right_answer_tokens = items.shifted_right_answer_tokens
                     loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
@@ -49,7 +51,8 @@ class TrainingMMFM4C(OpenEndedTask):
             for it, items in enumerate(dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs, _ = self.model.inference(items)
+                    results = self.model(items)
+                outs = results["scores"].argmax(dim=-1)
 
                 answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), 
@@ -71,7 +74,8 @@ class TrainingMMFM4C(OpenEndedTask):
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, items in enumerate(self.train_dataloader):
                 items = items.to(self.device)
-                out = self.model(items).contiguous()
+                results = self.model(items)
+                out = results["scores"].contiguous()
                 shifted_right_answer_tokens = items.shifted_right_answer_tokens
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))

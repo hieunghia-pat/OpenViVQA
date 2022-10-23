@@ -1,4 +1,4 @@
-TASK: TrainingM4C
+TASK: TrainingMMFM4C
 
 DATASET:
   FEATURE_DATASET:
@@ -9,8 +9,10 @@ DATASET:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.3
+    SCENE_TEXT_THRESHOLD: 0.7
     MAX_SCENE_TEXT: 30
+    WORD_EMBEDDING: ViFastText
+    WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
     TYPE: OcrDictionaryDataset
     BATCH_SIZE: 60
@@ -19,8 +21,10 @@ DATASET:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.3
+    SCENE_TEXT_THRESHOLD: 0.7
     MAX_SCENE_TEXT: 30
+    WORD_EMBEDDING: ViFastText
+    WORD_EMBEDDING_CACHE: null
   MIN_FREQ: 1
   VOCAB:
     TYPE: OcrVocab
@@ -60,7 +64,7 @@ TRAINING:
 
 MODEL:
   ARCHITECTURE: MMF_M4C
-  NAME: m4c_x152++_faster_rcnn
+  NAME: mmf_m4c_x152++_faster_rcnn
   DEVICE: cuda
   D_MODEL: 512
   OBJECT_EMBEDDING:
@@ -73,22 +77,19 @@ MODEL:
     D_MODEL: 768
     DROPOUT: .1
   OCR_TEXT_EMBEDDING:
-    ARCHITECTURE: OcrWordEmbedding
-    DEVICE: cuda
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
-    D_EMBEDDING: 300
-    DROPOUT: .1
   OCR_EMBEDDING:
     D_FEATURE: 812 # 256 (det features) + 256 (rec features) + 300 (fasttext)
     DROPOUT: .1
   OCR_PTR_NET:
     HIDDEN_SIZE: 768
     QUERY_KEY_SIZE: 768
+    OCR_MAX_NUM: 30
   CLASSIFIER:
     OCR_MAX_NUM: 30
   MMT:
-    hidden_size: 768
-    num_hidden_layers: 4
+    HIDDEN_SIZE: 768
+    NUM_HIDDEN_LAYERS: 4
   TEXT_BERT:
-    num_hidden_layers: 3
+    NUM_HIDDEN_LAYERS: 3

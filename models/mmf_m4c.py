@@ -1,5 +1,6 @@
 import functools
 import math
+from typing import List
 
 import torch
 from torch import nn
@@ -14,7 +15,7 @@ from pytorch_transformers.modeling_bert import (
 
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
-from builders.text_embedding_builder import build_text_embedding
+from builders.word_embedding_builder import build_word_embedding
 
 logger = setup_logger()
 
@@ -26,8 +27,12 @@ class MMF_M4C(nn.Module):
     def __init__(self, config, vocab):
         super().__init__()
         self.config = config
-        self.mmt_config = BertConfig(**self.config.MMT)
+        self.mmt_config = BertConfig(hidden_size=self.config.MMT.HIDDEN_SIZE,
+                                        num_hidden_layers=self.config.MMT.NUM_HIDDEN_LAYERS)
         self.vocab = vocab
+        self.d_model = self.mmt_config.hidden_size
+
+        self.build()
 
     def build(self):
         # split model building into several components
@@ -40,7 +45,7 @@ class MMF_M4C(nn.Module):
     def _build_txt_encoding(self):
         TEXT_BERT_HIDDEN_SIZE = 768
 
-        self.text_bert_config = BertConfig(**self.config.TEXT_BERT)
+        self.text_bert_config = BertConfig(num_hidden_layers=self.config.TEXT_BERT.NUM_HIDDEN_LAYERS)
         self.text_bert = TextBert.from_pretrained(
             "bert-base-uncased", config=self.text_bert_config
         )
@@ -80,7 +85,7 @@ class MMF_M4C(nn.Module):
         self.linear_ocr_bbox_to_mmt_in = nn.Linear(4, self.mmt_config.hidden_size)
 
         # OCR word embedding features
-        self.ocr_word_embedding = build_text_embedding(self.config.OCR_TEXT_EMBEDDING)
+        self.ocr_word_embedding = build_word_embedding(self.config.OCR_TEXT_EMBEDDING)
 
         self.ocr_feat_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
         self.ocr_bbox_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
@@ -100,10 +105,7 @@ class MMF_M4C(nn.Module):
         # remove the OCR copying dimensions in LoRRA's classifier output
         # (OCR copying will be handled separately)
         num_choices -= self.config.OCR_PTR_NET.OCR_MAX_NUM
-        self.classifier = nn.Linear(
-            in_dim=self.mmt_config.hidden_size,
-            out_dim=num_choices
-        )
+        self.classifier = nn.Linear(self.mmt_config.hidden_size, num_choices)
 
     def forward(self, items):
         # fwd_results holds intermediate forward pass results
@@ -144,7 +146,7 @@ class MMF_M4C(nn.Module):
     def _forward_ocr_encoding(self, items, fwd_results):
         # OCR FastText feature (300-dim)
         ocr_texts = items.ocr_texts
-        ocr_fasttext = self.ocr_word_embedding(ocr_texts)
+        ocr_fasttext = load_word_embeddings(self.ocr_word_embedding, ocr_texts)
         ocr_fasttext = F.normalize(ocr_fasttext, dim=-1)
         assert ocr_fasttext.size(-1) == 300
 
@@ -207,7 +209,7 @@ class MMF_M4C(nn.Module):
             self._forward_output(items, fwd_results)
         else:
             dec_step_num = items.answer_tokens.size(1)
-            # fill prev_inds with BOS_IDX at index 0, and zeros elsewhere
+            # fill prev_inds with bos_idx at index 0, and zeros elsewhere
             fwd_results["prev_inds"] = torch.zeros_like(items.answer_tokens)
             fwd_results["prev_inds"][:, 0] = self.vocab.bos_idx
 
@@ -447,3 +449,10 @@ def _batch_gather(x, inds):
     inds_flat = batch_offsets + inds
     results = F.embedding(inds_flat, x_flat)
     return results
+
+def load_word_embeddings(word_embeddings: torch.Tensor, tokens: List[str]):
+    embedding_weights = torch.Tensor(len(tokens), embedding_weights.dim())
+    for i, token in enumerate(tokens):
+        embedding_weights[i] = word_embeddings[token]
+
+    return embedding_weights

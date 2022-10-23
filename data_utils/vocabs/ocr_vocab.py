@@ -90,12 +90,11 @@ class OcrVocab(Vocab):
         answer_word_matches = []
         for word in text:
             matched_inds = []
-            # match answer word to OOV
+            # match answer to fixed vocab
+            matched_inds.append(self.stoi[word])
+            # match answer word to OOV if available
             if word in oov2inds:
                 matched_inds.extend(oov2inds[word])
-            # match word to fixed vocabulary
-            else:
-                matched_inds.append(self.stoi[word])
             answer_word_matches.append(matched_inds)
 
         # expand per-word matched indices into the list of matched sequences

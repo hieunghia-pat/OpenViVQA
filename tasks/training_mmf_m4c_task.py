@@ -15,7 +15,7 @@ import json
 logger = setup_logger()
 
 @META_TASK.register()
-class TrainingM4C(OpenEndedTask):
+class TrainingMMFM4C(OpenEndedTask):
     def __init__(self, config):
         super().__init__(config)
 

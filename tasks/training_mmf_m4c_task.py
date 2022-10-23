@@ -1,4 +1,5 @@
 import torch
+from torch.nn import functional as F
 
 from utils.logging_utils import setup_logger
 from utils.instances import Instances
@@ -30,6 +31,7 @@ class TrainingMMFM4C(OpenEndedTask):
                         results = self.model(items)
 
                     out = results["scores"].continuous()
+                    out = F.log_softmax(out, dim=-1)
                     
                     shifted_right_answer_tokens = items.shifted_right_answer_tokens
                     loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
@@ -76,6 +78,7 @@ class TrainingMMFM4C(OpenEndedTask):
                 items = items.to(self.device)
                 results = self.model(items)
                 out = results["scores"].contiguous()
+                out = F.log_softmax(out, dim=-1)
                 shifted_right_answer_tokens = items.shifted_right_answer_tokens
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))

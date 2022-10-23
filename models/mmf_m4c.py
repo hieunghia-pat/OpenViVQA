@@ -89,7 +89,7 @@ class MMF_M4C(nn.Module):
         self.linear_ocr_bbox_to_mmt_in = nn.Linear(4, self.mmt_config.hidden_size)
 
         # OCR word embedding features
-        self.ocr_word_embedding = build_word_embedding(self.config.OCR_TEXT_EMBEDDING)
+        # self.ocr_word_embedding = build_word_embedding(self.config.OCR_TEXT_EMBEDDING)
 
         self.ocr_feat_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
         self.ocr_bbox_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)

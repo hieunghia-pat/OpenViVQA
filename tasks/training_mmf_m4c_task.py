@@ -1,4 +1,5 @@
 import torch
+from torch import nn
 from torch.nn import functional as F
 
 from utils.logging_utils import setup_logger
@@ -15,10 +16,33 @@ import json
 
 logger = setup_logger()
 
+class BCEWithMasLogitsLoss(nn.Module):
+    def __init__(self, ignore_index=0):
+        super().__init__()
+        
+        self.ignore_index = ignore_index
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor):
+        loss_mask = (target == self.ignore_index)
+
+        source = torch.ones_like(input)
+        scattered_target = torch.zeros_like(input)
+        scattered_target.scatter_(dim=-1, index=target.unsqueeze(-1), src=source)
+
+        losses = F.binary_cross_entropy_with_logits(input, scattered_target, reduction="none")
+        losses = losses.masked_fill(loss_mask.unsqueeze(-1), value=0)
+
+        count = torch.max(torch.sum(loss_mask), torch.ones((1, )))
+        loss = torch.sum(losses) / count
+
+        return loss
+
 @META_TASK.register()
 class TrainingMMFM4C(OpenEndedTask):
     def __init__(self, config):
         super().__init__(config)
+
+        self.loss_fn = BCEWithMasLogitskLoss(ignore_index=self.vocab.padding_idx)
 
     def evaluate_loss(self, dataloader):
         self.model.eval()
@@ -31,7 +55,6 @@ class TrainingMMFM4C(OpenEndedTask):
                         results = self.model(items)
 
                     out = results["scores"].continuous()
-                    out = F.log_softmax(out, dim=-1)
                     
                     shifted_right_answer_tokens = items.shifted_right_answer_tokens
                     loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
@@ -78,7 +101,7 @@ class TrainingMMFM4C(OpenEndedTask):
                 items = items.to(self.device)
                 results = self.model(items)
                 out = results["scores"].contiguous()
-                out = F.log_softmax(out, dim=-1)
+
                 shifted_right_answer_tokens = items.shifted_right_answer_tokens
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))

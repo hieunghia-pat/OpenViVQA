@@ -17,7 +17,7 @@ from pytorch_transformers.modeling_bert import (
 
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
-from builders.word_embedding_builder import build_word_embedding
+from builders.text_embedding_builder import build_text_embedding
 
 logger = setup_logger()
 
@@ -30,7 +30,8 @@ class MMF_M4C(nn.Module):
         super().__init__()
         self.config = config
         self.mmt_config = BertConfig(hidden_size=self.config.MMT.HIDDEN_SIZE,
-                                        num_hidden_layers=self.config.MMT.NUM_HIDDEN_LAYERS)
+                                        num_hidden_layers=self.config.MMT.NUM_HIDDEN_LAYERS,
+                                        num_attention_heads=self.config.MMT.NUM_ATTENTION_HEADS)
         self.vocab = vocab
         self.d_model = self.mmt_config.hidden_size
         self.device = config.DEVICE
@@ -46,28 +47,36 @@ class MMF_M4C(nn.Module):
         self._build_mmt()
         self._build_output()
 
+    # def _build_txt_encoding(self):
+    #     TEXT_BERT_HIDDEN_SIZE = 768
+
+    #     self.text_bert_config = BertConfig(hidden_size=self.config.TEXT_BERT.HIDDEN_SIZE,
+    #                                         num_hidden_layers=self.config.TEXT_BERT.NUM_HIDDEN_LAYERS,
+    #                                         num_attention_heads=self.config.MMT.NUM_ATTENTION_HEADS)
+    #     if self.config.TEXT_BERT.LOAD_PRETRAINED:
+    #         self.text_bert = TextBert.from_pretrained(
+    #             "bert-base-uncased", config=self.text_bert_config
+    #         )
+    #     else:
+    #         self.text_bert = TextBert(self.text_bert_config)
+
+    #     # if the text bert output dimension doesn't match the
+    #     # multimodal transformer (mmt) hidden dimension,
+    #     # add a linear projection layer between the two
+    #     if self.mmt_config.hidden_size != TEXT_BERT_HIDDEN_SIZE:
+    #         logger.info(
+    #             f"Projecting text_bert output to {self.mmt_config.hidden_size} dim"
+    #         )
+
+    #         self.text_bert_out_linear = nn.Linear(
+    #             self.config.TEXT_BERT.HIDDEN_SIZE, self.mmt_config.hidden_size
+    #         )
+    #     else:
+    #         self.text_bert_out_linear = nn.Identity()
+
     def _build_txt_encoding(self):
-        TEXT_BERT_HIDDEN_SIZE = 768
-
-        self.text_bert_config = BertConfig(num_hidden_layers=self.config.TEXT_BERT.NUM_HIDDEN_LAYERS)
-        # self.text_bert = TextBert.from_pretrained(
-        #     "bert-base-uncased", config=self.text_bert_config
-        # )
-        self.text_bert = TextBert(self.text_bert_config)
-
-        # if the text bert output dimension doesn't match the
-        # multimodal transformer (mmt) hidden dimension,
-        # add a linear projection layer between the two
-        if self.mmt_config.hidden_size != TEXT_BERT_HIDDEN_SIZE:
-            logger.info(
-                f"Projecting text_bert output to {self.mmt_config.hidden_size} dim"
-            )
-
-            self.text_bert_out_linear = nn.Linear(
-                TEXT_BERT_HIDDEN_SIZE, self.mmt_config.hidden_size
-            )
-        else:
-            self.text_bert_out_linear = nn.Identity()
+        self.text_bert = build_text_embedding(self.config.TEXT_EMBEDDING, self.vocab)
+        self.text_bert_out_linear = nn.Identity()
 
     def _build_obj_encoding(self):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
@@ -178,9 +187,10 @@ class MMF_M4C(nn.Module):
 
     def _forward_mmt(self, items, fwd_results):
         # first forward the text BERT layers
-        text_bert_out = self.text_bert(
-            txt_inds=fwd_results["txt_inds"], txt_mask=fwd_results["txt_mask"]
-        )
+        # text_bert_out = self.text_bert(
+        #     txt_inds=fwd_results["txt_inds"], txt_mask=fwd_results["txt_mask"]
+        # )
+        text_bert_out, _ = self.text_bert(tokens=fwd_results["txt_inds"])
         fwd_results["txt_emb"] = self.text_bert_out_linear(text_bert_out)
 
         mmt_results = self.mmt(

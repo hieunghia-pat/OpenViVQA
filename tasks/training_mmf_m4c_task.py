@@ -16,7 +16,7 @@ import json
 
 logger = setup_logger()
 
-class BCEWithMasLogitsLoss(nn.Module):
+class BCEWithMaskLogitsLoss(nn.Module):
     def __init__(self, ignore_index=0):
         super().__init__()
         
@@ -42,7 +42,7 @@ class TrainingMMFM4C(OpenEndedTask):
     def __init__(self, config):
         super().__init__(config)
 
-        self.loss_fn = BCEWithMasLogitsLoss(ignore_index=self.vocab.padding_idx)
+        self.loss_fn = BCEWithMaskLogitsLoss(ignore_index=self.vocab.padding_idx)
 
     def evaluate_loss(self, dataloader):
         self.model.eval()

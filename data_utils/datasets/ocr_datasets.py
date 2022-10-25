@@ -84,9 +84,9 @@ class OcrFeatureDataset(FeatureDataset):
 
         answer_tokens = self.vocab.encode_answer(answer, ocr_tokens)
 
-        shifted_right_answer_tokens = torch.zeros_like(answer).fill_(self.vocab.padding_idx)
-        shifted_right_answer_tokens[:-1] = answer[1:]
-        answer = torch.where(answer == self.vocab.eos_idx, self.vocab.padding_idx, answer) # remove eos_token in answer
+        shifted_right_answer_tokens = torch.zeros_like(answer_tokens).fill_(self.vocab.padding_idx)
+        shifted_right_answer_tokens[:-1] = answer_tokens[1:]
+        answer_tokens = torch.where(answer_tokens == self.vocab.eos_idx, self.vocab.padding_idx, answer_tokens) # remove eos_token in answer
 
         return Instance(
             **features,

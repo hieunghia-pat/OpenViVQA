@@ -95,14 +95,6 @@ class TrainingMMFM4C(OpenEndedTask):
 
     def train(self):
         self.model.train()
-
-        with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
-            for it, items in enumerate(self.train_dataloader):
-                print(self.vocab.max_answer_length)
-                print(items.answer_tokens.shape)
-                print(items.shifted_right_answer_tokens.shape)
-                raise
-
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, items in enumerate(self.train_dataloader):

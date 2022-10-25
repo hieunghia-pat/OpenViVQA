@@ -790,7 +790,7 @@ class RawQuestionMultilingualFeatureDataset(BaseDataset):
         
         features = self.load_features(self.annotations[idx]["image_id"])
 
-        return Instance(
+        return Instances(
             question=question,
             answer_tokens=answer,
             shifted_right_answer_tokens=shifted_right_answer,

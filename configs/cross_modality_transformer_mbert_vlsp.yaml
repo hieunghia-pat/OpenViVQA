@@ -2,7 +2,7 @@ TASK: VlspEvjVqaTask
 
 DATASET:
   FEATURE_DATASET:
-    TYPE: MultilingualFeatureDataset
+    TYPE: RawQuestionMultilingualFeatureDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
@@ -11,7 +11,7 @@ DATASET:
       IMAGE: train-images
     SCENE_TEXT_THRESHOLD: 0.3
   DICT_DATASET:
-    TYPE: MultilingualDictionaryDataset
+    TYPE: RawQuestionMultilingualDictionaryDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:

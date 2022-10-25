@@ -6,18 +6,18 @@ DATASET:
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features/EVJVQA/vinvl_vinvl
+      FEATURES: vinvl_vinvl
       SCENE_TEXT: null
-      IMAGE: features/EVJVQA/images
+      IMAGE: train-images
     SCENE_TEXT_THRESHOLD: 0.3
   DICT_DATASET:
     TYPE: MultilingualDictionaryDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features/EVJVQA/vinvl_vinvl
+      FEATURES: vinvl_vinvl
       SCENE_TEXT: null
-      IMAGE: features/EVJVQA/images
+      IMAGE: train-images
     SCENE_TEXT_THRESHOLD: 0.3
   MIN_FREQ: 1
   VOCAB:
@@ -34,12 +34,16 @@ DATASET:
     BOX_TOKEN: <box>
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
-    PRETRAINED_LANGUAGE_MODEL: null
+    PRETRAINED_LANGUAGE_MODEL: bert-base-multilingual-uncased
+    JSON_PATH:
+      TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/train_data.json
+      DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/dev_data.json
+      TEST: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/official_evjvqa_public_test.json
   JSON_PATH:
-    TRAIN: features/EVJVQA/annotations/evjvqa_train.json
-    DEV: features/EVJVQA/annotations/evjvqa_dev.json
-    PUBLIC_TEST: features/EVJVQA/annotations/evjvqa_public_test.json
-    PRIVATE_TEST: features/EVJVQA/annotations/evjvqa_private_test.json
+    TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/train_data.json
+    DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/dev_data.json
+    PUBLIC_TEST: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/official_evjvqa_public_test.json
+    PRIVATE_TEST: null
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -74,7 +78,9 @@ MODEL:
     D_MODEL: 512
     DROPOUT: .1
   TEXT_EMBEDDING:
-    ARCHITECTURE: UsualEmbedding
+    ARCHITECTURE: BertEmbedding
+    PRETRAIN_NAME: bert-base-multilingual-uncasednull
+    D_PRETRAINED_FEATURE: 512
     DEVICE: cuda
     D_EMBEDDING: 300
     D_MODEL: 512

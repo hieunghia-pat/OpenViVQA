@@ -2,26 +2,26 @@ TASK: VlspEvjVqaTask
 
 DATASET:
   FEATURE_DATASET:
-    TYPE: RawQuestionMultilingualFeatureDataset
+    TYPE: MultilingualFeatureDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: vinvl_vinvl
+      FEATURES: features/EVJVQA/vinvl_vinvl
       SCENE_TEXT: null
-      IMAGE: train-images
+      IMAGE: features/EVJVQA/images
     SCENE_TEXT_THRESHOLD: 0.3
   DICT_DATASET:
-    TYPE: RawQuestionMultilingualDictionaryDataset
+    TYPE: MultilingualDictionaryDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: vinvl_vinvl
+      FEATURES: features/EVJVQA/vinvl_vinvl
       SCENE_TEXT: null
-      IMAGE: train-images
+      IMAGE: features/EVJVQA/images
     SCENE_TEXT_THRESHOLD: 0.3
   MIN_FREQ: 1
   VOCAB:
-    TYPE: VlspEvjVqaVocab
+    TYPE: VlspVqaMultiModalVocab
     TOKENIZER: null
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
@@ -34,22 +34,17 @@ DATASET:
     BOX_TOKEN: <box>
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
-    PRETRAINED_LANGUAGE_MODEL: bert-base-multilingual-uncased
-    JSON_PATH:
-      TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/train_data.json
-      DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/dev_data.json
-      TEST: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/official_evjvqa_public_test.json
+    PRETRAINED_LANGUAGE_MODEL: null
   JSON_PATH:
-    TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/train_data.json
-    DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/dev_data.json
-    PUBLIC_TEST: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/official_evjvqa_public_test.json
-    PRIVATE_TEST: null
+    TRAIN: features/EVJVQA/annotations/evjvqa_train.json
+    DEV: features/EVJVQA/annotations/evjvqa_dev.json
+    PUBLIC_TEST: features/EVJVQA/annotations/evjvqa_public_test.json
+    PRIVATE_TEST: features/EVJVQA/annotations/evjvqa_private_test.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
   LEARNING_RATE: 1
   RL_LEARNING_RATE: 0.000005
-  DEVICE: cuda
   WARMUP: 10000
   SCORE: CIDEr
   TRAINING_BEAM_SIZE: 5
@@ -79,9 +74,7 @@ MODEL:
     D_MODEL: 512
     DROPOUT: .1
   TEXT_EMBEDDING:
-    ARCHITECTURE: BertEmbedding
-    PRETRAINED_NAME: bert-base-multilingual-uncased
-    D_PRETRAINED_FEATURE: 512
+    ARCHITECTURE: UsualEmbedding
     DEVICE: cuda
     D_EMBEDDING: 300
     D_MODEL: 512

@@ -3,26 +3,26 @@ TASK: TrainingMMFM4C
 DATASET:
   FEATURE_DATASET:
     TYPE: OcrFeatureDataset
-    BATCH_SIZE: 60
+    BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.7
-    MAX_SCENE_TEXT: 30
+    MAX_SCENE_TEXT: 50
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
     TYPE: OcrDictionaryDataset
-    BATCH_SIZE: 60
+    BATCH_SIZE: 64
     WORKERS: 0
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.7
-    MAX_SCENE_TEXT: 30
+    MAX_SCENE_TEXT: 50
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   MIN_FREQ: 1
@@ -58,15 +58,15 @@ TRAINING:
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
   SCORE: CIDEr
-  TRAINING_BEAM_SIZE: 5
-  EVALUATING_BEAM_SIZE: 3
+  TRAINING_BEAM_SIZE: 1
+  EVALUATING_BEAM_SIZE: 1
   PATIENCE: 5
 
 MODEL:
   ARCHITECTURE: MMF_M4C
   NAME: mmf_m4c_x152++_faster_rcnn
   DEVICE: cuda
-  D_MODEL: 512
+  D_MODEL: 768
   OBJECT_EMBEDDING:
     D_FEATURE: 1024
     DROPOUT: .1
@@ -74,7 +74,7 @@ MODEL:
     ARCHITECTURE: FeatureEmbedding
     DEVICE: cuda
     D_FEATURE: 4
-    D_MODEL: 512
+    D_MODEL: 768
     DROPOUT: .1
   OCR_TEXT_EMBEDDING:
     WORD_EMBEDDING: ViFastText
@@ -83,13 +83,13 @@ MODEL:
     D_FEATURE: 812 # 256 (det features) + 256 (rec features) + 300 (fasttext)
     DROPOUT: .1
   OCR_PTR_NET:
-    HIDDEN_SIZE: 512
-    QUERY_KEY_SIZE: 512
+    HIDDEN_SIZE: 768
+    QUERY_KEY_SIZE: 768
     OCR_MAX_NUM: 30
   CLASSIFIER:
     OCR_MAX_NUM: 30
   MMT:
-    HIDDEN_SIZE: 512
+    HIDDEN_SIZE: 768
     NUM_HIDDEN_LAYERS: 4
     NUM_ATTENTION_HEADS: 8
   TEXT_BERT:
@@ -102,7 +102,7 @@ MODEL:
     ARCHITECTURE: UsualEmbedding
     DEVICE: cuda
     D_EMBEDDING: 300
-    D_MODEL: 512
+    D_MODEL: 768
     DROPOUT: .1
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null  

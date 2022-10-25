@@ -3,7 +3,7 @@ import torch
 from data_utils.datasets.feature_dataset import FeatureDataset
 from data_utils.datasets.dictionary_dataset import DictionaryDataset
 from data_utils.utils import preprocess_sentence
-from utils.instances import Instances
+from utils.instance import Instance
 from builders.dataset_builder import META_DATASET
 
 import os
@@ -52,7 +52,7 @@ class ImageQuestionDataset(FeatureDataset):
         shifted_right_answer_tokens[:-1] = answer_tokens[1:]
         answer_tokens = torch.where(answer_tokens == self.vocab.eos_idx, self.vocab.padding_idx, answer_tokens) # remove eos_token in answer
 
-        return Instances(
+        return Instance(
             question_id=idx,
             filename=image_file,
             image=image,
@@ -100,7 +100,7 @@ class ImageQuestionDictionaryDataset(DictionaryDataset):
         question = item["question"]
         answers = item["answers"]
 
-        return Instances(
+        return Instance(
             question_id=item["question_id"],
             image_id=image_id,
             filename=filename,

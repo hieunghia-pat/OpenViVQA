@@ -3,7 +3,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from utils.logging_utils import setup_logger
-from utils.instances import Instances
+from utils.instance import Instance
 from tasks.open_ended_task import OpenEndedTask
 from builders.task_builder import META_TASK
 import evaluation
@@ -176,9 +176,8 @@ class TrainingMMFM4C(OpenEndedTask):
         results = []
         overall_gens = {}
         overall_gts = {}
-        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataset)) as pbar:
-            for it, items in enumerate(self.test_dict_dataset):
-                items = Instances.cat([items])
+        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataloader)) as pbar:
+            for it, items in enumerate(self.test_dict_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
                     outs, _ = self.model.inference(items)

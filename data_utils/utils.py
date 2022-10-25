@@ -2,7 +2,7 @@ import torch
 import re
 from typing import List
 
-from utils.instances import Instances
+from utils.instance import Instance, InstanceList
 
 def get_tokenizer(tokenizer):
     if callable(tokenizer):
@@ -117,8 +117,8 @@ def unk_init(token, dim):
 def default_value():
     return None
 
-def collate_fn(samples: List[Instances]):
-    return Instances.cat(samples)
+def collate_fn(samples: List[Instance]):
+    return InstanceList(samples)
 
 def is_japanese_sentence(text: str):
     # REFERENCE UNICODE TABLES: 

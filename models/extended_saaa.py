@@ -9,7 +9,7 @@ from builders.attention_builder import META_ATTENTION
 from builders.vision_embedding_builder import build_vision_embedding
 from builders.text_embedding_builder import META_TEXT_EMBEDDING
 from builders.decoder_builder import build_decoder
-from utils.instances import Instances
+from utils.instance import Instance
 
 @META_ATTENTION.register()
 class CoAttention(nn.Module):
@@ -92,7 +92,7 @@ class ExtendedSAAA(BaseTransformer):
                 if module.bias is not None:
                     module.bias.data.zero_()
 
-    def encoder_forward(self, input_features: Instances):
+    def encoder_forward(self, input_features: Instance):
         v = input_features.region_features
         q = input_features.question_tokens
 
@@ -113,7 +113,7 @@ class ExtendedSAAA(BaseTransformer):
 
         return combined, combined_mask
 
-    def forward(self, input_features: Instances):
+    def forward(self, input_features: Instance):
         v = input_features.region_features
         q = input_features.question_tokens
 

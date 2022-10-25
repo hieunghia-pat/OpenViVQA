@@ -1,6 +1,6 @@
 from data_utils.datasets.base_dataset import BaseDataset
 from data_utils.utils import preprocess_sentence
-from utils.instances import Instances
+from utils.instance import Instance
 from builders.dataset_builder import META_DATASET
 
 import os
@@ -47,7 +47,7 @@ class ImageDataset(BaseDataset):
         answer = self.vocab.encode_answer(item["answer"])
         features = self.load_features(item["image_id"])
 
-        return Instances(
+        return Instance(
             **features,
             image=image,
             question=question,

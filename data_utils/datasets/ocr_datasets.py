@@ -131,7 +131,7 @@ class OcrDictionaryDataset(DictionaryDataset):
                 feature = [feature[idx] for idx, selected_id in enumerate(selected_ids) if selected_id]
             features[key] = feature
         # get the top confident-score ocr features and tokens
-        if len(selected_ids) > self.max_scene_text:
+        if np.array(selected_ids).sum() > self.max_scene_text:
             topk_scores = torch.topk(torch.tensor(features["scores"]), k=self.max_scene_text)
             for key, feature in features.items():
                 if isinstance(feature, torch.Tensor):

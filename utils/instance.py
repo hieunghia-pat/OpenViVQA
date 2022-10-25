@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, OrderedDict, Union
+from typing import Any, Dict, List, OrderedDict
 import torch
 import numpy as np
 

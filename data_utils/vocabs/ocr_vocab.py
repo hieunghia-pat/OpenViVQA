@@ -105,8 +105,6 @@ class OcrVocab(Vocab):
         '''
         assert isinstance(answer, list), f"answer must be a list of strings, get answer is of type {type(answer)}"
 
-        print(answer)
-
         # match answers to fixed vocabulary and OCR tokens
         ocr_tokens = {len(self.stoi)+idx: token for idx, token in enumerate(ocr_tokens)}
         ocr2inds = defaultdict(list)

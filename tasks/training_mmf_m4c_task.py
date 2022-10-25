@@ -42,7 +42,7 @@ class TrainingMMFM4C(OpenEndedTask):
     def __init__(self, config):
         super().__init__(config)
 
-        self.loss_fn = BCEWithMaskLogitsLoss(ignore_index=self.vocab.padding_idx)
+        # self.loss_fn = BCEWithMaskLogitsLoss(ignore_index=self.vocab.padding_idx)
 
     def evaluate_loss(self, dataloader):
         self.model.eval()
@@ -55,6 +55,7 @@ class TrainingMMFM4C(OpenEndedTask):
                         results = self.model(items)
 
                     out = results["scores"].continuous()
+                    out = F.log_softmax(out, dim=-1)
                     
                     shifted_right_answer_tokens = items.shifted_right_answer_tokens
                     loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
@@ -80,7 +81,7 @@ class TrainingMMFM4C(OpenEndedTask):
                 outs = results["scores"].argmax(dim=-1)
 
                 answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), 
+                answers_gen = self.vocab.decode_answer(outs.contiguous(), 
                                                         items.ocr_tokens, join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
@@ -95,12 +96,20 @@ class TrainingMMFM4C(OpenEndedTask):
     def train(self):
         self.model.train()
 
+        with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
+            for it, items in enumerate(self.train_dataloader):
+                print(self.vocab.max_answer_length)
+                print(items.answer_tokens.shape)
+                print(items.shifted_right_answer_tokens.shape)
+                raise
+
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, items in enumerate(self.train_dataloader):
                 items = items.to(self.device)
                 results = self.model(items)
                 out = results["scores"].contiguous()
+                out = F.log_softmax(out, dim=-1)
 
                 shifted_right_answer_tokens = items.shifted_right_answer_tokens
                 self.optim.zero_grad()

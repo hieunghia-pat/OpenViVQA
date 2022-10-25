@@ -221,10 +221,11 @@ class MMF_M4C(nn.Module):
             self._forward_output(items, fwd_results)
         else:
             # fill prev_inds with bos_idx at index 0, and zeros elsewhere
-            fwd_results["prev_inds"] = torch.zeros((items.batch_size, self.max_iter)).long()
+            fwd_results["prev_inds"] = torch.zeros((items.batch_size, self.max_iter)).long().to(self.device)
             fwd_results["prev_inds"][:, 0] = self.vocab.bos_idx
 
             # greedy decoding at test time
+            last_ids = torch.zeros((items.batch_size, ))
             for _ in range(self.max_iter):
                 self._forward_mmt(items, fwd_results)
                 self._forward_output(items, fwd_results)
@@ -234,6 +235,11 @@ class MMF_M4C(nn.Module):
                 # decoding
                 argmax_inds = fwd_results["scores"].argmax(dim=-1)
                 fwd_results["prev_inds"][:, 1:] = argmax_inds[:, :-1]
+                
+                # whether or not to interrupt the decoding process
+                last_ids = torch.where(last_ids == self.vocab.eos_idx, last_ids, argmax_inds[:, -1])
+                if last_ids.mean() == self.vocab.eos_idx:
+                    break
 
     def load_word_embeddings(self, word_embeddings, batch_of_texts: List[List[str]]):
         max_len = max([len(text) for text in batch_of_texts])

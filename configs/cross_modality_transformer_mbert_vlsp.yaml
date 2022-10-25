@@ -79,7 +79,7 @@ MODEL:
     DROPOUT: .1
   TEXT_EMBEDDING:
     ARCHITECTURE: BertEmbedding
-    PRETRAINED_NAME: bert-base-multilingual-uncasednull
+    PRETRAINED_NAME: bert-base-multilingual-uncased
     D_PRETRAINED_FEATURE: 512
     DEVICE: cuda
     D_EMBEDDING: 300

@@ -4,7 +4,7 @@ from torch.nn import functional as F
 from torch.nn import NLLLoss
 
 from .base_unique_transformer import BaseUniqueTransformer
-from utils.instances import Instances
+from utils.instance import Instance
 from builders.encoder_builder import build_encoder
 from builders.text_embedding_builder import build_text_embedding
 from builders.vision_embedding_builder import build_vision_embedding
@@ -147,7 +147,7 @@ class IterativeM4C(BaseUniqueTransformer):
 
         return answer_features, answer_masks
 
-    def embed_features(self, input_features: Instances):
+    def embed_features(self, input_features: Instance):
         region_features = input_features.region_features
         region_boxes = input_features.region_boxes
         region_features, region_padding_mask = self.forward_region_features(region_features, region_boxes)
@@ -183,7 +183,7 @@ class IterativeM4C(BaseUniqueTransformer):
 
         return results
 
-    def forward_mmt(self, input_features: Instances):
+    def forward_mmt(self, input_features: Instance):
         embedded_results = self.embed_features(input_features)
 
         region_len = embedded_results["region_len"]
@@ -227,7 +227,7 @@ class IterativeM4C(BaseUniqueTransformer):
 
         return out
 
-    def forward(self, input_features: Instances):
+    def forward(self, input_features: Instance):
         input_features = self.forward_mmt(input_features)
         out = self.forward_output(input_features)
         out = F.log_softmax(out, dim=-1)
@@ -269,7 +269,7 @@ class IterativeM4C(BaseUniqueTransformer):
 
         return out
 
-    def beam_search(self, input_features: Instances, batch_size: int, beam_size: int, out_size=1, return_probs=False, **kwargs):
+    def beam_search(self, input_features: Instance, batch_size: int, beam_size: int, out_size=1, return_probs=False, **kwargs):
         beam_search = BeamSearch(model=self, max_len=self.max_len, eos_idx=self.eos_idx, beam_size=beam_size, 
                             b_s=batch_size, device=self.device)
 

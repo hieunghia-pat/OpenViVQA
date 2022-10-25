@@ -2,7 +2,7 @@ import torch
 
 from data_utils.datasets.feature_dataset import FeatureDataset
 from data_utils.datasets.dictionary_dataset import DictionaryDataset
-from utils.instances import Instances
+from utils.instance import Instance
 from builders.dataset_builder import META_DATASET
 
 import os
@@ -86,7 +86,7 @@ class OcrFeatureDataset(FeatureDataset):
         shifted_right_answer_tokens = answer_tokens[1:] # ignore the bos token
         answer_tokens = answer_tokens[:-1] # ignore the eos token
 
-        return Instances(
+        return Instance(
             **features,
             ocr_tokens=ocr_tokens,
             question=question,
@@ -170,7 +170,7 @@ class OcrDictionaryDataset(DictionaryDataset):
 
         ocr_tokens = [text if text.strip() != "" else self.vocab.padding_token for text in features["ocr_texts"]]
 
-        return Instances(
+        return Instance(
             **features,
             question_id=item["question_id"],
             type=item["type"],

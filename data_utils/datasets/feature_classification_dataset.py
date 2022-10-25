@@ -1,6 +1,6 @@
 from data_utils.datasets.base_dataset import BaseDataset
 from data_utils.utils import preprocess_sentence
-from utils.instances import Instances
+from utils.instance import Instance
 from builders.dataset_builder import META_DATASET
 from typing import Dict, List
 
@@ -48,7 +48,7 @@ class FeatureClassificationDataset(BaseDataset):
         
         features = self.load_features(self.annotations[idx]["image_id"])
 
-        return Instances(
+        return Instance(
             question_tokens=question,
             answer_tokens=answer,
             **features

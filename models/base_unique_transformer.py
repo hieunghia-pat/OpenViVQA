@@ -3,7 +3,7 @@ from torch import nn
 
 from models.modules.containers import Module
 from models.modules.beam_search import BeamSearch
-from utils.instances import Instances
+from utils.instance import Instance
 
 class BaseUniqueTransformer(Module):
     def __init__(self, config, vocab):
@@ -23,7 +23,7 @@ class BaseUniqueTransformer(Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def embed_features(self, input_features: Instances):
+    def embed_features(self, input_features: Instance):
         raise NotImplementedError
 
     def append_answer(self, joint_features, joint_padding_mask, answer_features, answer_masks):
@@ -39,7 +39,7 @@ class BaseUniqueTransformer(Module):
 
         return joint_features, (joint_padding_mask, joint_attention_mask)
     
-    def forward(self, input_features: Instances):
+    def forward(self, input_features: Instance):
         raise NotImplementedError
 
     def step(self, t, prev_output):
@@ -58,7 +58,7 @@ class BaseUniqueTransformer(Module):
 
         return out
 
-    def beam_search(self, input_features: Instances, batch_size: int, beam_size: int, out_size=1, return_probs=False, **kwargs):
+    def beam_search(self, input_features: Instance, batch_size: int, beam_size: int, out_size=1, return_probs=False, **kwargs):
         beam_search = BeamSearch(model=self, max_len=self.max_len, eos_idx=self.eos_idx, beam_size=beam_size, 
                             b_s=batch_size, device=self.device)
 

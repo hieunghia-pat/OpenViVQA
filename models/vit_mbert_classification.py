@@ -6,7 +6,7 @@ from models.base_classification import BaseClassification
 from builders.model_builder import META_ARCHITECTURE
 from builders.vision_embedding_builder import build_vision_embedding
 from builders.text_embedding_builder import build_text_embedding
-from utils.instances import Instances
+from utils.instance import Instance
 
 @META_ARCHITECTURE.register()
 class ViTmBERTClassification(BaseClassification):
@@ -22,7 +22,7 @@ class ViTmBERTClassification(BaseClassification):
 
         self.proj = nn.Linear(config.D_MODEL, vocab.total_answers)
 
-    def forward(self, inputs: Instances):
+    def forward(self, inputs: Instance):
         images = inputs.image
         questions = inputs.question
 

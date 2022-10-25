@@ -1,5 +1,5 @@
 from data_utils.datasets.feature_classification_dataset import FeatureClassificationDataset
-from utils.instances import Instances
+from utils.instance import Instance
 from builders.dataset_builder import META_DATASET
 
 import os
@@ -24,7 +24,7 @@ class ImageQuestionClassificationDataset(FeatureClassificationDataset):
         answer = item["answer"]
         answer_tokens = self.vocab.encode_answer(answer)
 
-        return Instances(
+        return Instance(
             question_id=idx,
             filename=image_file,
             image=image,

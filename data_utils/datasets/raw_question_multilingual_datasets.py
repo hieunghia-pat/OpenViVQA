@@ -2,7 +2,7 @@ import torch
 
 from data_utils.datasets.base_dataset import BaseDataset
 from data_utils.utils import preprocess_sentence, is_japanese_sentence
-from utils.instances import Instances
+from utils.instance import Instance
 from builders.dataset_builder import META_DATASET
 
 from typing import Dict, List
@@ -54,7 +54,7 @@ class RawQuestionMultilingualFeatureDataset(BaseDataset):
         
         features = self.load_features(self.annotations[idx]["image_id"])
 
-        return Instances(
+        return Instance(
             question=question,
             answer_tokens=answer,
             shifted_right_answer_tokens=shifted_right_answer,
@@ -104,7 +104,7 @@ class RawQuestionMultilingualDictionaryDataset(BaseDataset):
         question = item["question"]
         answers = item["answers"]
 
-        return Instances(
+        return Instance(
             question_id=item["question_id"],
             type=item["type"],
             image_id=image_id,

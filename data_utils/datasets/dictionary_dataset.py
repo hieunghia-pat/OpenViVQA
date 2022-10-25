@@ -1,6 +1,6 @@
 from data_utils.utils import preprocess_sentence
 from data_utils.datasets.base_dataset import BaseDataset
-from utils.instances import Instances
+from utils.instance import Instance
 from builders.dataset_builder import META_DATASET
 
 from typing import Dict, List
@@ -42,7 +42,7 @@ class DictionaryDataset(BaseDataset):
         question_tokens = self.vocab.encode_question(question)
         answers = item["answers"]
 
-        return Instances(
+        return Instance(
             question_id=item["question_id"],
             type=item["type"],
             image_id=image_id,

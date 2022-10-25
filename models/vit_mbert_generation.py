@@ -7,7 +7,7 @@ from builders.model_builder import META_ARCHITECTURE
 from builders.vision_embedding_builder import build_vision_embedding
 from builders.text_embedding_builder import build_text_embedding
 from builders.decoder_builder import build_decoder
-from utils.instances import Instances
+from utils.instance import Instance
 
 @META_ARCHITECTURE.register()
 class ViTmBERTGeneration(BaseTransformer):
@@ -26,7 +26,7 @@ class ViTmBERTGeneration(BaseTransformer):
 
         self.decoder = build_decoder(config.DECODER, vocab)
 
-    def forward(self, inputs: Instances):
+    def forward(self, inputs: Instance):
         fused_features, fused_padding_mask = self.encoder_forward(inputs)
         
         answer_tokens = inputs.answer_tokens
@@ -38,7 +38,7 @@ class ViTmBERTGeneration(BaseTransformer):
 
         return F.log_softmax(out, dim=-1)
 
-    def encoder_forward(self, inputs: Instances):
+    def encoder_forward(self, inputs: Instance):
         features = inputs.grid_features
         questions = inputs.question
 

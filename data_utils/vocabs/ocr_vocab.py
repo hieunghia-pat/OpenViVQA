@@ -87,7 +87,7 @@ class OcrVocab(Vocab):
             each index corresponds to either a fixed vocabulary or an OOV token
             (in the index address space, the OOV tokens are after the fixed vocab)
         '''
-        answer_word_matches = []
+        indices = []
         for word in text:
             matched_inds = []
             # match answer to fixed vocab
@@ -95,17 +95,9 @@ class OcrVocab(Vocab):
             # match answer word to OOV if available
             if word in oov2inds:
                 matched_inds.extend(oov2inds[word])
-            answer_word_matches.append(matched_inds)
+            indices.append(matched_inds[np.random.choice(len(matched_inds))])
 
-        # expand per-word matched indices into the list of matched sequences
-        idx_seq_list = [[]]
-        for matched_inds in answer_word_matches:
-            idx_seq_list = [
-                seq + [idx, ]
-                for seq in idx_seq_list for idx in matched_inds
-            ]
-
-        return idx_seq_list
+        return indices
 
     def encode_answer(self, answer: List[str], ocr_tokens: List[str]) -> torch.Tensor:
         '''
@@ -113,13 +105,14 @@ class OcrVocab(Vocab):
         '''
         assert isinstance(answer, list), f"answer must be a list of strings, get answer is of type {type(answer)}"
 
+        print(answer)
+
         # match answers to fixed vocabulary and OCR tokens
         ocr_tokens = {len(self.stoi)+idx: token for idx, token in enumerate(ocr_tokens)}
         ocr2inds = defaultdict(list)
         for idx, token in ocr_tokens.items():
             ocr2inds[token].append(idx)
-        matched_ids = self.match_text_to_indices(answer, ocr2inds)
-        answer = matched_ids[np.random.choice(len(matched_ids))]
+        answer = self.match_text_to_indices(answer, ocr2inds)
 
         vec = torch.ones(self.max_answer_length).long() * self.padding_idx
         for ith, idx in enumerate([self.bos_idx] + answer + [self.eos_idx]):

@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 
 from utils.logging_utils import setup_logger
-from utils.instances import Instances
+from utils.instance import Instance
 from data_utils.utils import collate_fn
 from .base_task import BaseTask
 from builders.task_builder import META_TASK
@@ -61,7 +61,7 @@ class OpenEndedTask(BaseTask):
         )
         self.test_dataloader = DataLoader(
             dataset=self.test_dataset,
-            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
+            batch_size=1,
             shuffle=True,
             num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
             collate_fn=collate_fn
@@ -77,13 +77,13 @@ class OpenEndedTask(BaseTask):
         )
         self.dev_dict_dataloader = DataLoader(
             dataset=self.dev_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         )
         self.test_dict_dataloader = DataLoader(
             dataset=self.test_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=1,
             shuffle=True,
             collate_fn=collate_fn
         )
@@ -286,9 +286,8 @@ class OpenEndedTask(BaseTask):
         results = []
         overall_gens = {}
         overall_gts = {}
-        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataset)) as pbar:
-            for it, items in enumerate(self.test_dict_dataset):
-                items = Instances.cat([items])
+        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataloader)) as pbar:
+            for it, items in enumerate(self.test_dict_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)

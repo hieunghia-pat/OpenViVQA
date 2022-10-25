@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 from .base_transformer import BaseTransformer
-from utils.instances import Instances
+from utils.instance import Instance
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from builders.encoder_builder import build_encoder
 from builders.decoder_builder import build_decoder
@@ -31,7 +31,7 @@ class ExtendedMCAN(BaseTransformer):
 
         self.decoder = build_decoder(config.DECODER, vocab=vocab)
 
-    def forward(self, input_features: Instances):
+    def forward(self, input_features: Instance):
         encoder_features, encoder_padding_mask = self.encoder_forward(input_features)
 
         answer_tokens = input_features.answer_tokens
@@ -43,7 +43,7 @@ class ExtendedMCAN(BaseTransformer):
 
         return output
 
-    def encoder_forward(self, input_features: Instances):
+    def encoder_forward(self, input_features: Instance):
         region_features = input_features.region_features
         region_features, region_padding_mask = self.region_embedding(region_features)
         region_feat_tokens = torch.ones((region_features.shape[0], region_features.shape[1])).long().to(region_features.device) * self.vocab.feat_idx
@@ -114,7 +114,7 @@ class ExtendedMCANUsingRegion(BaseTransformer):
 
         self.decoder = build_decoder(config.DECODER, vocab=vocab)
 
-    def forward(self, input_features: Instances):
+    def forward(self, input_features: Instance):
         encoder_features, encoder_padding_mask = self.encoder_forward(input_features)
 
         answer_tokens = input_features.answer_tokens
@@ -126,7 +126,7 @@ class ExtendedMCANUsingRegion(BaseTransformer):
 
         return output
 
-    def encoder_forward(self, input_features: Instances):
+    def encoder_forward(self, input_features: Instance):
         vision_features = input_features.region_features
         vision_features, vision_padding_mask = self.vision_embedding(vision_features)
 

@@ -80,7 +80,7 @@ MODEL:
   TEXT_EMBEDDING:
     ARCHITECTURE: BertEmbedding
     PRETRAINED_NAME: bert-base-multilingual-uncased
-    D_PRETRAINED_FEATURE: 512
+    D_PRETRAINED_FEATURE: 768
     DEVICE: cuda
     D_EMBEDDING: 300
     D_MODEL: 512

@@ -69,8 +69,8 @@ class CrossModalityTransformer(BaseTransformer):
         vision_features = torch.cat([region_features, region_boxes, grid_features, grid_boxes], dim=1)
         vision_padding_mask = torch.cat([region_padding_mask, region_boxes_padding_mask, grid_padding_mask, grid_boxes_padding_mask], dim=-1)
 
-        question_tokens = input_features.question_tokens
-        text_features, (text_padding_mask, _) = self.text_embedding(question_tokens)
+        question = input_features.question
+        text_features, text_padding_mask = self.text_embedding(question)
 
         # Cross-Modality attention
         vision_features, language_features = self.encoder(Instances(

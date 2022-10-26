@@ -66,14 +66,14 @@ class AssembleBaseTask:
     def load_datasets(self, config):
         raise NotImplementedError
 
-    def create_dataloaders(self, config):
-        raise NotImplementedError
+    # def create_dataloaders(self, config):
+    #     raise NotImplementedError
 
-    def evaluate_loss(self, dataloader: DataLoader):
-        raise NotImplementedError
+    # def evaluate_loss(self, dataloader: DataLoader):
+    #     raise NotImplementedError
 
-    def evaluate_metrics(self, dataloader: DataLoader):
-        raise NotImplementedError
+    # def evaluate_metrics(self, dataloader: DataLoader):
+    #     raise NotImplementedError
 
     def train(self):
         raise NotImplementedError

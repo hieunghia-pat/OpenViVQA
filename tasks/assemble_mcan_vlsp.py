@@ -36,31 +36,6 @@ class AssembleTask(AssembleBaseTask):
 
     def load_datasets(self, config):
         self.dataset = self.load_feature_datasets(config)
-        self.train_dict_dataset, self.dev_dict_dataset, self.public_test_dict_dataset, self.private_test_dict_dataset = self.load_dict_datasets(config)
-
-    def create_feature_dataloaders(self, config):
-        # creating iterable-dataset data loader
-        self.e_dataloader = DataLoader(
-            dataset=self.dataset[0],
-            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
-            shuffle=True,
-            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
-            collate_fn=collate_fn
-        )
-        self.v_dataloader = DataLoader(
-            dataset=self.dataset[1],
-            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
-            shuffle=True,
-            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
-            collate_fn=collate_fn
-        )
-        self.j_dataloader = DataLoader(
-            dataset=self.dataset[0],
-            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
-            shuffle=True,
-            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
-            collate_fn=collate_fn
-        ) 
 
     def configuring_hyperparameters(self, config):
         self.epoch = 0

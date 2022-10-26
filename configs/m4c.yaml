@@ -4,23 +4,23 @@ DATASET:
   FEATURE_DATASET:
     TYPE: OcrFeatureDataset
     BATCH_SIZE: 60
-    WORKERS: 0
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.3
-    MAX_SCENE_TEXT: 30
+    SCENE_TEXT_THRESHOLD: 0.7
+    MAX_SCENE_TEXT: 50
   DICT_DATASET:
     TYPE: OcrDictionaryDataset
-    BATCH_SIZE: 60
-    WORKERS: 0
+    BATCH_SIZE: 64
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.3
-    MAX_SCENE_TEXT: 30
+    SCENE_TEXT_THRESHOLD: 0.7
+    MAX_SCENE_TEXT: 50
   MIN_FREQ: 1
   VOCAB:
     TYPE: OcrVocab
@@ -54,8 +54,8 @@ TRAINING:
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
   SCORE: CIDEr
-  TRAINING_BEAM_SIZE: 5
-  EVALUATING_BEAM_SIZE: 3
+  TRAINING_BEAM_SIZE: 1
+  EVALUATING_BEAM_SIZE: 1
   PATIENCE: 5
 
 MODEL:
@@ -130,5 +130,3 @@ MODEL:
       USE_AOA: False
       CAN_BE_STATEFUL: False
       DROPOUT: .1
-  DECODER:
-    MAX_ITER: 1

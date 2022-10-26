@@ -96,7 +96,6 @@ MODEL:
   OCR_TEXT_EMBEDDING:
     ARCHITECTURE: OcrWordEmbedding
     DEVICE: cuda
-    OCR_PATH: features/OpenViVQA/features/swintextspotter
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
     D_EMBEDDING: 300

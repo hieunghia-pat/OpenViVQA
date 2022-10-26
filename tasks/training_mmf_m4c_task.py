@@ -3,7 +3,6 @@ from torch import nn
 from torch.nn import functional as F
 
 from utils.logging_utils import setup_logger
-from utils.instance import Instance
 from tasks.open_ended_task import OpenEndedTask
 from builders.task_builder import META_TASK
 import evaluation
@@ -42,7 +41,7 @@ class TrainingMMFM4C(OpenEndedTask):
     def __init__(self, config):
         super().__init__(config)
 
-        self.loss_fn = BCEWithMaskLogitsLoss(ignore_index=self.vocab.padding_idx)
+        # self.loss_fn = BCEWithMaskLogitsLoss(ignore_index=self.vocab.padding_idx)
 
     def evaluate_loss(self, dataloader):
         self.model.eval()
@@ -54,7 +53,8 @@ class TrainingMMFM4C(OpenEndedTask):
                     with torch.no_grad():
                         results = self.model(items)
 
-                    out = results["scores"].continuous()
+                    out = results["scores"].contiguous()
+                    out = F.log_softmax(out, dim=-1)
                     
                     shifted_right_answer_tokens = items.shifted_right_answer_tokens
                     loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
@@ -80,7 +80,7 @@ class TrainingMMFM4C(OpenEndedTask):
                 outs = results["scores"].argmax(dim=-1)
 
                 answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), 
+                answers_gen = self.vocab.decode_answer(outs.contiguous(), 
                                                         items.ocr_tokens, join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
@@ -94,13 +94,13 @@ class TrainingMMFM4C(OpenEndedTask):
 
     def train(self):
         self.model.train()
-
         running_loss = .0
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, items in enumerate(self.train_dataloader):
                 items = items.to(self.device)
                 results = self.model(items)
                 out = results["scores"].contiguous()
+                out = F.log_softmax(out, dim=-1)
 
                 shifted_right_answer_tokens = items.shifted_right_answer_tokens
                 self.optim.zero_grad()
@@ -180,7 +180,8 @@ class TrainingMMFM4C(OpenEndedTask):
             for it, items in enumerate(self.test_dict_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs, _ = self.model.inference(items)
+                    results = self.model(items)
+                outs = results["scores"].argmax(dim=-1)
 
                 answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length),

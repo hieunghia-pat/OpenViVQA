@@ -6,7 +6,7 @@ DATASET:
     BATCH_SIZE: 15
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features/EVJVQA/vinvl_vinvl
+      FEATURES: /content/vinvl_vinvl
       SCENE_TEXT: null
       IMAGE: features/EVJVQA/images
     SCENE_TEXT_THRESHOLD: 0.3
@@ -15,7 +15,7 @@ DATASET:
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features/EVJVQA/vinvl_vinvl
+      FEATURES: /content/vinvl_vinvl
       SCENE_TEXT: null
       IMAGE: features/EVJVQA/images
     SCENE_TEXT_THRESHOLD: 0.3
@@ -46,10 +46,10 @@ DATASET:
     V_DATASET:
 
 PRETRAINED_MODELS:
-    E_MODEL_PATH:
-    J_MODEL_PATH:
-    V_MODEL_PATH:
-    RESULTS_PATH:
+    E_MODEL_PATH: /content/models/content/en_saved_models
+    J_MODEL_PATH: /content/models/content/ja_saved_models
+    V_MODEL_PATH: /content/models/content/vi_saved_models
+    RESULTS_PATH: /content/
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -65,6 +65,8 @@ MODEL:
   ARCHITECTURE: ExtendedMCAN
   NAME: extended_mcan_vlsp
   DEVICE: cuda
+  D_MODEL: 512
+  DROPOUT: .1
   REGION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
     DEVICE: cuda

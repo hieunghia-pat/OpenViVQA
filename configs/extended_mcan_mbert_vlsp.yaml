@@ -37,19 +37,19 @@ DATASET:
     ANSWER_TOKEN: <answer>
     PRETRAINED_LANGUAGE_MODEL: bert-base-multilingual-uncased
   JSON_PATH:
-    TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/train_data.json
-    DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/dev_data.json
-    PUBLIC_TEST: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/official_evjvqa_public_test.json
+    TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Data_root/evjvqa_train.json
+    DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Data_root/public-test-data-with-answer/evjvqa_public_test.json
+    PUBLIC_TEST: null
     PRIVATE_TEST: null
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
-  LEARNING_RATE: 1.
+  LEARNING_RATE: 2
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
-  SCORE: CIDEr
+  SCORE: F1
   TRAINING_BEAM_SIZE: 5
-  EVALUATING_BEAM_SIZE: 3
+  EVALUATING_BEAM_SIZE: 1
   PATIENCE: 5
 
 MODEL:

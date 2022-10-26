@@ -3,7 +3,6 @@ from torch import nn
 from torch.nn import functional as F
 
 from utils.logging_utils import setup_logger
-from utils.instance import Instance
 from tasks.open_ended_task import OpenEndedTask
 from builders.task_builder import META_TASK
 import evaluation
@@ -54,7 +53,7 @@ class TrainingMMFM4C(OpenEndedTask):
                     with torch.no_grad():
                         results = self.model(items)
 
-                    out = results["scores"].continuous()
+                    out = results["scores"].contiguous()
                     out = F.log_softmax(out, dim=-1)
                     
                     shifted_right_answer_tokens = items.shifted_right_answer_tokens

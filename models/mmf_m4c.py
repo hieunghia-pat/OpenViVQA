@@ -225,8 +225,8 @@ class MMF_M4C(nn.Module):
             fwd_results["prev_inds"][:, 0] = self.vocab.bos_idx
 
             # greedy decoding at test time
-            last_ids = torch.zeros((items.batch_size, ))
-            for _ in range(self.max_iter):
+            last_ids = torch.zeros((items.batch_size, )).to(self.device)
+            for ith in range(self.max_iter):
                 self._forward_mmt(items, fwd_results)
                 self._forward_output(items, fwd_results)
 
@@ -237,7 +237,7 @@ class MMF_M4C(nn.Module):
                 fwd_results["prev_inds"][:, 1:] = argmax_inds[:, :-1]
                 
                 # whether or not to interrupt the decoding process
-                last_ids = torch.where(last_ids == self.vocab.eos_idx, last_ids, argmax_inds[:, -1])
+                last_ids = torch.where(last_ids == self.vocab.eos_idx, last_ids, argmax_inds[:, ith])
                 if last_ids.mean() == self.vocab.eos_idx:
                     break
 

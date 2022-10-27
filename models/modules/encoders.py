@@ -280,3 +280,26 @@ class CrossModalityEncoder(nn.Module):
             )
 
         return vision_features, language_features
+
+
+class AutoFusion(nn.Module):
+    def __init__(self, config):
+        super(AutoFusion, self).__init__()
+        self.config = config
+
+        self.fuse_in = nn.Sequential(
+            nn.Linear(config.D_MODEL, config.D_MODEL//2),
+            nn.Tanh(),
+            nn.Linear(config.D_MODEL//2, config.LATENT_DIM),
+            nn.ReLU()
+            )
+        self.fuse_out = nn.Sequential(
+            nn.Linear(config.LATENT_DIM, config.D_MODEL//2),
+            nn.ReLU(),
+            nn.Linear(config.D_MODEL//2, config.D_MODEL)
+            )
+
+    def forward(self, feature):
+        fuse_feature = self.fuse_in(feature)
+        fuse_feature = self.fuse_out(fuse_feature)
+        return fuse_feature

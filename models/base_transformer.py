@@ -36,11 +36,11 @@ class BaseTransformer(Module):
         else:
             it = prev_output
 
-        output = self.decoder(
+        output = self.decoder(Instances(
             answer_tokens=it,
             encoder_features=self.encoder_features,
             encoder_attention_mask=self.encoder_padding_mask
-        )
+        ))
 
         return output
 

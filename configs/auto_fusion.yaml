@@ -2,22 +2,22 @@ TASK: VlspEvjVqaTask
 
 DATASET:
   FEATURE_DATASET:
-    TYPE: MultilingualFeatureDataset
+    TYPE: RawQuestionMultilingualFeatureDataset
     BATCH_SIZE: 15
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features/EVJVQA/vinvl_vinvl
+      FEATURES: /content/vinvl_vinvl
       SCENE_TEXT: null
-      IMAGE: features/EVJVQA/images
+      IMAGE: /content/train-images
     SCENE_TEXT_THRESHOLD: 0.3
   DICT_DATASET:
-    TYPE: MultilingualDictionaryDataset
+    TYPE: RawQuestionMultilingualDictionaryDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features/EVJVQA/vinvl_vinvl
+      FEATURES: /content/vinvl_vinvl
       SCENE_TEXT: null
-      IMAGE: features/EVJVQA/images
+      IMAGE: /content/train-images
     SCENE_TEXT_THRESHOLD: 0.3
   MIN_FREQ: 1
   SCENE_TEXT_THRESHOLD: 0.3
@@ -35,27 +35,29 @@ DATASET:
     BOX_TOKEN: <box>
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
-    PRETRAINED_LANGUAGE_MODEL: null
+    PRETRAINED_LANGUAGE_MODEL: bert-base-multilingual-uncased
   JSON_PATH:
-    TRAIN: features/EVJVQA/annotations/evjvqa_train.json
-    DEV: features/EVJVQA/annotations/evjvqa_dev.json
-    PUBLIC_TEST: features/EVJVQA/annotations/evjvqa_public_test.json
-    PRIVATE_TEST: features/EVJVQA/annotations/evjvqa_private_test.json
+    TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Data_root/evjvqa_train.json
+    DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Data_root/public-test-data-with-answer/evjvqa_public_test.json
+    PUBLIC_TEST: null
+    PRIVATE_TEST: null
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
-  LEARNING_RATE: 1.
+  LEARNING_RATE: 2
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
-  SCORE: CIDEr
+  SCORE: F1
   TRAINING_BEAM_SIZE: 5
-  EVALUATING_BEAM_SIZE: 3
+  EVALUATING_BEAM_SIZE: 1
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: AutoFusion
-  NAME: auto_fusion
+  ARCHITECTURE: ExtendedMCAN
+  NAME: extended_mcan_vlsp
   DEVICE: cuda
+  D_MODEL: 512
+  DROPOUT: .1
   REGION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
     DEVICE: cuda
@@ -102,6 +104,17 @@ MODEL:
   AUTO_FUSION:
     D_MODEL: 512
     LATENT_DIM: 100  
+  MULTIMODAL_FUSION:
+    ARCHITECTURE: ScaledDotProductAttention
+    HEAD: 8
+    D_MODEL: 512
+    D_KEY: 64
+    D_VALUE: 64
+    D_FF: 2048
+    D_FEATURE: 2048
+    USE_AOA: False
+    CAN_BE_STATEFUL: False
+    DROPOUT: .1
   DECODER:
     ARCHITECTURE: Decoder
     D_MODEL: 512

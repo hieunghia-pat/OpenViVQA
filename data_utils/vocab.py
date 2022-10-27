@@ -32,7 +32,8 @@ class Vocab(object):
         min_freq = max(config.MIN_FREQ, 1)
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
-        itos = specials
+        specials1=specials.copy()
+        self.itos = specials1
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         for tok in specials:
@@ -45,17 +46,18 @@ class Vocab(object):
         for word, freq in words_and_frequencies:
             if freq < min_freq:
                 break
-            itos.append(word)
+            self.itos.append(word)
 
-        self.itos = {i: tok for i, tok in enumerate(itos)}
-        self.stoi = {tok: i for i, tok in enumerate(itos)}
-
-        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
+        self.stoi = defaultdict()
+        # stoi is simply a reverse dict for itos
+        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
         self.eos_idx = self.stoi[self.eos_token]
         self.unk_idx = self.stoi[self.unk_token]
+
+        self.specials = specials
 
         self.word_embeddings = None
         if config.VOCAB.WORD_EMBEDDING is not None:
@@ -68,9 +70,14 @@ class Vocab(object):
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
-                for answer in ann["answers"]:
-                    question = preprocess_sentence(ann["question"], self.tokenizer)
-                    answer = preprocess_sentence(answer, self.tokenizer)
+                    question = ann["question"]
+                    answer = ann["answer"]
+                    if is_japanese_sentence(question):
+                        question = list(question)
+                        answer = list(answer)
+                    else:
+                        question = preprocess_sentence(question, self.tokenizer)
+                        answer = preprocess_sentence(answer, self.tokenizer)
                     self.freqs.update(question)
                     self.freqs.update(answer)
                     if len(question) + 2 > self.max_question_length:
@@ -99,6 +106,7 @@ class Vocab(object):
         questions = []
         for vec in question_vecs:
             question = " ".join([self.itos[idx] for idx in vec.tolist() if self.itos[idx] not in self.specials])
+            #question = " ".join([self.itos[idx] for idx in vec.tolist()])
             if join_words:
                 questions.append(question)
             else:
@@ -113,6 +121,8 @@ class Vocab(object):
         answers = []
         for vec in answer_vecs:
             answer = " ".join([self.itos[idx] for idx in vec.tolist() if self.itos[idx] not in self.specials])
+            #answer = " ".join([self.itos[idx] for idx in vec.tolist()])
+
             if join_words:
                 answers.append(answer)
             else:
@@ -187,13 +197,13 @@ class MultilingualVocab(Vocab):
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
-                for answer in ann["answers"]:
+                    answer = ann["answer"]
                     question = ann["question"]
                     if is_japanese_sentence(question):
                         question = list(question)
                         answer = list(answer)
                     else: # This is Vietnamese or English annotation
-                        question = preprocess_sentence(ann["question"], self.tokenizer)
+                        question = preprocess_sentence(question, self.tokenizer)
                         answer = preprocess_sentence(answer, self.tokenizer)
                     self.freqs.update(question)
                     self.freqs.update(answer)
@@ -202,57 +212,6 @@ class MultilingualVocab(Vocab):
                     if len(answer) + 2 > self.max_answer_length:
                         self.max_answer_length = len(answer) + 2
 
-@META_VOCAB.register()
-class VlspEvjVqaVocab(MultilingualVocab):
-    '''
-        This vocab is designed specially for EVJVQA dataset
-    '''
-    
-    def __init__(self, config) -> None:
-        self.tokenizer = config.VOCAB.TOKENIZER
-
-        self.padding_token = config.VOCAB.PAD_TOKEN
-        self.bos_token = config.VOCAB.BOS_TOKEN
-        self.eos_token = config.VOCAB.EOS_TOKEN
-        self.unk_token = config.VOCAB.UNK_TOKEN
-
-        self.make_vocab([
-            config.JSON_PATH.TRAIN,
-            config.JSON_PATH.DEV
-        ])
-        counter = self.freqs.copy()
-    
-        min_freq = max(config.MIN_FREQ, 1)
-
-        specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
-        itos = specials
-        # frequencies of special tokens are not counted when building vocabulary
-        # in frequency order
-        for tok in specials:
-            del counter[tok]
-
-        # sort by frequency, then alphabetically
-        words_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
-        words_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
-
-        for word, freq in words_and_frequencies:
-            if freq < min_freq:
-                break
-            itos.append(word)
-
-        self.itos = {i: tok for i, tok in enumerate(itos)}
-        self.stoi = {tok: i for i, tok in enumerate(itos)}
-
-        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
-
-        self.padding_idx = self.stoi[self.padding_token]
-        self.bos_idx = self.stoi[self.bos_token]
-        self.eos_idx = self.stoi[self.eos_token]
-        self.unk_idx = self.stoi[self.unk_token]
-
-        self.word_embeddings = None
-        if config.VOCAB.WORD_EMBEDDING is not None:
-            self.load_word_embeddings(build_word_embedding(config))
 
 @META_VOCAB.register()
 class ClassificationVocab(Vocab):
@@ -310,14 +269,14 @@ class MultilingualClassificationVocab(ClassificationVocab):
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
                 question = ann["question"]
-                for answer in ann["answers"]:
-                    if is_japanese_sentence(question): # This is Japanese annotation
-                        question = list(question)
-                    else: # This is Vietnamese or English annotation
-                        question = preprocess_sentence(question, self.tokenizer)
-                        answer = preprocess_sentence(answer, self.tokenizer)
-                        answer = "_".join(answer)
-                    itoa.add(answer)
+                answer = ann["answer"]
+                if is_japanese_sentence(question): # This is Japanese annotation
+                    question = list(question)
+                    answer=list(answer)
+                else: # This is Vietnamese or English annotation
+                    question = preprocess_sentence(question, self.tokenizer)
+                    answer = preprocess_sentence(answer, self.tokenizer)
+                itoa.add(answer)
                 self.freqs.update(question)
                 if len(question) + 2 > self.max_question_length:
                         self.max_question_length = len(question) + 2
@@ -354,7 +313,7 @@ class MultiModalVocab(Vocab):
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
                     self.feat_token, self.box_token, self.question_token, self.answer_token]
-        itos = specials
+        self.itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         for tok in specials:
@@ -367,13 +326,11 @@ class MultiModalVocab(Vocab):
         for word, freq in words_and_frequencies:
             if freq < min_freq:
                 break
-            itos.append(word)
+            self.itos.append(word)
 
-        self.itos = {i: tok for i, tok in enumerate(itos)}
-        self.stoi = {tok: i for i, tok in enumerate(itos)}
-
-        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
-                    self.feat_token, self.box_token, self.question_token, self.answer_token]
+        self.stoi = defaultdict()
+        # stoi is simply a reverse dict for itos
+        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
@@ -384,6 +341,8 @@ class MultiModalVocab(Vocab):
         self.box_idx = self.stoi[self.box_token]
         self.question_idx = self.stoi[self.question_token]
         self.answer_idx = self.stoi[self.answer_token]
+
+        self.specials = specials
 
         self.word_embeddings = None
         if config.VOCAB.WORD_EMBEDDING is not None:
@@ -417,7 +376,7 @@ class MultilingualMultiModalVocab(MultiModalVocab):
                     self.max_answer_length = len(answer) + 2
 
 @META_VOCAB.register()
-class OcrVocab(Vocab):
+class OcrVocab(MultiModalVocab):
     '''
         This class is designed especially for VQA with reading comprehension
     '''
@@ -450,7 +409,7 @@ class OcrVocab(Vocab):
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
                     self.feat_token, self.box_token, self.ocr_token, self.ocr_det_token, self.ocr_rec_token, 
                     self.question_token, self.answer_token]
-        itos = specials
+        self.itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
         for tok in specials:
@@ -463,14 +422,11 @@ class OcrVocab(Vocab):
         for word, freq in words_and_frequencies:
             if freq < min_freq:
                 break
-            itos.append(word)
+            self.itos.append(word)
 
-        self.itos = {i: tok for i, tok in enumerate(itos)}
-        self.stoi = {tok: i for i, tok in enumerate(itos)}
-
-        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
-                    self.feat_token, self.box_token, self.ocr_token, self.ocr_det_token, self.ocr_rec_token, 
-                    self.question_token, self.answer_token]
+        self.stoi = defaultdict()
+        # stoi is simply a reverse dict for itos
+        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
@@ -484,6 +440,8 @@ class OcrVocab(Vocab):
         self.ocr_rec_idx = self.stoi[self.ocr_rec_token]
         self.question_idx = self.stoi[self.question_token]
         self.answer_idx = self.stoi[self.answer_token]
+
+        self.specials = specials
 
         self.word_embeddings = None
         if config.VOCAB.WORD_EMBEDDING is not None:
@@ -541,6 +499,66 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
 
         specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
                     self.feat_token, self.box_token, self.question_token, self.answer_token]
+        
+        self.itos = specials.copy()
+        # frequencies of special tokens are not counted when building vocabulary
+        # in frequency order
+        for tok in specials:
+            del counter[tok]
+
+        # sort by frequency, then alphabetically
+        words_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
+        words_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
+
+        for word, freq in words_and_frequencies:
+            if freq < min_freq:
+                break
+            self.itos.append(word)
+
+        self.stoi = defaultdict()
+        # stoi is simply a reverse dict for itos
+        self.stoi.update({tok: i for i, tok in enumerate(self.itos)})
+
+        self.padding_idx = self.stoi[self.padding_token]
+        self.bos_idx = self.stoi[self.bos_token]
+        self.eos_idx = self.stoi[self.eos_token]
+        self.unk_idx = self.stoi[self.unk_token]
+        self.img_idx = self.stoi[self.img_token]
+        self.feat_idx = self.stoi[self.feat_token]
+        self.box_idx = self.stoi[self.box_token]
+        self.question_idx = self.stoi[self.question_token]
+        self.answer_idx = self.stoi[self.answer_token]
+
+        self.specials = specials
+
+        self.word_embeddings = None
+        if config.VOCAB.WORD_EMBEDDING is not None:
+            self.load_word_embeddings(build_word_embedding(config))
+
+
+@META_VOCAB.register()
+class VlspEvjVqaVocab(MultilingualVocab):
+    '''
+        This vocab is designed specially for EVJVQA dataset
+    '''
+    
+    def __init__(self, config) -> None:
+        self.tokenizer = config.VOCAB.TOKENIZER
+
+        self.padding_token = config.VOCAB.PAD_TOKEN
+        self.bos_token = config.VOCAB.BOS_TOKEN
+        self.eos_token = config.VOCAB.EOS_TOKEN
+        self.unk_token = config.VOCAB.UNK_TOKEN
+
+        self.make_vocab([
+            config.JSON_PATH.TRAIN,
+            config.JSON_PATH.DEV
+        ])
+        counter = self.freqs.copy()
+    
+        min_freq = max(config.MIN_FREQ, 1)
+
+        specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
         itos = specials
         # frequencies of special tokens are not counted when building vocabulary
         # in frequency order
@@ -559,18 +577,12 @@ class VlspVqaMultiModalVocab(MultilingualMultiModalVocab):
         self.itos = {i: tok for i, tok in enumerate(itos)}
         self.stoi = {tok: i for i, tok in enumerate(itos)}
 
-        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
-                    self.feat_token, self.box_token, self.question_token, self.answer_token]
+        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
         self.eos_idx = self.stoi[self.eos_token]
         self.unk_idx = self.stoi[self.unk_token]
-        self.img_idx = self.stoi[self.img_token]
-        self.feat_idx = self.stoi[self.feat_token]
-        self.box_idx = self.stoi[self.box_token]
-        self.question_idx = self.stoi[self.question_token]
-        self.answer_idx = self.stoi[self.answer_token]
 
         self.word_embeddings = None
         if config.VOCAB.WORD_EMBEDDING is not None:

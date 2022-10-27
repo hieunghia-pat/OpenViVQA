@@ -40,6 +40,7 @@ from models.visiolinguistic_transformer import VisiolinguisticTransformer
 from models.joint_transformer import JointTransformer
 from models.unique_transformer import UniqueTransformer
 from models.m4c import M4C
+from models.auto_fusion import AutoFusion
 from data_utils.dataset import (
     DictionaryDataset,
     RawQuestionDictionaryDataset,

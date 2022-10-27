@@ -110,6 +110,7 @@ class BaseTask:
             dict_for_saving[key] = value
 
         torch.save(dict_for_saving, os.path.join(self.checkpoint_path, "last_model.pth"))
+        torch.save(dict_for_saving, os.path.join(self.checkpoint_path, "last_model.pth"))
 
     def start(self):
         raise NotImplementedError

@@ -34,11 +34,11 @@ class AutoFusion(BaseTransformer):
         encoder_features, encoder_padding_mask = self.encoder_forward(input_features)
 
         answer_tokens = input_features.answer_tokens
-        output = self.decoder(
+        output = self.decoder(Instances(
             answer_tokens=answer_tokens,
             encoder_features=encoder_features,
             encoder_attention_mask=encoder_padding_mask
-        )
+        ))
 
         return output
 
@@ -61,28 +61,28 @@ class AutoFusion(BaseTransformer):
         grid_feat_embedded, _ = self.decoder.word_emb(grid_feat_tokens)
         grid_features += grid_feat_embedded
         
-        grid_boxes = input_features.grid_boxes
+        grid_boxes = input_features.grid_boxes.squeeze(1)
         grid_boxes, grid_boxes_padding_mask = self.box_embedding(grid_boxes)
         grid_box_tokens = torch.ones((grid_boxes.shape[0], grid_boxes.shape[1])).long().to(grid_boxes.device) * self.vocab.box_idx
         grid_box_embedded, _ = self.decoder.word_emb(grid_box_tokens)
-        grid_boxes += grid_box_embedded
+        grid_boxes += grid_box_embedded.squeeze(1)
 
         vision_features = torch.cat([region_features, region_boxes, grid_features, grid_boxes], dim=1)
         vision_padding_mask = torch.cat([region_padding_mask, region_boxes_padding_mask, grid_padding_mask, grid_boxes_padding_mask], dim=-1)
 
-        question_tokens = input_features.question_tokens
-        text_features, (text_padding_mask, _) = self.text_embedding(question_tokens)
-
+        question = input_features.question
+        text_features, text_padding_mask = self.text_embedding(question)
+        
         # SA
-        text_features = self.self_encoder(
+        text_features = self.self_encoder(Instances(
             features=text_features,
             features_padding_mask=text_padding_mask
-        )
-        #SA
-        vision_features = self.self_encoder(
+        ))
+        # SA
+        vision_features = self.self_encoder(Instances(
             features=vision_features,
             features_padding_mask=vision_padding_mask
-        )
+        ))
 
         # Multimodal fusion
         encoder_features = torch.cat([vision_features, text_features], dim=1)

@@ -35,10 +35,6 @@ DATASET:
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
     PRETRAINED_LANGUAGE_MODEL: bert-base-multilingual-uncased
-    JSON_PATH:
-      TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/train_data.json
-      DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/dev_data.json
-      TEST: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/official_evjvqa_public_test.json
   JSON_PATH:
     TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/train_data.json
     DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/dev_data.json

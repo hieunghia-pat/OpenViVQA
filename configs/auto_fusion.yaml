@@ -37,9 +37,9 @@ DATASET:
     ANSWER_TOKEN: <answer>
     PRETRAINED_LANGUAGE_MODEL: bert-base-multilingual-uncased
   JSON_PATH:
-    TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Data_root/evjvqa_train.json
-    DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Data_root/public-test-data-with-answer/evjvqa_public_test.json
-    PUBLIC_TEST: null
+    TRAIN: /content/Gdrive/MyDrive/UIT_SQUAD/Data/Splitted_Data/train_data.json
+    DEV: /content/Gdrive/MyDrive/UIT_SQUAD/Data/Splitted_Data/dev_data.json
+    PUBLIC_TEST: /content/Gdrive/MyDrive/UIT_SQUAD/Data/Data_root/evjvqa_public_test.json
     PRIVATE_TEST: null
 
 TRAINING:
@@ -50,11 +50,11 @@ TRAINING:
   SCORE: F1
   TRAINING_BEAM_SIZE: 5
   EVALUATING_BEAM_SIZE: 1
-  PATIENCE: 5
+  PATIENCE: 20
 
 MODEL:
-  ARCHITECTURE: ExtendedMCAN
-  NAME: extended_mcan_vlsp
+  ARCHITECTURE: AutoFusion
+  NAME: auto_fusion
   DEVICE: cuda
   D_MODEL: 512
   DROPOUT: .1

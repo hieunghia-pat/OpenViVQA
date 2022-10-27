@@ -8,6 +8,7 @@ from pytorch_transformers.modeling_bert import (
     BertIntermediate,
     BertAttention,
     BertOutput,
+    BertEncoder,
     BertPreTrainedModel,
 )
 
@@ -15,7 +16,6 @@ from .mmf_m4c import TextBert, MMT, OcrPtrNet, PrevPredEmbeddings, _get_mask, _g
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
 
-from typing import List
 import math
 
 logger = setup_logger()
@@ -56,7 +56,7 @@ class MMF_LoRRA(nn.Module):
                                             num_attention_heads=self.config.MMT.NUM_ATTENTION_HEADS)
         if self.config.TEXT_BERT.LOAD_PRETRAINED:
             self.text_bert = TextBert.from_pretrained(
-                "bert-base-uncased", config=self.text_bert_config
+                self.config.TEXT_BERT.PRETRAINED_NAME, config=self.text_bert_config
             )
         else:
             self.text_bert = TextBert(self.text_bert_config)
@@ -290,6 +290,8 @@ class MMT(BertPreTrainedModel):
         self.self_att = nn.Identity(config)
         self.spatial_att = BertCrossAttentionLayer(config)
         self.context_att = BertCrossAttentionLayer(config)
+
+        self.decoder = BertEncoder(config)
         
         self.init_weights()
 
@@ -318,11 +320,6 @@ class MMT(BertPreTrainedModel):
         )
         dec_mask = (1 - dec_mask) * -10000.0
 
-        max_len = 0
-        for emb in [obj_emb, ocr_emb, txt_emb]:
-            if max_len < emb.shape[1]:
-                max_len = emb.shape[1]
-
         # applying self-attention for question features
         # as M4C used BERT as text encoder hence we do not need attention module anymore
         txt_mask = (1 - txt_mask) * -10000.0
@@ -337,10 +334,23 @@ class MMT(BertPreTrainedModel):
         att_2 = self.context_att(txt_emb, ocr_emb, ocr_mask)
 
         # join the self-attention features with spatial attention features
-        encoder_outputs = att_1 + att_2
+        att = att_1 + att_2
+        encoder_inputs = torch.cat([att, dec_emb], dim=1)
+        attention_mask = torch.cat([txt_mask, dec_mask], dim=1)
+        # create multimodal attention mask
+        attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+        extended_attention_mask = attention_mask.repeat((1, 1, encoder_inputs.size(1), 1))
+        dec_max_num = dec_mask.size(-1)
+        extended_attention_mask[:, :, -dec_max_num:, -dec_max_num:] = _get_causal_mask(dec_max_num, encoder_inputs.device)
 
+        encoder_outputs = self.decoder(
+            encoder_inputs, extended_attention_mask
+        )
+
+        mmt_dec_output = encoder_outputs[:, -dec_max_num:]
         results = {
-            "mmt_dec_output": encoder_outputs
+            "mmt_dec_output": mmt_dec_output,
+            "mmt_ocr_output": ocr_emb
         }
 
         return results

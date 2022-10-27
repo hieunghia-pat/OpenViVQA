@@ -1,4 +1,4 @@
-TASK: TrainingMMFM4C
+TASK: TrainingMMF
 
 DATASET:
   FEATURE_DATASET:
@@ -63,8 +63,8 @@ TRAINING:
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: MMF_M4C
-  NAME: mmf_m4c_x152++_faster_rcnn
+  ARCHITECTURE: MMF_LoRRA
+  NAME: mmf_lorra_x152++_faster_rcnn
   DEVICE: cuda
   D_MODEL: 768
   OBJECT_EMBEDDING:
@@ -91,7 +91,7 @@ MODEL:
     NUM_HIDDEN_LAYERS: 12
     NUM_ATTENTION_HEADS: 12
     LOAD_PRETRAINED: True
-    PRETRAINED_NAME: "bert-base-multilingual-cased"
+    PRETRAINED_NAME: "bert-base-uncased"
   TEXT_EMBEDDING:
     ARCHITECTURE: UsualEmbedding
     DEVICE: cuda

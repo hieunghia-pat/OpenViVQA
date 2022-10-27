@@ -54,7 +54,7 @@ class MMF_M4C(nn.Module):
                                             num_attention_heads=self.config.MMT.NUM_ATTENTION_HEADS)
         if self.config.TEXT_BERT.LOAD_PRETRAINED:
             self.text_bert = TextBert.from_pretrained(
-                "bert-base-uncased", config=self.text_bert_config
+                self.config.TEXT_BERT.PRETRAINED_NAME, config=self.text_bert_config
             )
         else:
             self.text_bert = TextBert(self.text_bert_config)

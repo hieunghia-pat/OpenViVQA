@@ -282,7 +282,7 @@ class CrossModalityEncoder(nn.Module):
         return vision_features, language_features
 
 
-class AutoFusion(nn.Module):
+class AutoFusionEncoder(nn.Module):
     def __init__(self, config):
         super(AutoFusion, self).__init__()
         self.config = config

@@ -43,13 +43,11 @@ from models.m4c import M4C
 from models.auto_fusion import AutoFusion
 from data_utils.dataset import (
     DictionaryDataset,
-    RawQuestionDictionaryDataset,
     RawQuestionMultilingualDictionaryDataset,
     ImageQuestionDictionaryDataset,
     MultilingualImageQuestionDictionaryDataset,
     ImageDataset,
     FeatureDataset,
-    RawQuestionFeatureDataset,
     RawQuestionMultilingualFeatureDataset,
     ImageQuestionDataset,
     MultilingualImageQuestionDataset,

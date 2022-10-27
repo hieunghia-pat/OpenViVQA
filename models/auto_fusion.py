@@ -3,7 +3,7 @@ from torch import nn
 
 from .base_transformer import BaseTransformer
 from utils.instances import Instances
-from models.modules.encoders import AutoFusion
+from models.modules.encoders import AutoFusionEncoder
 from builders.encoder_builder import build_encoder
 from builders.decoder_builder import build_decoder
 from builders.text_embedding_builder import build_text_embedding
@@ -25,7 +25,7 @@ class AutoFusion(BaseTransformer):
 
         self.self_encoder = build_encoder(config.SELF_ENCODER)
 
-        self.fusion = AutoFusion(config.AUTO_FUSION)
+        self.fusion = AutoFusionEncoder(config.AUTO_FUSION)
         self.norm = nn.LayerNorm(config.AUTO_FUSION.D_MODEL)
 
         self.decoder = build_decoder(config.DECODER, vocab=vocab)

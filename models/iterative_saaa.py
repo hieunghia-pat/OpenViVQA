@@ -62,7 +62,7 @@ class TextProcessor(nn.Module):
         return c.squeeze(0)
 
 @META_ARCHITECTURE.register()
-class ExtendedSAAA(BaseTransformer):
+class IterativeSAAA(BaseTransformer):
     """ 
         Re-implementation of "Show, Ask, Attend, and Answer: A Strong Baseline For Visual Question Answering" (https://arxiv.org/abs/1704.03162).
     """

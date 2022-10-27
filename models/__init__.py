@@ -1,6 +1,6 @@
 from .cross_modality_transformer import CrossModalityTransformer
-from .extended_mcan import ExtendedMCAN, ExtendedMCANUsingRegion
-from .extended_saaa import ExtendedSAAA
+from .iterative_mcan import IterativeMCAN
+from .iterative_saaa import IterativeSAAA
 from .joint_transformer import JointTransformer
 from .unique_transformer import UniqueTransformer
 from .m4c import M4C

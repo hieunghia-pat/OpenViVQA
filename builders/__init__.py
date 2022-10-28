@@ -41,6 +41,7 @@ from models.joint_transformer import JointTransformer
 from models.unique_transformer import UniqueTransformer
 from models.m4c import M4C
 from models.auto_fusion import AutoFusion
+from models.auto_fusion2 import AutoFusion2
 from data_utils.dataset import (
     DictionaryDataset,
     RawQuestionMultilingualDictionaryDataset,

@@ -257,8 +257,8 @@ class CrossAttention(BertSelfAttention):
 class BertCrossAttention(BertAttention):
     def __init__(self, config):
         super().__init__(config)
-        
-        self.self = BertSelfAttention(config)
+
+        self.self = CrossAttention(config)
         self.output = BertSelfOutput(config)
         self.pruned_heads = set()
 
@@ -320,34 +320,34 @@ class MMT(BertPreTrainedModel):
         dec_mask = torch.zeros(
             dec_emb.size(0), dec_emb.size(1), dtype=torch.float32, device=dec_emb.device
         )
-        dec_mask = (1 - dec_mask) * -10000.0
+        dec_mask = (1 - dec_mask.unsqueeze(1).unsqueeze(2)) * -10000.0
 
         # applying self-attention for question features
         # as M4C used BERT as text encoder hence we do not need attention module anymore
-        txt_mask = (1 - txt_mask) * -10000.0
+        txt_mask = (1 - txt_mask.unsqueeze(1).unsqueeze(2)) * -10000.0
         txt_emb = self.self_att(txt_emb)
 
         # applying spatial attention between question features and object features
-        obj_mask = (1 - obj_mask) * -10000.0
-        att_1 = self.spatial_att(txt_emb, obj_emb, obj_mask)
+        obj_mask = (1 - obj_mask.unsqueeze(1).unsqueeze(2)) * -10000.0
+        att_1 = self.spatial_att(txt_emb, obj_emb, obj_mask)[0]
 
         # applying contextual attention between question feautres and ocr features
-        ocr_mask = (1 - ocr_mask) * -10000.0
-        att_2 = self.context_att(txt_emb, ocr_emb, ocr_mask)
+        ocr_mask = (1 - ocr_mask.unsqueeze(1).unsqueeze(2)) * -10000.0
+        att_2 = self.context_att(txt_emb, ocr_emb, ocr_mask)[0]
 
         # join the self-attention features with spatial attention features
         att = att_1 + att_2
         encoder_inputs = torch.cat([att, dec_emb], dim=1)
-        attention_mask = torch.cat([txt_mask, dec_mask], dim=1)
+        attention_mask = torch.cat([txt_mask, dec_mask], dim=-1)
         # create multimodal attention mask
-        attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
         extended_attention_mask = attention_mask.repeat((1, 1, encoder_inputs.size(1), 1))
         dec_max_num = dec_mask.size(-1)
         extended_attention_mask[:, :, -dec_max_num:, -dec_max_num:] = _get_causal_mask(dec_max_num, encoder_inputs.device)
+        head_mask = [None] * self.config.num_hidden_layers
 
         encoder_outputs = self.decoder(
-            encoder_inputs, extended_attention_mask
-        )
+            encoder_inputs, extended_attention_mask, head_mask
+        )[0]
 
         mmt_dec_output = encoder_outputs[:, -dec_max_num:]
         results = {

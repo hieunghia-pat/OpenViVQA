@@ -180,8 +180,8 @@ class TrainingMMF(OpenEndedTask):
             for it, items in enumerate(self.test_dict_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    results = self.model(items)
-                outs = results["scores"].argmax(dim=-1)
+                    result = self.model(items)
+                outs = result["scores"].argmax(dim=-1)
 
                 answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length),

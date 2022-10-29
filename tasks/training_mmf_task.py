@@ -37,7 +37,7 @@ class BCEWithMaskLogitsLoss(nn.Module):
         return loss
 
 @META_TASK.register()
-class TrainingMMFM4C(OpenEndedTask):
+class TrainingMMF(OpenEndedTask):
     def __init__(self, config):
         super().__init__(config)
 
@@ -180,7 +180,8 @@ class TrainingMMFM4C(OpenEndedTask):
             for it, items in enumerate(self.test_dict_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs, _ = self.model.inference(items)
+                    result = self.model(items)
+                outs = result["scores"].argmax(dim=-1)
 
                 answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length),

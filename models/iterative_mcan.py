@@ -50,7 +50,7 @@ class IterativeMCAN(BaseTransformer):
         # SA
         text_features = self.self_encoder(
             features=text_features,
-            features_padding_mask=text_padding_mask
+            padding_mask=text_padding_mask
         )
 
         # GSA

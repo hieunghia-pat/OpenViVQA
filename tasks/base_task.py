@@ -25,7 +25,7 @@ class BaseTask:
 
         if not os.path.isfile(os.path.join(self.checkpoint_path, "vocab.bin")):
             logger.info("Creating vocab")
-            self.vocab = self.load_vocab(config.DATASET)
+            self.vocab = self.load_vocab(config.DATASET.VOCAB)
             logger.info("Saving vocab to %s" % os.path.join(self.checkpoint_path, "vocab.bin"))
             pickle.dump(self.vocab, open(os.path.join(self.checkpoint_path, "vocab.bin"), "wb"))
         else:

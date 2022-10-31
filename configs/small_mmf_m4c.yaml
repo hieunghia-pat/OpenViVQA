@@ -63,8 +63,8 @@ TRAINING:
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: experimental_MMF_M4C
-  NAME: experimental_mmf_m4c_x152++_faster_rcnn
+  ARCHITECTURE: MMF_M4C
+  NAME: mmf_m4c_x152++_faster_rcnn
   DEVICE: cuda
   D_MODEL: 512
   OBJECT_EMBEDDING:
@@ -77,7 +77,6 @@ MODEL:
     D_MODEL: 512
     DROPOUT: .1
   OCR_TEXT_EMBEDDING:
-    D_FEATURE: 300
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   OCR_EMBEDDING:

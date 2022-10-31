@@ -14,14 +14,13 @@ from pytorch_transformers.modeling_bert import (
 
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
+from builders.text_embedding_builder import build_text_embedding
+from builders.word_embedding_builder import build_word_embedding
 
 logger = setup_logger()
 
 @META_ARCHITECTURE.register()
-class MMF_M4C(nn.Module):
-    '''
-        This is the original version of M4C method copied directly from https://github.com/ronghanghu/mmf
-    '''
+class experimental_MMF_M4C(nn.Module):
     def __init__(self, config, vocab):
         super().__init__()
         self.config = config
@@ -44,35 +43,8 @@ class MMF_M4C(nn.Module):
         self._build_output()
 
     def _build_txt_encoding(self):
-        TEXT_BERT_HIDDEN_SIZE = 768
-
-        self.text_bert_config = BertConfig(hidden_size=self.config.TEXT_BERT.HIDDEN_SIZE,
-                                            num_hidden_layers=self.config.TEXT_BERT.NUM_HIDDEN_LAYERS,
-                                            num_attention_heads=self.config.MMT.NUM_ATTENTION_HEADS)
-        if self.config.TEXT_BERT.LOAD_PRETRAINED:
-            self.text_bert = TextBert.from_pretrained(
-                self.config.TEXT_BERT.PRETRAINED_NAME, config=self.text_bert_config
-            )
-        else:
-            self.text_bert = TextBert(self.text_bert_config)
-
-        # if the text bert output dimension doesn't match the
-        # multimodal transformer (mmt) hidden dimension,
-        # add a linear projection layer between the two
-        if self.mmt_config.hidden_size != TEXT_BERT_HIDDEN_SIZE:
-            logger.info(
-                f"Projecting text_bert output to {self.mmt_config.hidden_size} dim"
-            )
-
-            self.text_bert_out_linear = nn.Linear(
-                self.config.TEXT_BERT.HIDDEN_SIZE, self.mmt_config.hidden_size
-            )
-        else:
-            self.text_bert_out_linear = nn.Identity()
-
-    # def _build_txt_encoding(self):
-    #     self.text_bert = build_text_embedding(self.config.TEXT_EMBEDDING, self.vocab)
-    #     self.text_bert_out_linear = nn.Identity()
+        self.text_bert = build_text_embedding(self.config.TEXT_EMBEDDING, self.vocab)
+        self.text_bert_out_linear = nn.Identity()
 
     def _build_obj_encoding(self):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
@@ -95,7 +67,7 @@ class MMF_M4C(nn.Module):
         self.linear_ocr_bbox_to_mmt_in = nn.Linear(4, self.mmt_config.hidden_size)
 
         # OCR word embedding features
-        # self.ocr_word_embedding = build_word_embedding(self.config.OCR_TEXT_EMBEDDING)
+        self.ocr_word_embedding = build_word_embedding(self.config.OCR_TEXT_EMBEDDING.D_FEATURE)
 
         self.ocr_feat_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
         self.ocr_bbox_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
@@ -153,10 +125,11 @@ class MMF_M4C(nn.Module):
         fwd_results["obj_mask"] = _get_mask(obj_nums, obj_mmt_in.size(1))
 
     def _forward_ocr_encoding(self, items, fwd_results):
-        # OCR FastText feature (300-dim)
-        ocr_fasttext = items.ocr_fasttext_features
-        ocr_fasttext = F.normalize(ocr_fasttext, dim=-1)
-        assert ocr_fasttext.size(-1) == 300
+        # OCR Word-Embedding feature (300-dim)
+        ocr_tokens = items.ocr_tokens
+        ocr_features = self.ocr_word_embedding(ocr_tokens)
+        ocr_features = F.normalize(ocr_features, dim=-1)
+        assert ocr_features.size(-1) == 300
 
         # OCR rec feature (256-dim), replace the OCR PHOC features, extracted from swintextspotter
         ocr_phoc = items.ocr_rec_features
@@ -168,7 +141,7 @@ class MMF_M4C(nn.Module):
         ocr_fc = F.normalize(ocr_fc, dim=-1)
 
         ocr_feat = torch.cat(
-            [ocr_fasttext, ocr_phoc, ocr_fc], dim=-1
+            [ocr_features, ocr_phoc, ocr_fc], dim=-1
         )
         ocr_bbox = items.ocr_boxes
         ocr_mmt_in = self.ocr_feat_layer_norm(

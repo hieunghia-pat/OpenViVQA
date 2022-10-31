@@ -4,7 +4,7 @@ from data_utils.vocab import Vocab
 from builders.text_embedding_builder import META_TEXT_EMBEDDING
 from builders.word_embedding_builder import build_word_embedding
 from models.utils import generate_sequential_mask, generate_padding_mask
-
+from transformers import AutoTokenizer,AutoModel
 from transformers import BertTokenizer, BertModel, AlbertTokenizer, AlbertModel, T5Tokenizer, T5EncoderModel
 
 from typing import List
@@ -69,8 +69,8 @@ class BertEmbedding(nn.Module):
 
         self.device = config.DEVICE
 
-        self.tokenizer = BertTokenizer.from_pretrained(config.PRETRAINED_NAME)
-        self.embedding = BertModel.from_pretrained(config.PRETRAINED_NAME)
+        self.tokenizer = AutoTokenizer.from_pretrained(config.PRETRAINED_NAME)
+        self.embedding = AutoModel.from_pretrained(config.PRETRAINED_NAME)
         # freeze all parameters of pretrained model
         for param in self.embedding.parameters():
             param.requires_grad = False

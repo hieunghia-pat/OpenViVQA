@@ -83,8 +83,9 @@ MODEL:
     D_EMBEDDING: 300
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
+    DROPOUT: .1
   OCR_EMBEDDING:
-    D_FEATURE: 812 # 256 (det features) + 256 (rec features) + 300 (fasttext)
+    D_FEATURE: 1024 # 256 (det features) + 256 (rec features) + 512 (word embedding)
     DROPOUT: .1
   OCR_PTR_NET:
     HIDDEN_SIZE: 512

@@ -102,7 +102,7 @@ class experimental_MMF_M4C(nn.Module):
         self.ocr_drop = nn.Dropout(self.config.OCR_EMBEDDING.DROPOUT)
 
     def _build_mmt(self):
-        self.mmt = MMT(self.mmt_config)
+        self.mmt = MMT(self.mmt_config, self.config.DYNAMIC_EMBEDDING)
 
     def _build_output(self):
         # dynamic OCR-copying scores with pointer network
@@ -263,10 +263,11 @@ class TextBert(BertPreTrainedModel):
 
 
 class MMT(BertPreTrainedModel):
-    def __init__(self, config):
+    def __init__(self, config, dymanic_embedding_config):
         super().__init__(config)
 
-        self.prev_pred_embeddings = PrevPredEmbeddings(config)
+        # self.prev_pred_embeddings = PrevPredEmbeddings(config)
+        self.dynamic_embedding = build_text_embedding(dymanic_embedding_config)
         self.encoder = BertEncoder(config)
         self.init_weights()
 
@@ -282,17 +283,19 @@ class MMT(BertPreTrainedModel):
         prev_inds,
     ):
 
-        # build embeddings for predictions in previous decoding steps
-        # fixed_ans_emb is an embedding lookup table for each fixed vocabulary
-        dec_emb = self.prev_pred_embeddings(fixed_ans_emb, ocr_emb, prev_inds)
+        # # build embeddings for predictions in previous decoding steps
+        # # fixed_ans_emb is an embedding lookup table for each fixed vocabulary
+        # dec_emb = self.prev_pred_embeddings(fixed_ans_emb, ocr_emb, prev_inds)
 
-        # a zero mask for decoding steps, so the encoding steps elements can't
-        # attend to decoding steps.
-        # A triangular causal mask will be filled for the decoding steps
-        # later in extended_attention_mask
-        dec_mask = torch.zeros(
-            dec_emb.size(0), dec_emb.size(1), dtype=torch.float32, device=dec_emb.device
-        )
+        # # a zero mask for decoding steps, so the encoding steps elements can't
+        # # attend to decoding steps.
+        # # A triangular causal mask will be filled for the decoding steps
+        # # later in extended_attention_mask
+        # dec_mask = torch.zeros(
+        #     dec_emb.size(0), dec_emb.size(1), dtype=torch.float32, device=dec_emb.device
+        # )
+
+        dec_emb, (dec_padding_mask, dec_mask) = self.dynamic_embedding(fixed_ans_emb, ocr_emb, prev_inds)
         encoder_inputs = torch.cat([txt_emb, obj_emb, ocr_emb, dec_emb], dim=1)
         attention_mask = torch.cat([txt_mask, obj_mask, ocr_mask, dec_mask], dim=1)
 

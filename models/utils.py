@@ -160,15 +160,3 @@ def box_relational_embedding(f_g, dim_g=64, wave_len=1000, trignometric_embeddin
         embedding = position_mat
         
     return embedding # (batch_size, max_nr_bounding_boxes, max_nr_bounding_boxes, dim_g)
-
-def apply_attention(input, attention):
-    """ Apply any number of attention maps over the input. """
-    n = input.shape[0]
-
-    input = input.unsqueeze(1).permute(0, 1, -1, -2) # [n, 1, dim, s]
-    attention = attention.permute(0, -1, 1) # [n, g, s]
-    attention = F.softmax(attention, dim=-1).unsqueeze(2) # [n, g, 1, s]
-    weighted = attention * input # [n, g, dim, s]
-    weighted = weighted.sum(dim=1).permute(0, -1, 1) # [n, s, dim]
-    
-    return weighted

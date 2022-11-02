@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import init, functional as F
-from .utils import apply_attention, generate_padding_mask
+from .utils import generate_padding_mask
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.base_transformer import BaseTransformer
 from builders.model_builder import META_ARCHITECTURE
@@ -88,6 +88,16 @@ class IterativeSAAA(BaseTransformer):
                 if module.bias is not None:
                     module.bias.data.zero_()
 
+    def apply_attention(self, input, attention):
+        """ Apply any number of attention maps over the input. """
+        input = input.unsqueeze(1).permute(0, 1, -1, -2) # [n, 1, dim, s]
+        attention = attention.permute(0, -1, 1) # [n, g, s]
+        attention = F.softmax(attention, dim=-1).unsqueeze(2) # [n, g, 1, s]
+        weighted = attention * input # [n, g, dim, s]
+        weighted = weighted.sum(dim=1).permute(0, -1, 1) # [n, s, dim]
+        
+        return weighted
+
     def encoder_forward(self, input_features: Instance):
         v = input_features.region_features
         q = input_features.question_tokens
@@ -98,7 +108,7 @@ class IterativeSAAA(BaseTransformer):
 
         v = v / (v.norm(p=2, dim=1, keepdim=True).expand_as(v) + 1e-8)
         a = self.attention(v, q)
-        v = apply_attention(v, a)
+        v = self.apply_attention(v, a)
 
         q = q.unsqueeze(dim=1)
         combined = torch.cat([v, q], dim=1)
@@ -110,23 +120,7 @@ class IterativeSAAA(BaseTransformer):
         return combined, combined_mask
 
     def forward(self, input_features: Instance):
-        v = input_features.region_features
-        q = input_features.question_tokens
-
-        v, v_padding_mask = self.vision(v)
-        q = self.text(q)
-        q_padding_mask = generate_padding_mask(q.unsqueeze(dim=1), padding_idx=self.padding_idx)
-
-        v = v / (v.norm(p=2, dim=1, keepdim=True).expand_as(v) + 1e-8)
-        a = self.attention(v, q)
-        v = apply_attention(v, a)
-
-        q = q.unsqueeze(dim=1)
-        combined = torch.cat([v, q], dim=1)
-        combined_mask = torch.cat([v_padding_mask, q_padding_mask], dim=-1)
-        combined = self.fusion(combined)
-        combined = combined.masked_fill(combined_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
-        combined = self.norm(combined)
+        combined, combined_mask = self.encoder_forward(input_features)
 
         answer_tokens = input_features.answer_tokens
         out = self.decoder(

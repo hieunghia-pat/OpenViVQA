@@ -57,7 +57,7 @@ class ScaledDotProductAttention(nn.Module):
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)
 
-        return out
+        return out, att
 
 @META_ATTENTION.register()
 class AugmentedGeometryScaledDotProductAttention(nn.Module):
@@ -134,7 +134,7 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         out = torch.matmul(mn, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)
 
-        return out
+        return out, mn
 
 @META_ATTENTION.register()
 class AugmentedMemoryScaledDotProductAttention(nn.Module):
@@ -205,7 +205,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)
 
-        return out
+        return out, att
 
 @META_ATTENTION.register()
 class AdaptiveScaledDotProductAttention(nn.Module):
@@ -288,7 +288,7 @@ class AdaptiveScaledDotProductAttention(nn.Module):
         out = out.permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)
 
-        return out
+        return out, combined_attn
 
 class MultiHeadAttention(Module):
     '''
@@ -324,7 +324,7 @@ class MultiHeadAttention(Module):
             self.running_values = torch.cat([self.running_values, values], 1)
             values = self.running_values
 
-        out = self.attention(queries, keys, values, attention_mask, **kwargs)
+        out, _ = self.attention(queries, keys, values, attention_mask, **kwargs)
         out = out.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
         
         # normalization after residual connection

@@ -31,7 +31,7 @@ class BCEWithLogitsLoss(nn.Module):
         return loss
 
 @META_TASK.register()
-class ClassificationTask(BaseTask):
+class MmfClassificationTask(BaseTask):
     def __init__(self, config):
         super().__init__(config)
 
@@ -81,10 +81,11 @@ class ClassificationTask(BaseTask):
                 for it, items in enumerate(dataloader):
                     items = items.to(self.device)
                     with torch.no_grad():
-                        out = self.model(items).contiguous()
+                        results = self.model(items)
+                    out = results["scores"].contiguous()
                     
                     answer = items.answer
-                    loss = self.loss_fn(out.view(-1, self.vocab.total_answers), answer.view(-1))
+                    loss = self.loss_fn(out.view(-1, self.vocab.num_choices), answer.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
 
@@ -103,10 +104,11 @@ class ClassificationTask(BaseTask):
             for it, items in enumerate(dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs = self.model(items).contiguous()
+                    results = self.model(items)
+                outs = results["scores"].contiguous()
 
-                answers_gt = self.vocab.decode_answer(items.answer.squeeze(-1), join_word=True)
-                answers_gen = self.vocab.decode_answer(outs.argmax(dim=-1), join_word=True)
+                answers_gt = self.vocab.decode_answer(items.answer.squeeze(-1), items.ocr_tokens, join_word=True)
+                answers_gen = self.vocab.decode_answer(outs.argmax(dim=-1), items.ocr_tokens, join_word=True)
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = [gts_i, ]
@@ -123,10 +125,11 @@ class ClassificationTask(BaseTask):
         with tqdm(desc='Epoch %d - Training' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, items in enumerate(self.train_dataloader):
                 items = items.to(self.device)
-                out = self.model(items).contiguous()
+                results = self.model(items)
+                out = results["scores"].contiguous()
                 answer = items.answer
                 self.optim.zero_grad()
-                loss = self.loss_fn(out.view(-1, self.vocab.total_answers), answer.view(-1))
+                loss = self.loss_fn(out.view(-1, self.vocab.num_choices), answer.view(-1))
                 loss.backward()
 
                 self.optim.step()

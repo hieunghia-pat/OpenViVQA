@@ -1,4 +1,5 @@
 from .classification_task import ClassificationTask
+from .mmf_classification_task import MmfClassificationTask
 from .open_ended_task import OpenEndedTask
 from .ocr_open_ended_task import OcrOpenEndedTask
 from .training_saaa_task import TrainingSAAATask

@@ -4,5 +4,6 @@ from .multilingual_multimodal_vocab import MultilingualMultiModalVocab
 from .multimodal_vocab import MultiModalVocab
 from .multilingual_vocab import MultilingualVocab
 from .ocr_vocab import OcrVocab
+from .ocr_classification_vocab import OcrClassificationVocab
 from .vlsp_evjvqa_vocab import VlspEvjVqaVocab
 from .vlsp_vqa_multimodal_vocab import VlspVqaMultiModalVocab

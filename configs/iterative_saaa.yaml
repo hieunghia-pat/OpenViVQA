@@ -50,7 +50,7 @@ TRAINING:
 
 MODEL:
   ARCHITECTURE: IterativeSAAA
-  NAME: extended_saaa_region_x152++
+  NAME: iterative_saaa_region_x152++_faster_rcnn
   DEVICE: cuda
   VISION_PROCESSOR:
     ARCHITECTURE: FeatureEmbedding

@@ -1,29 +1,18 @@
-TASK: OpenEndedTask
+TASK: ClassificationTask
 
 DATASET:
   FEATURE_DATASET:
-    TYPE: FeatureDataset
+    TYPE: FeatureClassificationDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: null
       IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.3
-  DICT_DATASET:
-    TYPE: DictionaryDataset
-    BATCH_SIZE: 60
-    WORKERS: 0
-    FEATURE_PATH:
-      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
-      SCENE_TEXT: null
-      IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.3
-  MIN_FREQ: 1
-  SCENE_TEXT_THRESHOLD: 0.3
   VOCAB:
-    TYPE: Vocab
+    TYPE: ClassificationVocab
     TOKENIZER: null
+    MIN_FREQ: 1
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
     BOS_TOKEN: <bos>
@@ -47,17 +36,18 @@ DATASET:
 TRAINING:
   CHECKPOINT_PATH: saved_models
   LEARNING_RATE: 1.
-  RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
   SCORE: CIDEr
+  GET_SCORES: True
   TRAINING_BEAM_SIZE: 5
   EVALUATING_BEAM_SIZE: 3
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: IterativeMCAN
-  NAME: iterative_mcan_region_x152++_faster_rcnn
+  ARCHITECTURE: MCAN
+  NAME: mcan_region_x152++_faster_rcnn
   DEVICE: cuda
+  D_MODEL: 512
   VISION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
     D_FEATURE: 1024
@@ -111,41 +101,9 @@ MODEL:
       USE_AOA: False
       CAN_BE_STATEFUL: False
       DROPOUT: .1
-  MULTIMODAL_FUSION:
+  VISION_ATTR_REDUCE:
     D_MODEL: 512
-    D_FF: 2048
-    DROPOUT: .1
-  DECODER:
-    ARCHITECTURE: Decoder
+    DROPOUT: 0.1
+  TEXT_ATTR_REDUCE:
     D_MODEL: 512
-    LAYERS: 3
-    ATTENTION:
-      SELF_ATTENTION:
-        ARCHITECTURE: ScaledDotProductAttention
-        HEAD: 8
-        D_MODEL: 512
-        D_KEY: 64
-        D_VALUE: 64
-        D_FF: 2048
-        D_FEATURE: 2048
-        USE_AOA: False
-        CAN_BE_STATEFUL: True
-        DROPOUT: .1
-      ENC_ATTENTION:
-        ARCHITECTURE: ScaledDotProductAttention
-        HEAD: 8
-        D_MODEL: 512
-        D_KEY: 64
-        D_VALUE: 64
-        D_FF: 2048
-        D_FEATURE: 2048
-        USE_AOA: False
-        CAN_BE_STATEFUL: False
-        DROPOUT: .1
-    TEXT_EMBEDDING:
-      ARCHITECTURE: UsualEmbedding
-      D_MODEL: 512
-      D_EMBEDDING: 300
-      WORD_EMBEDDING: null
-      WORD_EMBEDDING_CACHE: null
-      DROPOUT: 0.1
+    DROPOUT: 0.1

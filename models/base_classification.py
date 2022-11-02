@@ -2,8 +2,8 @@ from torch import nn
 
 from utils.instance import Instance
 
-class BaseClassification(nn.Module):
-    def __init__(self, config):
+class BaseClassificationModel(nn.Module):
+    def __init__(self, config, vocab):
         super().__init__()
 
         self.d_model = config.D_MODEL

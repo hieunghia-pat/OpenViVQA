@@ -29,7 +29,6 @@ class FeatureClassificationDataset(BaseDataset):
                     for answer in ann["answers"]:
                         question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
-                        answer = "_".join(answer)
                         annotation = {
                             "question": question,
                             "answer": answer,
@@ -50,6 +49,6 @@ class FeatureClassificationDataset(BaseDataset):
 
         return Instance(
             question_tokens=question,
-            answer_tokens=answer,
+            answer=answer,
             **features
         )

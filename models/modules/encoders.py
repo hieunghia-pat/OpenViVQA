@@ -169,7 +169,7 @@ class GuidedAttentionEncoder(nn.Module):
 
         self.guided_attn_layers = nn.ModuleList([GuidedEncoderLayer(config.GUIDED_ATTENTION) for _ in range(config.LAYERS)])
 
-    def forward(self, vision_features: torch.Tensor, boxes: torch.Tensor, vision_padding_mask: torch.Tensor, 
+    def forward(self, vision_features: torch.Tensor, vision_padding_mask: torch.Tensor, 
                 language_features: torch.Tensor, language_padding_mask: torch.Tensor):
         out = self.layer_norm(vision_features) + self.pos_embedding(vision_features)
         for guided_attn_layer in self.guided_attn_layers:
@@ -177,7 +177,6 @@ class GuidedAttentionEncoder(nn.Module):
                 queries=out,
                 keys=language_features,
                 values=language_features,
-                boxes=boxes,
                 self_padding_mask=vision_padding_mask,
                 self_attention_mask=vision_padding_mask,
                 guided_attention_mask=language_padding_mask

@@ -5,13 +5,10 @@ from .utils import apply_attention, generate_padding_mask
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.base_transformer import BaseTransformer
 from builders.model_builder import META_ARCHITECTURE
-from builders.attention_builder import META_ATTENTION
 from builders.vision_embedding_builder import build_vision_embedding
-from builders.text_embedding_builder import META_TEXT_EMBEDDING
 from builders.decoder_builder import build_decoder
 from utils.instance import Instance
 
-@META_ATTENTION.register()
 class CoAttention(nn.Module):
     def __init__(self, config):
         super(CoAttention, self).__init__()
@@ -30,7 +27,6 @@ class CoAttention(nn.Module):
         x = self.x_conv(self.drop(x))
         return x
 
-@META_TEXT_EMBEDDING.register()
 class TextProcessor(nn.Module):
     def __init__(self, config, vocab):
         super(TextProcessor, self).__init__()

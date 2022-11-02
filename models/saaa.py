@@ -3,16 +3,10 @@ from torch import nn
 from torch.nn import init, functional as F
 
 from models.base_classification import BaseClassificationModel
-from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from builders.model_builder import META_ARCHITECTURE
-from builders.attention_builder import META_ATTENTION
 from builders.vision_embedding_builder import build_vision_embedding
-from builders.text_embedding_builder import META_TEXT_EMBEDDING
-from builders.decoder_builder import build_decoder
-from utils.instance import Instance
-from .utils import apply_attention, generate_padding_mask
+from utils.instance import InstanceList
 
-@META_ATTENTION.register()
 class CoAttention(nn.Module):
     def __init__(self, config):
         super(CoAttention, self).__init__()
@@ -31,7 +25,6 @@ class CoAttention(nn.Module):
         x = self.x_conv(self.drop(x))
         return x
 
-@META_TEXT_EMBEDDING.register()
 class TextProcessor(nn.Module):
     def __init__(self, config, vocab):
         super(TextProcessor, self).__init__()
@@ -62,8 +55,17 @@ class TextProcessor(nn.Module):
         _, (_, c) = self.lstm(tanhed)
         return c.squeeze(0)
 
+class Classifier(nn.Sequential):
+    def __init__(self, in_features, mid_features, out_features, drop=0.0):
+        super(Classifier, self).__init__()
+        self.add_module('drop1', nn.Dropout(drop))
+        self.add_module('lin1', nn.Linear(in_features, mid_features))
+        self.add_module('relu', nn.ReLU())
+        self.add_module('drop2', nn.Dropout(drop))
+        self.add_module('lin2', nn.Linear(mid_features, out_features))
+
 @META_ARCHITECTURE.register()
-class IterativeSAAA(BaseClassificationModel):
+class SAAA(BaseClassificationModel):
     """ 
         Re-implementation of "Show, Ask, Attend, and Answer: A Strong Baseline For Visual Question Answering" (https://arxiv.org/abs/1704.03162).
     """
@@ -77,12 +79,12 @@ class IterativeSAAA(BaseClassificationModel):
         self.text = TextProcessor(config.TEXT_PROCESSOR, vocab)
         self.attention = CoAttention(config.ATTENTION)
 
-        self.fusion = PositionWiseFeedForward(config.MULTIMODAL_FUSION)
-        self.norm = nn.LayerNorm(config.MULTIMODAL_FUSION.D_MODEL)
-
-        self.decoder = build_decoder(config.DECODER, vocab)
-
-        self.padding_idx = vocab.padding_idx
+        self.classifier = Classifier(
+            in_features=config.ATTENTION.GLIMPSES * config.ATTENTION.D_VISION + config.ATTENTION.D_LANGUAGE,
+            mid_features=1024,
+            out_features=vocab.total_answers,
+            drop=0.5,
+        )
 
         self.initialize()
 
@@ -93,51 +95,31 @@ class IterativeSAAA(BaseClassificationModel):
                 if module.bias is not None:
                     module.bias.data.zero_()
 
-    def encoder_forward(self, input_features: Instance):
+    def apply_attention(self, input, attention):
+        """ Apply any number of attention maps over the input. """
+        n = input.shape[0]
+
+        # flatten the spatial dims into the third dim, since we don't need to care about how they are arranged
+        input = input.view(n, 1, -1, self.d_model).permute(0, 1, 3, 2) # [n, 1, d_model, s]
+        attention = attention.permute(0, -1, 1)
+        attention = F.softmax(attention, dim=-1).unsqueeze(2) # [n, g, 1, s]
+        weighted = attention * input # [n, g, v, s]
+        weighted_mean = weighted.sum(dim=-1) # [n, g, v]
+        
+        return weighted_mean.view(n, -1)
+
+    def forward(self, input_features: InstanceList):
         v = input_features.region_features
         q = input_features.question_tokens
 
-        v, v_padding_mask = self.vision(v)
+        v, _ = self.vision(v)
         q = self.text(q)
-        q_padding_mask = generate_padding_mask(q.unsqueeze(dim=1), padding_idx=self.padding_idx)
 
         v = v / (v.norm(p=2, dim=1, keepdim=True).expand_as(v) + 1e-8)
         a = self.attention(v, q)
-        v = apply_attention(v, a)
+        v = self.apply_attention(v, a)
 
-        q = q.unsqueeze(dim=1)
         combined = torch.cat([v, q], dim=1)
-        combined_mask = torch.cat([v_padding_mask, q_padding_mask], dim=-1)
-        combined = self.fusion(combined)
-        combined = combined.masked_fill(combined_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
-        combined = self.norm(combined)
+        out = self.classifier(combined)
 
-        return combined, combined_mask
-
-    def forward(self, input_features: Instance):
-        v = input_features.region_features
-        q = input_features.question_tokens
-
-        v, v_padding_mask = self.vision(v)
-        q = self.text(q)
-        q_padding_mask = generate_padding_mask(q.unsqueeze(dim=1), padding_idx=self.padding_idx)
-
-        v = v / (v.norm(p=2, dim=1, keepdim=True).expand_as(v) + 1e-8)
-        a = self.attention(v, q)
-        v = apply_attention(v, a)
-
-        q = q.unsqueeze(dim=1)
-        combined = torch.cat([v, q], dim=1)
-        combined_mask = torch.cat([v_padding_mask, q_padding_mask], dim=-1)
-        combined = self.fusion(combined)
-        combined = combined.masked_fill(combined_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
-        combined = self.norm(combined)
-
-        answer_tokens = input_features.answer_tokens
-        out = self.decoder(
-            answer_tokens=answer_tokens,
-            encoder_features=combined,
-            encoder_attention_mask=combined_mask
-        )
-
-        return F.log_softmax(out, dim=-1)
+        return out

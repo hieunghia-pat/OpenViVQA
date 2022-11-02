@@ -138,7 +138,7 @@ class TrainingMMF(OpenEndedTask):
 
             # Prepare for next epoch
             best = False
-            if val_score >= best_val_score:
+            if val_score > best_val_score:
                 best_val_score = val_score
                 patience = 0
                 best = True

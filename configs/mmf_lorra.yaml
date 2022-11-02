@@ -1,8 +1,8 @@
-TASK: TrainingMMF
+TASK: ClassificationTask
 
 DATASET:
   FEATURE_DATASET:
-    TYPE: OcrFeatureDataset
+    TYPE: OcrClassificationDataset
     BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
@@ -11,26 +11,12 @@ DATASET:
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.7
     MAX_SCENE_TEXT: 50
-    WORD_EMBEDDING: ViFastText
-    WORD_EMBEDDING_CACHE: null
-  DICT_DATASET:
-    TYPE: OcrDictionaryDataset
-    BATCH_SIZE: 64
-    WORKERS: 0
-    FEATURE_PATH:
-      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
-      SCENE_TEXT: features/OpenViVQA/features/swintextspotter
-      IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.7
-    MAX_SCENE_TEXT: 50
-    WORD_EMBEDDING: ViFastText
-    WORD_EMBEDDING_CACHE: null
-  MIN_FREQ: 1
   VOCAB:
-    TYPE: OcrVocab
+    TYPE: OcrClassificationVocab
     TOKENIZER: null
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
+    MIN_FREQ: 1
     BOS_TOKEN: <bos>
     EOS_TOKEN: <eos>
     PAD_TOKEN: <pad>
@@ -79,19 +65,6 @@ MODEL:
   OCR_EMBEDDING:
     D_FEATURE: 300 # (fasttext)
     DROPOUT: .1
-  OCR_PTR_NET:
-    HIDDEN_SIZE: 768
-    QUERY_KEY_SIZE: 768
-  MMT:
-    HIDDEN_SIZE: 768
-    NUM_HIDDEN_LAYERS: 4
-    NUM_ATTENTION_HEADS: 8
-  TEXT_BERT:
-    HIDDEN_SIZE: 768
-    NUM_HIDDEN_LAYERS: 12
-    NUM_ATTENTION_HEADS: 12
-    LOAD_PRETRAINED: True
-    PRETRAINED_NAME: "bert-base-uncased"
   TEXT_EMBEDDING:
     ARCHITECTURE: UsualEmbedding
     DEVICE: cuda

@@ -208,7 +208,8 @@ class MmfClassificationTask(BaseTask):
             for it, items in enumerate(self.test_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs = self.model(items)
+                    result = self.model(items)
+                outs = result["scores"].contiguous()
 
                 answers_gt = self.vocab.decode_answer(items.answer, join_word=True)
                 answers_gen = self.vocab.decode_answer(outs.argmax(dim=-1), join_word=True)

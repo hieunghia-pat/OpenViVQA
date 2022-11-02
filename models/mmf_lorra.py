@@ -39,26 +39,26 @@ class MMF_LoRRA(nn.Module):
 
     def _build_obj_encoding(self):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
-            self.config.OBJECT_EMBEDDING.D_FEATURE, self.mmt_config.hidden_size
+            self.config.OBJECT_EMBEDDING.D_FEATURE, self.config.D_MODEL
         )
 
         # object location feature: relative bounding box coordinates (4-dim)
-        self.linear_obj_bbox_to_mmt_in = nn.Linear(4, self.mmt_config.hidden_size)
+        self.linear_obj_bbox_to_mmt_in = nn.Linear(4, self.config.D_MODEL)
 
-        self.obj_feat_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
-        self.obj_bbox_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
+        self.obj_feat_layer_norm = nn.LayerNorm(self.config.D_MODEL)
+        self.obj_bbox_layer_norm = nn.LayerNorm(self.config.D_MODEL)
         self.obj_drop = nn.Dropout(self.config.OBJECT_EMBEDDING.DROPOUT)
 
     def _build_ocr_encoding(self):
         self.linear_ocr_feat_to_mmt_in = nn.Linear(
-            self.config.OCR_EMBEDDING.D_FEATURE, self.mmt_config.hidden_size
+            self.config.OCR_EMBEDDING.D_FEATURE, self.config.D_MODEL
         )
 
-        self.ocr_feat_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
+        self.ocr_feat_layer_norm = nn.LayerNorm(self.config.D_MODEL)
         self.ocr_drop = nn.Dropout(self.config.OCR_EMBEDDING.DROPOUT)
 
     def _build_mmt(self):
-        self.self_attn = build_attention(self.config.SELF_ATTETION)
+        self.self_attn = build_attention(self.config.SELF_ATTENTION)
         self.spatial_attn = build_attention(self.config.SPATIAL_ATTENTION)
         self.context_attn = build_attention(self.config.CONTEXT_ATTENTION)
 
@@ -116,7 +116,7 @@ class MMF_LoRRA(nn.Module):
     def _forward_mmt(self, items, fwd_results):
         txt_emb = fwd_results["txt_emb"]
         txt_padding_mask = fwd_results["txt_mask"]
-        self_attn_feat = self.self_attn(
+        self_attn_feat, _ = self.self_attn(
             queries=txt_emb,
             keys=txt_emb,
             values=txt_emb,
@@ -126,27 +126,31 @@ class MMF_LoRRA(nn.Module):
 
         obj_feat_in = fwd_results["obj_feat_in"]
         obj_mask = fwd_results["obj_mask"]
-        _, spatial_attn_feat_weight = self.spatial_attn(
-            queries=self_attn_feat,
-            keys=obj_feat_in,
-            values=obj_feat_in,
-            padding_mask=txt_padding_mask,
-            attention_mask=obj_mask
+        _, spatial_attn_weights = self.spatial_attn(
+            queries=obj_feat_in,
+            keys=self_attn_feat,
+            values=self_attn_feat,
+            padding_mask=obj_mask,
+            attention_mask=txt_padding_mask
         )
+        spatial_attn_weights = spatial_attn_weights.squeeze(1) # (bs, n_obj_feat_in, n_self_attn_feat)
         
-        ocr_feat_in = fwd_results["ocr_mnt_in"]
+        ocr_feat_in = fwd_results["ocr_mmt_in"]
         ocr_mask = fwd_results["ocr_mask"]
         _, context_attn_weights = self.context_attn(
-            queries=self_attn_feat,
-            keys=ocr_feat_in,
-            values=ocr_feat_in,
-            padding_mask=txt_padding_mask,
-            attention_mask=ocr_mask
+            queries=ocr_feat_in,
+            keys=self_attn_feat,
+            values=self_attn_feat,
+            padding_mask=ocr_mask,
+            attention_mask=txt_padding_mask
         )
+        context_attn_weights = context_attn_weights.squeeze(1) # (bs, n_ocr_feat_in, n_self_attn_feat)
 
-        mmt_feat = (spatial_attn_feat_weight*self_attn_feat) + (context_attn_weights*self_attn_feat)
+        attended_spatial_feat = (spatial_attn_weights.unsqueeze(-1) * self_attn_feat.unsqueeze(1)).sum(dim=1)
+        attended_context_feat = (context_attn_weights.unsqueeze(-1) * self_attn_feat.unsqueeze(1)).sum(dim=1)
+        mmt_feat = attended_spatial_feat + attended_context_feat
 
-        fwd_results["mnt_feat"] = mmt_feat
+        fwd_results["mmt_feat"] = mmt_feat
 
     def _forward_output(self, items, fwd_results):
         mmt_feat = fwd_results["mmt_feat"]

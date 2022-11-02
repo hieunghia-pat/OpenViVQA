@@ -60,6 +60,24 @@ class OcrClassificationDataset(FeatureClassificationDataset):
 
         return features
 
+    def pad_array(self, array: np.ndarray, max_len: int, value: int = 0):
+        pad_value_array = np.zeros((max_len-array.shape[0], array.shape[-1])).fill(value)
+        array = np.concatenate([array, pad_value_array], axis=0)
+        
+        return array
+
+    def pad_tensor(self, tensor: torch.Tensor, max_len: int, value: int = 0):
+        pad_value_tensor = torch.zeros((max_len-tensor.shape[0], tensor.shape[-1])).fill_(value)
+        tensor = torch.cat([tensor, pad_value_tensor], dim=0)
+        
+        return tensor
+
+    def pad_list(self, list: List, max_len: int, value: int = 0):
+        pad_value_list = [value] * (max_len - len(list))
+        list.extend(pad_value_list)
+
+        return list
+
     def load_scene_text_features(self, image_id: int) -> Dict[str, Any]:
         feature_file = os.path.join(self.scene_text_features_path, f"{image_id}.npy")
         features = np.load(feature_file, allow_pickle=True)[()]
@@ -84,6 +102,17 @@ class OcrClassificationDataset(FeatureClassificationDataset):
                 else:
                     feature = [feature[idx] for idx in topk_scores.indices]
                 features[key] = feature
+        else: # pad to the highest number of ocr tokens
+            for key, feature in features.items():
+                if isinstance(feature, torch.Tensor):
+                    features[key] = self.pad_tensor(feature, self.max_scene_text, 1.)
+                elif isinstance(feature, np.ndarray):
+                    features[key] = self.pad_array(feature, self.max_scene_text, 1.)
+                elif isinstance(feature, list):
+                    if isinstance(feature[0], str):
+                        features[key] = self.pad_list(feature, self.max_scene_text, self.vocab.padding_token)
+                    else:
+                        features[key] = self.pad_list(feature, self.max_scene_text, 1.)
 
         return {
             "ocr_det_features": features["det_features"],

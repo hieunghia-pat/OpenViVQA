@@ -1,5 +1,6 @@
 import torch
 
+from builders.vocab_builder import META_VOCAB
 from .classification_vocab import ClassificationVocab
 
 import numpy as np
@@ -7,9 +8,12 @@ from typing import List, Union, Dict
 from copy import deepcopy
 from collections import defaultdict
 
+@META_VOCAB.register()
 class OcrClassificationVocab(ClassificationVocab):
     def __init__(self, config):
         super().__init__(config)
+
+        self.num_choices = self.total_answers + config.MAX_SCENE_TEXT
 
     def match_text_to_index(self, text: List[str], oov2inds: Dict[str, int]) -> int:
         text = " ".join(text)
@@ -17,7 +21,7 @@ class OcrClassificationVocab(ClassificationVocab):
         if text in oov2inds:
             indices.append(oov2inds[text])
 
-        index = np.random.choice(indices)
+        index = indices[np.random.choice(1)]
 
         return index
 
@@ -27,6 +31,7 @@ class OcrClassificationVocab(ClassificationVocab):
         for idx, token in ocr_tokens.items():
             ocr2inds[token].append(idx)
         answer = self.match_text_to_index(answer, ocr2inds)
+        assert isinstance(answer, int), f"answer must be the type of int, get {type(answer)}"
 
         vec = torch.tensor([answer]).long()
 

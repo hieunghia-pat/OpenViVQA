@@ -3,33 +3,17 @@ TASK: TrainingSAAATask
 DATASET:
   FEATURE_DATASET:
     TYPE: FeatureDataset
-    BATCH_SIZE: 64
-    WORKERS: 2
-    JSON_PATH:
-      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
-      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
-      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
-    FEATURE_PATH:
-      FEATURES: x152++_faster_rcnn
-      SCENE_TEXT: null
-      IMAGE: null
+    BATCH_SIZE: 60
+    WORKERS: 0
   DICT_DATASET:
     TYPE: DictionaryDataset
     BATCH_SIZE: 60
-    WORKERS: 2
-    JSON_PATH:
-      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
-      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
-      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
-    FEATURE_PATH:
-      FEATURES: x152++_faster_rcnn
-      SCENE_TEXT: null
-      IMAGE: null
+    WORKERS: 0
+  MIN_FREQ: 1
   SCENE_TEXT_THRESHOLD: 0.3
   VOCAB:
     TYPE: Vocab
     TOKENIZER: null
-    MIN_FREQ: 1
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
     BOS_TOKEN: <bos>
@@ -50,7 +34,7 @@ DATASET:
     DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
     TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
   FEATURE_PATH:
-    FEATURES: x152++_faster_rcnn
+    FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
     SCENE_TEXT: null
     IMAGE: null
 
@@ -63,42 +47,40 @@ TRAINING:
   TRAINING_BEAM_SIZE: 5
   EVALUATING_BEAM_SIZE: 3
   PATIENCE: 5
-  GET_SCORES: True
 
 MODEL:
   ARCHITECTURE: IterativeSAAA
-  NAME: iterative_saaa_region_x152++
+  NAME: iterative_saaa_region_x152++_faster_rcnn
   DEVICE: cuda
-  D_MODEL: 768
   VISION_PROCESSOR:
     ARCHITECTURE: FeatureEmbedding
     D_FEATURE: 1024
-    D_MODEL: 768
+    D_MODEL: 512
     DROPOUT: .1
   TEXT_PROCESSOR:
     D_EMBEDDING: 300
-    D_MODEL: 768
+    D_MODEL: 512
     DROPOUT: .1
   ATTENTION:
     ARCHITECTURE: CoAttention
-    D_VISION: 768
-    D_LANGUAGE: 768
-    D_MODEL: 768
+    D_VISION: 512
+    D_LANGUAGE: 512
+    D_MODEL: 512
     DROPOUT: .1
     GLIMPSES: 2
   MULTIMODAL_FUSION:
-    D_MODEL: 768
+    D_MODEL: 512
     D_FF: 2048
     DROPOUT: .1
   DECODER:
     ARCHITECTURE: Decoder
-    D_MODEL: 768
-    LAYERS: 3
+    D_MODEL: 512
+    LAYERS: 1
     ATTENTION:
       SELF_ATTENTION:
         ARCHITECTURE: ScaledDotProductAttention
-        HEAD: 12
-        D_MODEL: 768
+        HEAD: 8
+        D_MODEL: 512
         D_KEY: 64
         D_VALUE: 64
         D_FF: 2048
@@ -108,8 +90,8 @@ MODEL:
         DROPOUT: .1
       ENC_ATTENTION:
         ARCHITECTURE: ScaledDotProductAttention
-        HEAD: 12
-        D_MODEL: 768
+        HEAD: 8
+        D_MODEL: 512
         D_KEY: 64
         D_VALUE: 64
         D_FF: 2048
@@ -119,7 +101,7 @@ MODEL:
         DROPOUT: .1
     TEXT_EMBEDDING:
       ARCHITECTURE: UsualEmbedding
-      D_MODEL: 768
+      D_MODEL: 512
       D_EMBEDDING: 300
       WORD_EMBEDDING: null
       WORD_EMBEDDING_CACHE: null

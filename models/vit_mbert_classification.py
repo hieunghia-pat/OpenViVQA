@@ -2,14 +2,14 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from models.base_classification import BaseClassification
+from models.base_classification import BaseClassificationModel
 from builders.model_builder import META_ARCHITECTURE
 from builders.vision_embedding_builder import build_vision_embedding
 from builders.text_embedding_builder import build_text_embedding
 from utils.instance import Instance
 
 @META_ARCHITECTURE.register()
-class ViTmBERTClassification(BaseClassification):
+class ViTmBERTClassification(BaseClassificationModel):
     def __init__(self, config, vocab):
         super().__init__(config)
 

@@ -190,17 +190,17 @@ class M4C(BaseUniqueTransformer):
         assert joint_features_len == region_len + grid_len + ocr_len + question_len + answer_len
 
         input_features.answer_features = encoder_features[:, -answer_len:]
-        input_features.ocr_features = encoder_features[:, ocr_start:ocr_end]
-        input_features.ocr_padding_mask = joint_padding_mask[:, :, :, ocr_start:ocr_end]
+        input_features.mmt_ocr_features = encoder_features[:, ocr_start:ocr_end]
+        input_features.mmt_ocr_padding_mask = joint_padding_mask[:, :, :, ocr_start:ocr_end]
 
         return input_features
 
     def forward_output(self, input_features):
         answer_features = input_features.answer_features
-        ocr_features = input_features.ocr_features
-        ocr_padding_mask = input_features.ocr_padding_mask
+        ocr_features = input_features.mmt_
+        ocr_padding_mask = input_features.mmt_ocr_padding_mask
         vocab_features = self.vocab_proj(answer_features) # (bs, answer_len, num_vocab)
-        ocr_features = self.dynamic_network(ocr_features, answer_features, ocr_padding_mask).transpose(-2, -1) # (bs, answer_len, ocr_len)
+        ocr_features = self.dynamic_network(answer_features, ocr_features, ocr_padding_mask) # (bs, answer_len, ocr_len)
         out = torch.cat([vocab_features, ocr_features], dim=-1) # (bs, answer_len, num_vocab + ocr_len)
 
         return out

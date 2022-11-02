@@ -14,14 +14,13 @@ from pytorch_transformers.modeling_bert import (
 
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
+from builders.text_embedding_builder import build_text_embedding
+from builders.encoder_builder import build_encoder
 
 logger = setup_logger()
 
 @META_ARCHITECTURE.register()
-class MMF_M4C(nn.Module):
-    '''
-        This is the original version of M4C method copied directly from https://github.com/ronghanghu/mmf
-    '''
+class experimental_MMF_M4C(nn.Module):
     def __init__(self, config, vocab):
         super().__init__()
         self.config = config
@@ -44,7 +43,7 @@ class MMF_M4C(nn.Module):
         self._build_output()
 
     def _build_txt_encoding(self):
-        TEXT_BERT_HIDDEN_SIZE = 768
+        TEXT_BERT_HIDDEN_SIZE = self.config.TEXT_BERT.HIDDEN_SIZE,
 
         self.text_bert_config = BertConfig(hidden_size=self.config.TEXT_BERT.HIDDEN_SIZE,
                                             num_hidden_layers=self.config.TEXT_BERT.NUM_HIDDEN_LAYERS,
@@ -95,7 +94,7 @@ class MMF_M4C(nn.Module):
         self.linear_ocr_bbox_to_mmt_in = nn.Linear(4, self.mmt_config.hidden_size)
 
         # OCR word embedding features
-        # self.ocr_word_embedding = build_word_embedding(self.config.OCR_TEXT_EMBEDDING)
+        self.ocr_word_embedding = build_text_embedding(self.config.OCR_TEXT_EMBEDDING, self.vocab)
 
         self.ocr_feat_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
         self.ocr_bbox_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
@@ -103,7 +102,7 @@ class MMF_M4C(nn.Module):
         self.ocr_drop = nn.Dropout(self.config.OCR_EMBEDDING.DROPOUT)
 
     def _build_mmt(self):
-        self.mmt = MMT(self.mmt_config)
+        self.mmt = MMT(self.mmt_config, self.config, self.vocab)
 
     def _build_output(self):
         # dynamic OCR-copying scores with pointer network
@@ -153,10 +152,11 @@ class MMF_M4C(nn.Module):
         fwd_results["obj_mask"] = _get_mask(obj_nums, obj_mmt_in.size(1))
 
     def _forward_ocr_encoding(self, items, fwd_results):
-        # OCR FastText feature (300-dim)
-        ocr_fasttext = items.ocr_fasttext_features
-        ocr_fasttext = F.normalize(ocr_fasttext, dim=-1)
-        assert ocr_fasttext.size(-1) == 300
+        # OCR Word-Embedding feature (300-dim)
+        ocr_tokens = items.ocr_texts
+        ocr_features, _ = self.ocr_word_embedding(ocr_tokens)
+        ocr_features = F.normalize(ocr_features, dim=-1)
+        # assert ocr_features.size(-1) == 300
 
         # OCR rec feature (256-dim), replace the OCR PHOC features, extracted from swintextspotter
         ocr_phoc = items.ocr_rec_features
@@ -168,7 +168,7 @@ class MMF_M4C(nn.Module):
         ocr_fc = F.normalize(ocr_fc, dim=-1)
 
         ocr_feat = torch.cat(
-            [ocr_fasttext, ocr_phoc, ocr_fc], dim=-1
+            [ocr_features, ocr_phoc, ocr_fc], dim=-1
         )
         ocr_bbox = items.ocr_boxes
         ocr_mmt_in = self.ocr_feat_layer_norm(
@@ -263,11 +263,13 @@ class TextBert(BertPreTrainedModel):
 
 
 class MMT(BertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, mmt_config, config, vocab):
+        super().__init__(mmt_config)
 
-        self.prev_pred_embeddings = PrevPredEmbeddings(config)
-        self.encoder = BertEncoder(config)
+        # self.prev_pred_embeddings = PrevPredEmbeddings(config)
+        self.dynamic_embedding = build_text_embedding(config.DYNAMIC_EMBEDDING, vocab)
+        # self.encoder = BertEncoder(config)
+        self.encoder = build_encoder(config.ENCODER)
         self.init_weights()
 
     def forward(
@@ -282,14 +284,16 @@ class MMT(BertPreTrainedModel):
         prev_inds,
     ):
 
-        # build embeddings for predictions in previous decoding steps
-        # fixed_ans_emb is an embedding lookup table for each fixed vocabulary
-        dec_emb = self.prev_pred_embeddings(fixed_ans_emb, ocr_emb, prev_inds)
+        # # build embeddings for predictions in previous decoding steps
+        # # fixed_ans_emb is an embedding lookup table for each fixed vocabulary
+        # dec_emb = self.prev_pred_embeddings(fixed_ans_emb, ocr_emb, prev_inds)
 
-        # a zero mask for decoding steps, so the encoding steps elements can't
-        # attend to decoding steps.
-        # A triangular causal mask will be filled for the decoding steps
-        # later in extended_attention_mask
+        # # a zero mask for decoding steps, so the encoding steps elements can't
+        # # attend to decoding steps.
+        # # A triangular causal mask will be filled for the decoding steps
+        # # later in extended_attention_mask
+
+        dec_emb, (dec_padding_mask, _) = self.dynamic_embedding(prev_inds, ocr_emb, fixed_ans_emb)
         dec_mask = torch.zeros(
             dec_emb.size(0), dec_emb.size(1), dtype=torch.float32, device=dec_emb.device
         )
@@ -316,24 +320,27 @@ class MMT(BertPreTrainedModel):
         # generate the attention mask similar to prefix LM
         # all elements can attend to the elements in encoding steps
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-        extended_attention_mask = extended_attention_mask.repeat(
-            1, 1, from_seq_length, 1
-        )
-        # decoding step elements can attend to themselves in a causal manner
-        extended_attention_mask[:, :, -dec_max_num:, -dec_max_num:] = _get_causal_mask(
-            dec_max_num, encoder_inputs.device
-        )
+        # extended_attention_mask = extended_attention_mask.repeat(
+        #     1, 1, from_seq_length, 1
+        # )
+        # # decoding step elements can attend to themselves in a causal manner
+        # extended_attention_mask[:, :, -dec_max_num:, -dec_max_num:] = _get_causal_mask(
+        #     dec_max_num, encoder_inputs.device
+        # )
 
-        # flip the mask, so that invalid attention pairs have -10000.
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-        assert not extended_attention_mask.requires_grad
-        head_mask = [None] * self.config.num_hidden_layers
+        # # flip the mask, so that invalid attention pairs have -10000.
+        # extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        # assert not extended_attention_mask.requires_grad
+        # head_mask = [None] * self.config.num_hidden_layers
 
+        extended_attention_mask = torch.where(extended_attention_mask == 0, 0, 1).bool()
         encoder_outputs = self.encoder(
-            encoder_inputs, extended_attention_mask, head_mask=head_mask
+            features=encoder_inputs, 
+            padding_mask=dec_padding_mask,
+            attention_mask=extended_attention_mask
         )
 
-        mmt_seq_output = encoder_outputs[0]
+        mmt_seq_output = encoder_outputs
         mmt_txt_output = mmt_seq_output[:, txt_begin:txt_end]
         mmt_ocr_output = mmt_seq_output[:, ocr_begin:ocr_end]
         mmt_dec_output = mmt_seq_output[:, -dec_max_num:]

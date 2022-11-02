@@ -80,7 +80,7 @@ class OcrWordEmbedding(nn.Module):
         for batch, texts in enumerate(batch_of_texts):
             for idx, token in enumerate(texts):
                 token = [ocr2idx[subtoken] for subtoken in token.split()]
-                token = torch.tensor(token).unsqueeze(0).to(self.device)
+                token = torch.tensor(token).long().unsqueeze(0).to(self.device)
                 feature = F.embedding(token, weights, padding_idx=self.padding_idx).sum(dim=1)
                 features[batch][idx] = feature
             features[batch] = torch.cat(features[batch], dim=0).unsqueeze(0)
@@ -129,6 +129,48 @@ class DynamicEmbedding(nn.Module):
         # construct the dynamic embeding weights
         bs = tokens.shape[0]
         fixed_weights = self.fixed_weights.unsqueeze(0).expand((bs, -1, -1)) # (bs, vocab_len, d_model)
+        weights = torch.cat([fixed_weights, oov_features], dim=1) # (bs, vocab_len + ocr_len, d_model)
+
+        features = self.batch_embedding(weights, tokens, self.vocab.padding_idx)
+
+        return features, (padding_mask, sequential_mask)
+
+@META_TEXT_EMBEDDING.register()
+class FixedVocabDynamicEmbedding(nn.Module):
+    def __init__(self, config, vocab):
+        super().__init__()
+
+        self.d_model = config.D_MODEL
+        self.vocab = vocab
+
+    def batch_embedding(self, weights, tokens, padding_idx):
+        '''
+            weights: (bs, embedding_len, d_model)
+            tokens: (bs, seq_len)
+        '''
+        assert weights.dim() == 3
+        batch_size = weights.shape[0]
+        length = weights.shape[1]
+        d_model = weights.shape[-1]
+        assert d_model == self.d_model
+        flattened_weights = weights.view(batch_size*length, d_model)
+
+        batch_offsets = torch.arange(batch_size, device=tokens.device) * length
+        batch_offsets = batch_offsets.unsqueeze(-1)
+        assert batch_offsets.dim() == tokens.dim()
+        flattened_tokens = tokens + batch_offsets
+        results = F.embedding(flattened_tokens, flattened_weights, padding_idx=padding_idx)
+        
+        return results
+
+    def forward(self, tokens: torch.Tensor, oov_features: torch.Tensor, fixed_weights):
+        padding_mask = generate_padding_mask(tokens, padding_idx=self.vocab.padding_idx).to(oov_features.device)
+        seq_len = tokens.shape[1]
+        sequential_mask = generate_sequential_mask(seq_len).to(oov_features.device)
+
+        # construct the dynamic embeding weights
+        bs = tokens.shape[0]
+        fixed_weights = fixed_weights.unsqueeze(0).expand((bs, -1, -1)) # (bs, vocab_len, d_model)
         weights = torch.cat([fixed_weights, oov_features], dim=1) # (bs, vocab_len + ocr_len, d_model)
 
         features = self.batch_embedding(weights, tokens, self.vocab.padding_idx)

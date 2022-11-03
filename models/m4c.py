@@ -167,6 +167,7 @@ class M4C(nn.Module):
             input_features.answer_tokens = torch.ones(input_features.batch_size, self.max_len).long().to(self.device) * self.vocab.padding_idx
             input_features.answer_tokens[:, 0] = self.vocab.bos_idx
             last_ids = torch.zeros((input_features.batch_size, )).to(self.device)
+            output = None
             for ith in range(self.max_len):
                 decoder_outputs, ocr_encoder_outputs, ocr_padding_mask = self.forward_mmt(input_features)
                 input_features.decoder_outputs = decoder_outputs
@@ -179,5 +180,6 @@ class M4C(nn.Module):
                 # whether or not to interrupt the decoding process
                 last_ids = torch.where(last_ids == self.vocab.eos_idx, last_ids, answer_ids[:, ith])
                 if last_ids.mean() == self.vocab.eos_idx:
-                    results = {"scores": output}
-                    return results
+                    break
+
+            return output

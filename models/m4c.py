@@ -19,11 +19,11 @@ class DynamicPointerNetwork(nn.Module):
         self.key = nn.Linear(config.D_MODEL, config.D_MODEL)
         self.d_model = config.D_MODEL
 
-    def forward(self, query_inputs, key_inputs, query_attention_mask):
+    def forward(self, query_inputs, key_inputs, key_attention_mask):
         queries = self.query(query_inputs)
         keys = self.key(key_inputs)
         scores = torch.matmul(queries, keys.transpose(-1, -2)) / math.sqrt(self.d_model)
-        scores = scores.masked_fill(query_attention_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=-np.inf)
+        scores = scores.masked_fill(key_attention_mask.squeeze(1), value=-np.inf) # there is no head for attention mask
 
         return scores
 

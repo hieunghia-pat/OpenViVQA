@@ -6,18 +6,18 @@ DATASET:
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features/EVJVQA/vinvl_vinvl
+      FEATURES: vinvl_vinvl
       SCENE_TEXT: null
-      IMAGE: features/EVJVQA/images
+      IMAGE: train-images
     SCENE_TEXT_THRESHOLD: 0.3
   DICT_DATASET:
     TYPE: MultilingualDictionaryDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features/EVJVQA/vinvl_vinvl
+      FEATURES: vinvl_vinvl
       SCENE_TEXT: null
-      IMAGE: features/EVJVQA/images
+      IMAGE: train-images
     SCENE_TEXT_THRESHOLD: 0.3
   MIN_FREQ: 1
   VOCAB:
@@ -36,10 +36,10 @@ DATASET:
     ANSWER_TOKEN: <answer>
     PRETRAINED_LANGUAGE_MODEL: null
   JSON_PATH:
-    TRAIN: features/EVJVQA/annotations/evjvqa_train.json
-    DEV: features/EVJVQA/annotations/evjvqa_dev.json
-    PUBLIC_TEST: features/EVJVQA/annotations/evjvqa_public_test.json
-    PRIVATE_TEST: features/EVJVQA/annotations/evjvqa_private_test.json
+    TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/New_splitted_data/Ja_data/train_ja.json
+    DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/New_splitted_data/Ja_data/dev_ja.json
+    PUBLIC_TEST: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/New_splitted_data/Ja_data/dev_ja.json
+    PRIVATE_TEST: null
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -86,10 +86,10 @@ MODEL:
   ENCODER:
     ARCHITECTURE: CrossModalityEncoder
     D_MODEL: 512
-    LAYERS: 3
+    LAYERS: 1
     VISION_LANGUAGE_ATTENTION:
       ARCHITECTURE: ScaledDotProductAttention
-      HEAD: 8
+      HEAD: 24
       D_MODEL: 512
       D_KEY: 64
       D_VALUE: 64
@@ -100,7 +100,7 @@ MODEL:
       DROPOUT: .1
     LANGUAGE_VISION_ATTENTION:
       ARCHITECTURE: ScaledDotProductAttention
-      HEAD: 8
+      HEAD: 24
       D_MODEL: 512
       D_KEY: 64
       D_VALUE: 64
@@ -111,7 +111,7 @@ MODEL:
       DROPOUT: .1
     VISION_SELF_ATTENTION:
       ARCHITECTURE: ScaledDotProductAttention
-      HEAD: 8
+      HEAD: 24
       D_MODEL: 512
       D_KEY: 64
       D_VALUE: 64
@@ -122,7 +122,7 @@ MODEL:
       DROPOUT: .1
     LANGUAGE_SELF_ATTENTION:
       ARCHITECTURE: ScaledDotProductAttention
-      HEAD: 8
+      HEAD: 24
       D_MODEL: 512
       D_KEY: 64
       D_VALUE: 64
@@ -133,7 +133,7 @@ MODEL:
       DROPOUT: .1
   MULTIMODAL_FUSION:
     ARCHITECTURE: ScaledDotProductAttention
-    HEAD: 8
+    HEAD: 24
     D_MODEL: 512
     D_KEY: 64
     D_VALUE: 64
@@ -145,11 +145,11 @@ MODEL:
   DECODER:
     ARCHITECTURE: Decoder
     D_MODEL: 512
-    LAYERS: 3
+    LAYERS: 1
     ATTENTION:
       SELF_ATTENTION:
         ARCHITECTURE: ScaledDotProductAttention
-        HEAD: 8
+        HEAD: 24
         D_MODEL: 512
         D_KEY: 64
         D_VALUE: 64
@@ -160,7 +160,7 @@ MODEL:
         DROPOUT: .1
       ENC_ATTENTION:
         ARCHITECTURE: ScaledDotProductAttention
-        HEAD: 8
+        HEAD: 24
         D_MODEL: 512
         D_KEY: 64
         D_VALUE: 64

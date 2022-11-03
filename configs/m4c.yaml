@@ -1,4 +1,4 @@
-TASK: TrainingM4C
+TASK: TrainingMMF
 
 DATASET:
   FEATURE_DATASET:
@@ -11,20 +11,25 @@ DATASET:
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.7
     MAX_SCENE_TEXT: 50
+    WORD_EMBEDDING: ViFastText
+    WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
     TYPE: OcrDictionaryDataset
     BATCH_SIZE: 64
-    WORKERS: 2
+    WORKERS: 0
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.7
     MAX_SCENE_TEXT: 50
+    WORD_EMBEDDING: ViFastText
+    WORD_EMBEDDING_CACHE: null
   MIN_FREQ: 1
   VOCAB:
     TYPE: OcrVocab
     TOKENIZER: null
+    MIN_FREQ: 1
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
     BOS_TOKEN: <bos>
@@ -69,13 +74,7 @@ MODEL:
     D_FEATURE: 1024
     D_MODEL: 512
     DROPOUT: .1
-  GRID_EMBEDDING:
-    ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
-    D_FEATURE: 2048
-    D_MODEL: 512
-    DROPOUT: .1
-  BOX_EMBEDDING:
+  REGION_BOX_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
     DEVICE: cuda
     D_FEATURE: 4
@@ -91,6 +90,12 @@ MODEL:
     ARCHITECTURE: FeatureEmbedding
     DEVICE: cuda
     D_FEATURE: 256
+    D_MODEL: 512
+    DROPOUT: .1
+  OCR_BOX_EMBEDDING:
+    ARCHITECTURE: FeatureEmbedding
+    DEVICE: cuda
+    D_FEATURE: 4
     D_MODEL: 512
     DROPOUT: .1
   OCR_TEXT_EMBEDDING:
@@ -110,7 +115,7 @@ MODEL:
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
   DYNAMIC_EMBEDDING:
-    ARCHITECTURE: DynamicEmbedding
+    ARCHITECTURE: FixedVocabDynamicEmbedding
     DEVICE: cuda
     D_MODEL: 512
     DROPOUT: .1

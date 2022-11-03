@@ -46,6 +46,6 @@ class OcrClassificationVocab(ClassificationVocab):
             batch_ocr_token_of = ocr_token_of[batch]
             itoa = deepcopy(self.itoa)
             itoa.update(batch_ocr_token_of)
-            answers.append(self.itoa[answer_idx] if join_word else self.itoa[answer_idx].split())
+            answers.append(itoa[answer_idx] if join_word else itoa[answer_idx].split())
 
         return answers

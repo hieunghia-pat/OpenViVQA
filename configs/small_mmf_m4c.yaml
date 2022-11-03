@@ -16,7 +16,7 @@ DATASET:
   DICT_DATASET:
     TYPE: OcrDictionaryDataset
     BATCH_SIZE: 64
-    WORKERS: 0
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: features/OpenViVQA/features/swintextspotter
@@ -96,7 +96,7 @@ MODEL:
     HIDDEN_SIZE: 512
     NUM_HIDDEN_LAYERS: 4
     NUM_ATTENTION_HEADS: 8
-    LOAD_PRETRAINED: True
+    LOAD_PRETRAINED: False
     PRETRAINED_NAME: "bert-base-uncased"
   TEXT_EMBEDDING:
     ARCHITECTURE: UsualEmbedding

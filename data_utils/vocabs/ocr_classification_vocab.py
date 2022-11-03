@@ -40,6 +40,7 @@ class OcrClassificationVocab(ClassificationVocab):
     def decode_answer(self, answer_vecs: torch.Tensor, list_ocr_tokens: List[List[str]], join_word=True) -> Union[List[str], List[List[str]]]:
         ocr_token_of = [{self.total_answers+idx: token for idx, token in enumerate(ocr_tokens)} for ocr_tokens in list_ocr_tokens]
         answers = []
+        answer_vecs = answer_vecs.squeeze(-1)
         list_answers = answer_vecs.tolist()
         for batch, answer_idx in enumerate(list_answers):
             batch_ocr_token_of = ocr_token_of[batch]

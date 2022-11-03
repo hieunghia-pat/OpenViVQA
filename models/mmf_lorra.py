@@ -1,4 +1,3 @@
-import torch
 from torch import nn
 from torch.nn import functional as F
 
@@ -149,6 +148,7 @@ class MMF_LoRRA(nn.Module):
         attended_spatial_feat = (spatial_attn_weights.unsqueeze(-1) * self_attn_feat.unsqueeze(1)).sum(dim=1)
         attended_context_feat = (context_attn_weights.unsqueeze(-1) * self_attn_feat.unsqueeze(1)).sum(dim=1)
         mmt_feat = attended_spatial_feat + attended_context_feat
+        mmt_feat = mmt_feat.sum(dim=1)
 
         fwd_results["mmt_feat"] = mmt_feat
 

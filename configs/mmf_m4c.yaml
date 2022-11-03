@@ -31,6 +31,7 @@ DATASET:
     TOKENIZER: null
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
+    MIN_FREQ: 1
     BOS_TOKEN: <bos>
     EOS_TOKEN: <eos>
     PAD_TOKEN: <pad>

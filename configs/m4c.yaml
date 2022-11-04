@@ -3,7 +3,7 @@ TASK: TrainingMMF
 DATASET:
   FEATURE_DATASET:
     TYPE: OcrFeatureDataset
-    BATCH_SIZE: 64
+    BATCH_SIZE: 16
     WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
@@ -68,51 +68,21 @@ MODEL:
   NAME: m4c_x152++_faster_rcnn
   DEVICE: cuda
   D_MODEL: 512
-  REGION_EMBEDDING:
-    ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
+  OBJECT_EMBEDDING:
     D_FEATURE: 1024
     D_MODEL: 512
     DROPOUT: .1
-  REGION_BOX_EMBEDDING:
-    ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
-    D_FEATURE: 4
+  OCR_EMBEDDING:
+    D_FEATURE: 812
     D_MODEL: 512
     DROPOUT: .1
-  OCR_DET_EMBEDDING:
-    ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
-    D_FEATURE: 256
-    D_MODEL: 512
-    DROPOUT: .1
-  OCR_REC_EMBEDDING:
-    ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
-    D_FEATURE: 256
-    D_MODEL: 512
-    DROPOUT: .1
-  OCR_BOX_EMBEDDING:
-    ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
-    D_FEATURE: 4
-    D_MODEL: 512
-    DROPOUT: .1
-  OCR_TEXT_EMBEDDING:
-    ARCHITECTURE: OcrWordEmbedding
-    DEVICE: cuda
-    WORD_EMBEDDING: ViFastText
-    WORD_EMBEDDING_CACHE: null
-    D_EMBEDDING: 300
-    D_MODEL: 512
-    DROPOUT: .1
-  TEXT_EMBEDDING:
+  QUESTION_EMBEDDING:
     ARCHITECTURE: UsualEmbedding
     DEVICE: cuda
     D_EMBEDDING: 300
     D_MODEL: 512
     DROPOUT: .1
-    WORD_EMBEDDING: null
+    WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   DYNAMIC_EMBEDDING:
     ARCHITECTURE: FixedVocabDynamicEmbedding

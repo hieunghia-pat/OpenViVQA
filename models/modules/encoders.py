@@ -130,7 +130,7 @@ class MultiModalEncoder(Encoder):
         super().__init__(config)
 
     def forward(self, features: torch.Tensor, padding_mask: torch.Tensor, attention_mask: torch.Tensor):        
-        out = self.layer_norm(features) + self.pos_embedding(features)
+        out = self.pos_embedding(features)
         for layer in self.layers:
             out = layer(queries=out, keys=out, values=out, padding_mask=padding_mask, attention_mask=attention_mask)
 

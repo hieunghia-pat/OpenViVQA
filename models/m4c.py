@@ -3,9 +3,9 @@ from torch import nn
 from torch.nn import functional as F
 
 from utils.instance import InstanceList
+from .utils import generate_padding_mask, generate_sequential_mask
 from builders.encoder_builder import build_encoder
 from builders.text_embedding_builder import build_text_embedding
-from builders.vision_embedding_builder import build_vision_embedding
 from builders.model_builder import META_ARCHITECTURE
 
 import numpy as np
@@ -42,66 +42,91 @@ class M4C(nn.Module):
         self.eos_idx = vocab.eos_idx
         self.d_model = config.D_MODEL
 
-        # embedding for object features
-        self.region_embedding = build_vision_embedding(config.REGION_EMBEDDING)
-        self.region_box_embedding = build_vision_embedding(config.REGION_BOX_EMBEDDING)
+        self.build(config)
 
-        # embedding for ocr features
-        self.ocr_det_embedding = build_vision_embedding(config.OCR_DET_EMBEDDING)
-        self.ocr_rec_embedding = build_vision_embedding(config.OCR_REC_EMBEDDING)
-        self.ocr_box_embedding = build_vision_embedding(config.OCR_BOX_EMBEDDING)
-        self.ocr_token_embedding = build_text_embedding(config.OCR_TEXT_EMBEDDING, vocab)
-        self.proj_ocr_features = nn.Linear(config.D_MODEL*3, config.D_MODEL)
-        self.norm_ocr_features = nn.LayerNorm(config.D_MODEL)
+    def build(self, config):
+        self.build_object_embedding(config)
+        self.build_ocr_embedding(config)
+        self.build_question_embedding(config)
+        self.build_mmt(config)
+        self.build_output(config)
 
-        # embedding for question
-        self.question_embedding = build_text_embedding(config.TEXT_EMBEDDING, vocab)
+    def build_object_embedding(self, config):
+        self.linear_obj_feat_to_mmt_in = nn.Linear(config.OBJECT_EMBEDDING.D_FEATURE, config.D_MODEL)
 
+        # object location feature: relative bounding box coordinates (4-dim)
+        self.linear_obj_bbox_to_mmt_in = nn.Linear(4, config.D_MODEL)
+
+        self.obj_feat_layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.obj_bbox_layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.obj_drop = nn.Dropout(config.OBJECT_EMBEDDING.DROPOUT)
+
+    def build_ocr_embedding(self, config):
+        self.linear_ocr_feat_to_mmt_in = nn.Linear(config.OCR_EMBEDDING.D_FEATURE, config.D_MODEL)
+
+        # OCR location feature: relative bounding box coordinates (4-dim)
+        self.linear_ocr_bbox_to_mmt_in = nn.Linear(4, config.D_MODEL)
+
+        self.ocr_feat_layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.ocr_bbox_layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.ocr_text_layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.ocr_drop = nn.Dropout(config.OCR_EMBEDDING.DROPOUT)
+
+    def build_question_embedding(self, config):
+        self.question_embedding = build_text_embedding(config.QUESTION_EMBEDDING, self.vocab)
+        self.question_feat_layer_norm = nn.LayerNorm(config.D_MODEL)
+
+    def build_mmt(self, config):
         # embedding for answer
-        self.dynamic_embedding = build_text_embedding(config.DYNAMIC_EMBEDDING, vocab)
-
+        self.dynamic_embedding = build_text_embedding(config.DYNAMIC_EMBEDDING, self.vocab)
         # multimodal transformer
         self.encoder = build_encoder(config.ENCODER)
 
-        # output layers
+    def build_output(self, config):
         self.dynamic_network = DynamicPointerNetwork(config)
-        self.vocab_proj = nn.Linear(config.D_MODEL, len(vocab))
+        self.vocab_proj = nn.Linear(config.D_MODEL, len(self.vocab))
 
     def forward_object_features(self, input_features: InstanceList):
         features = input_features.region_features
-        features, padding_mask = self.region_embedding(features)
-
         boxes = input_features.region_boxes
-        boxes, _ = self.region_box_embedding(boxes)
+        padding_mask = generate_padding_mask(features, padding_idx=0)
 
-        obj_features = features + boxes
+        obj_features = self.obj_feat_layer_norm(
+            self.linear_obj_feat_to_mmt_in(features)
+        ) + self.obj_bbox_layer_norm(
+            self.linear_ocr_bbox_to_mmt_in(boxes)
+        )
+        obj_features = self.obj_drop(obj_features)
 
         return obj_features, padding_mask
 
     def forward_ocr_features(self, input_features: InstanceList):
         ocr_det_features = input_features.ocr_det_features
-        ocr_det_features, padding_mask = self.ocr_det_embedding(ocr_det_features)
+        ocr_det_features = F.normalize(ocr_det_features, dim=-1)
 
         ocr_rec_features = input_features.ocr_rec_features
-        ocr_rec_features, _ = self.ocr_rec_embedding(ocr_rec_features)
+        ocr_rec_features = F.normalize(ocr_rec_features, dim=-1)
 
-        ocr_tokens = input_features.ocr_tokens
-        ocr_word_features, _ = self.ocr_token_embedding(ocr_tokens)
+        ocr_fasttext = input_features.ocr_fasttext_features
+        ocr_fasttext = F.normalize(ocr_fasttext, dim=-1)
 
-        ocr_features = torch.cat([ocr_det_features, ocr_rec_features, ocr_word_features], dim=-1)
-        ocr_features = self.proj_ocr_features(ocr_features)
-        ocr_features = self.norm_ocr_features(ocr_features)
+        padding_mask = generate_padding_mask(ocr_det_features, padding_idx=0)
 
-        ocr_boxes = input_features.ocr_boxes        
-        ocr_boxes, _ = self.ocr_box_embedding(ocr_boxes)
-        
-        ocr_features += ocr_boxes
+        ocr_feat = torch.cat([ocr_det_features, ocr_rec_features, ocr_fasttext], dim=-1)
+        ocr_boxes = input_features.ocr_boxes
+        ocr_feat_in = self.ocr_feat_layer_norm(
+            self.linear_ocr_feat_to_mmt_in(ocr_feat)
+        ) + self.ocr_bbox_layer_norm(
+            self.linear_obj_bbox_to_mmt_in(ocr_boxes)
+        )
+        ocr_feat_in = self.ocr_drop(ocr_feat_in)
 
-        return ocr_features, padding_mask
+        return ocr_feat_in, padding_mask
 
     def forward_questions(self, input_features: InstanceList):
         question_tokens = input_features.question_tokens
         question_features, (question_padding_mask, _) = self.question_embedding(question_tokens)
+        question_features = self.question_feat_layer_norm(question_features)
 
         return question_features, question_padding_mask
 
@@ -121,7 +146,7 @@ class M4C(nn.Module):
         joint_len = joint_features.shape[1]
         joint_attention_mask = joint_padding_mask.repeat(1, 1, joint_len, 1) # (bs, 1, joint_len, joint_len)
         answer_len = answer_features.shape[1]
-        joint_attention_mask[:, :,  -answer_len:, -answer_len:] = answer_sequential_mask.squeeze(1)
+        joint_attention_mask[:, :,  -answer_len:, -answer_len:] = answer_sequential_mask.squeeze()
         
         encoder_outputs = self.encoder(
             features=joint_features,

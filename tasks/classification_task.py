@@ -207,7 +207,7 @@ class ClassificationTask(BaseTask):
                 with torch.no_grad():
                     outs = self.model(items)
 
-                answers_gt = self.vocab.decode_answer(items.answer, join_word=True)
+                answers_gt = self.vocab.decode_answer(items.answer.squeeze(-1), join_word=True)
                 answers_gen = self.vocab.decode_answer(outs.argmax(dim=-1), join_word=True)
                 gts = {}
                 gens = {}
@@ -222,8 +222,7 @@ class ClassificationTask(BaseTask):
                     "id": items.question_id,
                     "filename": items.filename,
                     "gens": gens,
-                    "gts": gts,
-                    "scores": scores
+                    "gts": gts
                 })
 
                 pbar.update()

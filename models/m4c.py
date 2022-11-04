@@ -2,9 +2,14 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+from pytorch_transformers.modeling_bert import (
+    BertConfig,
+    BertEncoder,
+    BertEmbeddings
+)
+
 from utils.instance import InstanceList
-from .utils import generate_padding_mask, generate_sequential_mask
-from builders.encoder_builder import build_encoder
+from .utils import generate_padding_mask
 from builders.text_embedding_builder import build_text_embedding
 from builders.model_builder import META_ARCHITECTURE
 
@@ -73,14 +78,20 @@ class M4C(nn.Module):
         self.ocr_drop = nn.Dropout(config.OCR_EMBEDDING.DROPOUT)
 
     def build_question_embedding(self, config):
-        self.question_embedding = build_text_embedding(config.QUESTION_EMBEDDING, self.vocab)
-        self.question_feat_layer_norm = nn.LayerNorm(config.D_MODEL)
+        bert_config = BertConfig(hidden_size=config.TEXT_BERT.HIDDEN_SIZE,
+                                    num_hidden_layers=config.TEXT_BERT.NUM_HIDDEN_LAYERS,
+                                    num_attention_heads=config.MMT.NUM_ATTENTION_HEADS)
+        self.question_embedding = BertEmbeddings(bert_config)
+        self.question_encoder = BertEncoder(bert_config)
 
     def build_mmt(self, config):
         # embedding for answer
         self.dynamic_embedding = build_text_embedding(config.DYNAMIC_EMBEDDING, self.vocab)
         # multimodal transformer
-        self.encoder = build_encoder(config.ENCODER)
+        mmt_config = BertConfig(hidden_size=config.ENCODER.SELF_ATTENTION.D_MODEL,
+                                        num_hidden_layers=config.ENCODER.LAYERS,
+                                        num_attention_heads=config.ENCODER.SELF_ATTENTION.HEAD)
+        self.encoder = BertEncoder(mmt_config)
 
     def build_output(self, config):
         self.dynamic_network = DynamicPointerNetwork(config)
@@ -125,8 +136,17 @@ class M4C(nn.Module):
 
     def forward_questions(self, input_features: InstanceList):
         question_tokens = input_features.question_tokens
-        question_features, (question_padding_mask, _) = self.question_embedding(question_tokens)
-        question_features = self.question_feat_layer_norm(question_features)
+        question_features = self.question_embedding(question_tokens)
+        
+        question_padding_mask = generate_padding_mask(question_tokens, padding_idx=self.vocab.padding_idx)
+        attention_mask = question_padding_mask * -10e4
+        head_mask = [None] * 4
+
+        question_features = self.question_encoder(
+            question_features,
+            attention_mask,
+            head_mask=head_mask
+        )
 
         return question_features, question_padding_mask
 
@@ -147,12 +167,16 @@ class M4C(nn.Module):
         joint_attention_mask = joint_padding_mask.repeat(1, 1, joint_len, 1) # (bs, 1, joint_len, joint_len)
         answer_len = answer_features.shape[1]
         joint_attention_mask[:, :,  -answer_len:, -answer_len:] = answer_sequential_mask.squeeze()
+        # flip the mask, so that invalid attention pairs have -10000
+        joint_padding_mask = joint_padding_mask.long() * -10000
+        joint_attention_mask = joint_attention_mask.long() * -10000
+        head_mask = [None] * 4
         
         encoder_outputs = self.encoder(
-            features=joint_features,
-            padding_mask=joint_padding_mask,
-            attention_mask=joint_attention_mask
-        )
+            joint_features,
+            joint_attention_mask,
+            head_mask=head_mask
+        )[0]
 
         # get the offset of features
         obj_len = obj_features.shape[1]
@@ -192,13 +216,14 @@ class M4C(nn.Module):
             input_features.answer_tokens = torch.ones(input_features.batch_size, self.max_len).long().to(self.device) * self.vocab.padding_idx
             input_features.answer_tokens[:, 0] = self.vocab.bos_idx
             last_ids = torch.zeros((input_features.batch_size, )).to(self.device)
-            output = None
+            results = {}
             for ith in range(self.max_len):
                 decoder_outputs, ocr_encoder_outputs, ocr_padding_mask = self.forward_mmt(input_features)
                 input_features.decoder_outputs = decoder_outputs
                 input_features.ocr_encoder_outputs = ocr_encoder_outputs
                 input_features.ocr_padding_mask = ocr_padding_mask
                 output = self.forward_output(input_features)
+                results["scores"] = output
                 answer_ids = output.argmax(dim=-1)
                 input_features.answer_tokens[:, 1:] = answer_ids[:, :-1]
 
@@ -207,4 +232,4 @@ class M4C(nn.Module):
                 if last_ids.mean() == self.vocab.eos_idx:
                     break
 
-            return output
+            return results

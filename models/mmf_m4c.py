@@ -70,10 +70,6 @@ class MMF_M4C(nn.Module):
         else:
             self.text_bert_out_linear = nn.Identity()
 
-    # def _build_txt_encoding(self):
-    #     self.text_bert = build_text_embedding(self.config.TEXT_EMBEDDING, self.vocab)
-    #     self.text_bert_out_linear = nn.Identity()
-
     def _build_obj_encoding(self):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
             self.config.OBJECT_EMBEDDING.D_FEATURE, self.mmt_config.hidden_size

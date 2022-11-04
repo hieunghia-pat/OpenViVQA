@@ -1,9 +1,5 @@
-import functools
-import math
-
 import torch
 from torch import nn
-import torch.nn.functional as F
 from torch import nn
 from pytorch_transformers.modeling_bert import (
     BertEncoder,
@@ -40,7 +36,7 @@ class MMF_REGIONAL_M4C(MMF_M4C):
 
         self.region_feat_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
         self.region_bbox_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
-        self.region_drop = nn.Dropout(self.config.OBJECT_EMBEDDING.DROPOUT)
+        self.region_drop = nn.Dropout(self.config.REGION_EMBEDDING.DROPOUT)
 
     def _build_mmt(self):
         self.mmt = MMT(self.mmt_config)
@@ -144,6 +140,8 @@ class MMT(BertPreTrainedModel):
         txt_mask,
         obj_emb,
         obj_mask,
+        region_emb,
+        region_mask,
         ocr_emb,
         ocr_mask,
         fixed_ans_emb,
@@ -161,17 +159,18 @@ class MMT(BertPreTrainedModel):
         dec_mask = torch.zeros(
             dec_emb.size(0), dec_emb.size(1), dtype=torch.float32, device=dec_emb.device
         )
-        encoder_inputs = torch.cat([txt_emb, obj_emb, ocr_emb, dec_emb], dim=1)
-        attention_mask = torch.cat([txt_mask, obj_mask, ocr_mask, dec_mask], dim=1)
+        encoder_inputs = torch.cat([txt_emb, obj_emb, region_emb, ocr_emb, dec_emb], dim=1)
+        attention_mask = torch.cat([txt_mask, obj_mask, region_mask, ocr_mask, dec_mask], dim=1)
 
         # offsets of each modality in the joint embedding space
         txt_max_num = txt_mask.size(-1)
         obj_max_num = obj_mask.size(-1)
+        region_max_num = region_mask.size(-1)
         ocr_max_num = ocr_mask.size(-1)
         dec_max_num = dec_mask.size(-1)
         txt_begin = 0
         txt_end = txt_begin + txt_max_num
-        ocr_begin = txt_max_num + obj_max_num
+        ocr_begin = txt_max_num + obj_max_num + region_max_num
         ocr_end = ocr_begin + ocr_max_num
 
         # We create a 3D attention mask from a 2D tensor mask.

@@ -2,9 +2,13 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+from pytorch_transformers.modeling_bert import (
+    BertConfig,
+    BertEncoder
+)
+
 from utils.instance import InstanceList
-from .utils import generate_padding_mask, generate_sequential_mask
-from builders.encoder_builder import build_encoder
+from .utils import generate_padding_mask
 from builders.text_embedding_builder import build_text_embedding
 from builders.model_builder import META_ARCHITECTURE
 
@@ -80,7 +84,10 @@ class M4C(nn.Module):
         # embedding for answer
         self.dynamic_embedding = build_text_embedding(config.DYNAMIC_EMBEDDING, self.vocab)
         # multimodal transformer
-        self.encoder = build_encoder(config.ENCODER)
+        mmt_config = BertConfig(hidden_size=config.ENCODER.SELF_ATTENTION.D_MODEL,
+                                        num_hidden_layers=config.ENCODER.LAYERS,
+                                        num_attention_heads=config.ENCODER.SELF_ATTENTION.HEAD)
+        self.encoder = BertEncoder(mmt_config)
 
     def build_output(self, config):
         self.dynamic_network = DynamicPointerNetwork(config)
@@ -147,11 +154,15 @@ class M4C(nn.Module):
         joint_attention_mask = joint_padding_mask.repeat(1, 1, joint_len, 1) # (bs, 1, joint_len, joint_len)
         answer_len = answer_features.shape[1]
         joint_attention_mask[:, :,  -answer_len:, -answer_len:] = answer_sequential_mask.squeeze()
+        # flip the mask, so that invalid attention pairs have -10000
+        joint_padding_mask = joint_padding_mask.long() * -10000
+        joint_attention_mask = joint_attention_mask.long() * -10000
+        head_mask = [None] * 4
         
         encoder_outputs = self.encoder(
-            features=joint_features,
-            padding_mask=joint_padding_mask,
-            attention_mask=joint_attention_mask
+            joint_features,
+            joint_attention_mask,
+            head_mask=head_mask
         )
 
         # get the offset of features
@@ -207,4 +218,5 @@ class M4C(nn.Module):
                 if last_ids.mean() == self.vocab.eos_idx:
                     break
 
-            return output
+            results = {"scores": output}
+            return results

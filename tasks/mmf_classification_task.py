@@ -158,7 +158,7 @@ class MmfClassificationTask(BaseTask):
         while True:
             self.train()
 
-            self.evaluate_loss(self.dev_dataloader)
+            # self.evaluate_loss(self.dev_dataloader)
 
             # val scores
             scores = self.evaluate_metrics(self.dev_dataloader)

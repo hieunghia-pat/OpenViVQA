@@ -53,7 +53,7 @@ def generate_padding_mask(sequences: TensorOrNone, padding_idx: int) -> torch.Bo
     else:
         __seq = sequences
 
-    mask = (torch.sum(__seq, dim=-1) == (padding_idx*__seq.shape[-1])) # (b_s, seq_len)
+    mask = (torch.sum(__seq, dim=-1) == (padding_idx*__seq.shape[-1])).long() * -10e4 # (b_s, seq_len)
     return mask.unsqueeze(1).unsqueeze(1) # (bs, 1, 1, seq_len)
 
 def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
@@ -61,7 +61,7 @@ def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
         Mask out subsequent positions
     '''
     attn_shape = (seq_len, seq_len)
-    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).to(torch.bool) # (seq_len, seq_len)
+    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1) * -10e4 # (seq_len, seq_len)
 
     return subsequent_mask.unsqueeze(0).unsqueeze(0) # (1, 1, seq_len, seq_len)
 

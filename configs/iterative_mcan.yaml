@@ -3,8 +3,8 @@ TASK: OpenEndedTask
 DATASET:
   FEATURE_DATASET:
     TYPE: FeatureDataset
-    BATCH_SIZE: 60
-    WORKERS: 0
+    BATCH_SIZE: 64
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: null
@@ -12,18 +12,18 @@ DATASET:
     SCENE_TEXT_THRESHOLD: 0.3
   DICT_DATASET:
     TYPE: DictionaryDataset
-    BATCH_SIZE: 60
-    WORKERS: 0
+    BATCH_SIZE: 64
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
       SCENE_TEXT: null
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.3
-  MIN_FREQ: 1
   SCENE_TEXT_THRESHOLD: 0.3
   VOCAB:
     TYPE: Vocab
     TOKENIZER: null
+    MIN_FREQ: 1
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
     BOS_TOKEN: <bos>
@@ -58,6 +58,7 @@ MODEL:
   ARCHITECTURE: IterativeMCAN
   NAME: iterative_mcan_region_x152++_faster_rcnn
   DEVICE: cuda
+  D_MODEL: 512
   VISION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
     D_FEATURE: 1024

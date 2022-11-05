@@ -3,17 +3,27 @@ TASK: TrainingSAAATask
 DATASET:
   FEATURE_DATASET:
     TYPE: FeatureDataset
-    BATCH_SIZE: 60
-    WORKERS: 0
+    BATCH_SIZE: 64
+    WORKERS: 2
+    FEATURE_PATH:
+      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      SCENE_TEXT: null
+      IMAGE: null
+    SCENE_TEXT_THRESHOLD: 0.3
   DICT_DATASET:
     TYPE: DictionaryDataset
-    BATCH_SIZE: 60
-    WORKERS: 0
-  MIN_FREQ: 1
+    BATCH_SIZE: 64
+    WORKERS: 2
+    FEATURE_PATH:
+      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      SCENE_TEXT: null
+      IMAGE: null
+    SCENE_TEXT_THRESHOLD: 0.3
   SCENE_TEXT_THRESHOLD: 0.3
   VOCAB:
     TYPE: Vocab
     TOKENIZER: null
+    MIN_FREQ: 1
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
     BOS_TOKEN: <bos>
@@ -33,10 +43,6 @@ DATASET:
     TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
     DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
     TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
-  FEATURE_PATH:
-    FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
-    SCENE_TEXT: null
-    IMAGE: null
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -52,6 +58,7 @@ MODEL:
   ARCHITECTURE: IterativeSAAA
   NAME: iterative_saaa_region_x152++_faster_rcnn
   DEVICE: cuda
+  D_MODEL: 512
   VISION_PROCESSOR:
     ARCHITECTURE: FeatureEmbedding
     D_FEATURE: 1024

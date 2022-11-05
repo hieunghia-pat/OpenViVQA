@@ -13,7 +13,7 @@ from builders.model_builder import META_ARCHITECTURE
 @META_ARCHITECTURE.register()
 class IterativeMCAN(BaseTransformer):
     def __init__(self, config, vocab):
-        super().__init__(vocab)
+        super().__init__(config, vocab)
 
         self.device = torch.device(config.DEVICE)
 
@@ -50,7 +50,7 @@ class IterativeMCAN(BaseTransformer):
         # SA
         text_features = self.self_encoder(
             features=text_features,
-            features_padding_mask=text_padding_mask
+            padding_mask=text_padding_mask
         )
 
         # GSA

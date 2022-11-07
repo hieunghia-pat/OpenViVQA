@@ -140,13 +140,13 @@ class M4C(nn.Module):
         
         question_padding_mask = generate_padding_mask(question_tokens, padding_idx=self.vocab.padding_idx)
         attention_mask = question_padding_mask * -10e4
-        head_mask = [None] * 4
+        head_mask = [None] * 12
 
         question_features = self.question_encoder(
             question_features,
             attention_mask,
             head_mask=head_mask
-        )
+        )[0]
 
         return question_features, question_padding_mask
 

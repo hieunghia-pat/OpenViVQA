@@ -5,7 +5,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch import nn
-from pytorch_transformers.modeling_bert import (
+from transformers.models.bert.modeling_bert import (
     BertConfig,
     BertEmbeddings,
     BertEncoder,

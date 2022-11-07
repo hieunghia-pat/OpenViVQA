@@ -6,7 +6,7 @@ from .iterative_saaa import IterativeSAAA
 from .joint_transformer import JointTransformer
 from .unique_transformer import UniqueTransformer
 from .m4c import M4C
-from .iterative_m4c import IterativeM4C
+from .mmf_iterative_m4c import MMF_IterativeM4C
 from .mmf_m4c import MMF_M4C
 from .mmf_regional_m4c import MMF_REGIONAL_M4C
 from .mmf_lorra import MMF_LoRRA

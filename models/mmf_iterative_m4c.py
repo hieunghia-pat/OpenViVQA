@@ -1,8 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from pytorch_transformers.modeling_bert import BertConfig, BertEncoder
-from transformers.models.bert_generation import BertGenerationConfig, BertGenerationDecoder
+from transformers.models.bert.modeling_bert import BertConfig, BertEncoder
 
 from .mmf_regional_m4c import PrevPredEmbeddings, _get_causal_mask, _get_mask
 from .mmf_m4c import OcrPtrNet, TextBert
@@ -99,15 +98,16 @@ class MMF_IterativeM4C(nn.Module):
         self.encoder = BertEncoder(self.encoder_config)
 
     def _build_decoder(self, config):
-        self.decoder_config = BertGenerationConfig(
+        self.decoder_config = BertConfig(
             hidden_size=config.D_MODEL,
             num_attention_heads=config.HEAD, 
             num_hidden_layers=config.LAYERS,
+            add_cross_attention=True,
             is_decoder=True,
             hidden_dropout_prob=config.DROPOUT
         )
         self.prev_pred_embeddings = PrevPredEmbeddings(self.decoder_config)
-        self.decoder = BertGenerationDecoder(self.decoder_config)
+        self.decoder = BertEncoder(self.decoder_config)
 
     def forward(self, items):
         # fwd_results holds intermediate forward pass results
@@ -232,7 +232,7 @@ class MMF_IterativeM4C(nn.Module):
         mmt_ocr_output = mmt_encoder_output[:, ocr_begin:ocr_end]
 
         fwd_results["mmt_encoder_output"] = mmt_encoder_output
-        fwd_results["mmt_encoder_mask"] = attention_mask
+        fwd_results["mmt_encoder_mask"] = extended_attention_mask
         fwd_results["mmt_ocr_output"] = mmt_ocr_output
 
     def _forward_decoder(self, items, fwd_results):
@@ -263,6 +263,16 @@ class MMF_IterativeM4C(nn.Module):
         )[0]
 
         fwd_results["mmt_dec_output"] = decoder_outputs
+
+    def _forward_output(self, items, fwd_results):
+        mmt_dec_output = fwd_results["mmt_dec_output"]
+        mmt_ocr_output = fwd_results["mmt_ocr_output"]
+        ocr_mask = fwd_results["ocr_mask"]
+
+        fixed_scores = self.classifier(mmt_dec_output)
+        dynamic_ocr_scores = self.ocr_ptr_net(mmt_dec_output, mmt_ocr_output, ocr_mask)
+        scores = torch.cat([fixed_scores, dynamic_ocr_scores], dim=-1)
+        fwd_results["scores"] = scores
 
     def _forward_encoder_decoder(self, items, fwd_results):
         self._forward_encoder(items, fwd_results)

@@ -49,6 +49,8 @@ class ImageDataset(BaseDataset):
 
         return Instance(
             **features,
+            image_id=item["image_id"],
+            filename=item["filename"],
             image=image,
             question=question,
             answer=answer

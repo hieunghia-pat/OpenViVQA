@@ -145,6 +145,8 @@ class OcrClassificationDataset(FeatureClassificationDataset):
 
         return Instance(
             **features,
+            image_id=item["image_id"],
+            filename=item["filename"],
             question_tokens=question,
             answer=answer,
             ocr_tokens=ocr_tokens

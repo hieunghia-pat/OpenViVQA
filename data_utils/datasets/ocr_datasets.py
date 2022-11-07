@@ -90,6 +90,8 @@ class OcrFeatureDataset(FeatureDataset):
 
         return Instance(
             **features,
+            image_id=item["image_id"],
+            filename=item["filename"],
             ocr_tokens=ocr_tokens,
             question=question,
             question_tokens=question_tokens,

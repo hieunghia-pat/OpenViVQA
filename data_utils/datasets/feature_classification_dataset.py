@@ -48,6 +48,8 @@ class FeatureClassificationDataset(BaseDataset):
         features = self.load_features(self.annotations[idx]["image_id"])
 
         return Instance(
+            image_id=item["image_id"],
+            filename=item["filename"],
             question_tokens=question,
             answer=answer,
             **features

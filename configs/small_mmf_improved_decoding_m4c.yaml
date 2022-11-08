@@ -65,7 +65,7 @@ TRAINING:
 
 MODEL:
   ARCHITECTURE: MMF_ImprovedDecodingM4C
-  NAME: small_mmf_m4c_x152++_faster_rcnn
+  NAME: small_mmf_improved_decoding_m4c_x152++_faster_rcnn
   DEVICE: cuda
   D_MODEL: 512
   OBJECT_EMBEDDING:

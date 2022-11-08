@@ -24,7 +24,6 @@ class MMF_IterativeM4C(nn.Module):
     def build(self, config):
         self._build_txt_encoding(config.TEXT_BERT)
         self._build_obj_encoding(config.OBJECT_EMBEDDING)
-        self._build_region_encoding(config.REGION_EMBEDDING)
         self._build_ocr_encoding(config.OCR_EMBEDDING)
         self._build_encoder(config.ENCODER)
         self._build_decoder(config.DECODER)
@@ -48,18 +47,6 @@ class MMF_IterativeM4C(nn.Module):
         self.obj_feat_layer_norm = nn.LayerNorm(config.D_MODEL)
         self.obj_bbox_layer_norm = nn.LayerNorm(config.D_MODEL)
         self.obj_drop = nn.Dropout(config.DROPOUT)
-
-    def _build_region_encoding(self, config):
-        self.linear_region_feat_to_mmt_in = nn.Linear(
-            config.D_FEATURE, config.D_MODEL
-        )
-
-        # region feature: relative bounding box coordinates (4-dim)
-        self.linear_region_bbox_to_mmt_in = nn.Linear(4, config.D_MODEL)
-
-        self.region_feat_layer_norm = nn.LayerNorm(config.D_MODEL)
-        self.region_bbox_layer_norm = nn.LayerNorm(config.D_MODEL)
-        self.region_drop = nn.Dropout(config.DROPOUT)
 
     def _build_ocr_encoding(self, config):
         self.linear_ocr_feat_to_mmt_in = nn.Linear(
@@ -115,7 +102,6 @@ class MMF_IterativeM4C(nn.Module):
         fwd_results = {}
         self._forward_txt_encoding(items, fwd_results)
         self._forward_obj_encoding(items, fwd_results)
-        self._forward_region_encoding(items, fwd_results)
         self._forward_ocr_encoding(items, fwd_results)
         self._forward_encoder_decoder(items, fwd_results)
 
@@ -151,20 +137,6 @@ class MMF_IterativeM4C(nn.Module):
         obj_nums = (items.region_features.sum(dim=-1) != 0).sum(dim=-1)
         fwd_results["obj_mask"] = _get_mask(obj_nums, obj_mmt_in.size(1))
 
-    def _forward_region_encoding(self, items, fwd_results):
-        # region appearance feature
-        region_feat = items.grid_features
-        region_bbox = items.grid_boxes
-        region_mmt_in = self.region_feat_layer_norm(
-            self.linear_region_feat_to_mmt_in(region_feat)
-        ) + self.region_bbox_layer_norm(self.linear_region_bbox_to_mmt_in(region_bbox))
-        region_mmt_in = self.obj_drop(region_mmt_in)
-        fwd_results["region_mmt_in"] = region_mmt_in
-
-        # binary mask of valid object vs padding
-        region_nums = (items.grid_features.sum(dim=-1) != 0).sum(dim=-1)
-        fwd_results["region_mask"] = _get_mask(region_nums, region_mmt_in.size(1))
-
     def _forward_ocr_encoding(self, items, fwd_results):
         # OCR FastText feature (300-dim)
         ocr_fasttext = items.ocr_fasttext_features
@@ -199,20 +171,17 @@ class MMF_IterativeM4C(nn.Module):
         txt_mask = fwd_results["txt_mask"]
         obj_emb = fwd_results["obj_mmt_in"]
         obj_mask = fwd_results["obj_mask"]
-        region_emb = fwd_results["region_mmt_in"]
-        region_mask = fwd_results["region_mask"]
         ocr_emb = fwd_results["ocr_mmt_in"]
         ocr_mask = fwd_results["ocr_mask"]
 
-        encoder_inputs = torch.cat([txt_emb, obj_emb, region_emb, ocr_emb], dim=1)
-        attention_mask = torch.cat([txt_mask, obj_mask, region_mask, ocr_mask], dim=1)
+        encoder_inputs = torch.cat([txt_emb, obj_emb, ocr_emb], dim=1)
+        attention_mask = torch.cat([txt_mask, obj_mask, ocr_mask], dim=1)
 
         # offsets of each modality in the joint embedding space
         txt_max_num = txt_mask.size(-1)
         obj_max_num = obj_mask.size(-1)
-        region_max_num = region_mask.size(-1)
         ocr_max_num = ocr_mask.size(-1)
-        ocr_begin = txt_max_num + obj_max_num + region_max_num
+        ocr_begin = txt_max_num + obj_max_num
         ocr_end = ocr_begin + ocr_max_num
 
         # generate the attention mask similar to prefix LM
@@ -283,7 +252,7 @@ class MMF_IterativeM4C(nn.Module):
             self._forward_output(items, fwd_results)
         else:
             # greedy decoding at test time
-            fwd_results["prev_inds"] = torch.zeros((items.batch_size, 1)).long().to(self.device)
+            fwd_results["prev_inds"] = torch.zeros((items.batch_size, self.max_iter)).long().to(self.device)
             fwd_results["prev_inds"][:, 0] = self.vocab.bos_idx
             last_ids = torch.zeros((items.batch_size, )).to(self.device)
             for ith in range(self.max_iter):

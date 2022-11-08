@@ -81,6 +81,8 @@ class MMF_REGIONAL_M4C(MMF_M4C):
             txt_mask=fwd_results["txt_mask"],
             obj_emb=fwd_results["obj_mmt_in"],
             obj_mask=fwd_results["obj_mask"],
+            region_emb=fwd_results["region_mmt_in"],
+            region_mask=fwd_results["region_mask"],
             ocr_emb=fwd_results["ocr_mmt_in"],
             ocr_mask=fwd_results["ocr_mask"],
             fixed_ans_emb=self.classifier.weight,

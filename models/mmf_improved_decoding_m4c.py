@@ -18,7 +18,7 @@ from builders.model_builder import META_ARCHITECTURE
 logger = setup_logger()
 
 @META_ARCHITECTURE.register()
-class MMF_M4C(nn.Module):
+class MMF_ImprovedDecodingM4C(nn.Module):
     '''
         This is the original version of M4C method copied directly from https://github.com/ronghanghu/mmf
     '''

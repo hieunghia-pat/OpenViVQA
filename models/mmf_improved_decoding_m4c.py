@@ -212,13 +212,13 @@ class MMF_ImprovedDecodingM4C(nn.Module):
             self._forward_mmt(items, fwd_results)
             self._forward_output(items, fwd_results)
         else:
-            # fill prev_inds with bos_idx at index 0, and zeros elsewhere
-            fwd_results["prev_inds"] = torch.zeros((items.batch_size, self.max_iter)).long().to(self.device)
+            # fill prev_inds with bos_idx at index 0, and padding index elsewhere
+            fwd_results["prev_inds"] = torch.zeros((items.batch_size, self.max_iter)).long().to(self.device).fill_(self.vocab.padding_idx)
             fwd_results["prev_inds"][:, 0] = self.vocab.bos_idx
 
             # greedy decoding at test time
             last_ids = torch.zeros((items.batch_size, )).to(self.device)
-            for ith in range(self.max_iter):
+            for ith in range(1, self.max_iter+1):
                 self._forward_mmt(items, fwd_results)
                 self._forward_output(items, fwd_results)
 
@@ -226,8 +226,9 @@ class MMF_ImprovedDecodingM4C(nn.Module):
                 # or an OCR), and add it to prev_inds for auto-regressive
                 # decoding
                 argmax_inds = fwd_results["scores"].argmax(dim=-1)
+                fwd_results["prev_inds"][:, 1:] = argmax_inds[:, :-1]
                 # different from orifinal code, this improved implemetation does not allow step after ith iterator to attend in previous indices
-                fwd_results["prev_inds"][:, 1:] = argmax_inds[:, :ith]
+                fwd_results["prev_inds"][:, ith+1:] = self.vocab.padding_idx
                 
                 # whether or not to interrupt the decoding process
                 last_ids = torch.where(last_ids == self.vocab.eos_idx, last_ids, argmax_inds[:, ith])

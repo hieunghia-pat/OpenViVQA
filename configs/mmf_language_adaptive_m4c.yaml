@@ -3,7 +3,7 @@ TASK: TrainingMMF
 DATASET:
   FEATURE_DATASET:
     TYPE: OcrFeatureDataset
-    BATCH_SIZE: 64
+    BATCH_SIZE: 4
     WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
@@ -91,11 +91,11 @@ MODEL:
     NUM_HIDDEN_LAYERS: 4
     NUM_ATTENTION_HEADS: 8
   TEXT_BERT:
-    HIDDEN_SIZE: 512
+    D_LANGUAGE: 768
+    DEVICE: cuda
     NUM_HIDDEN_LAYERS: 4
     NUM_ATTENTION_HEADS: 8
-    LOAD_PRETRAINED: False
-    PRETRAINED_NAME: "bert-base-uncased"
+    PRETRAINED_NAME: "vinai/phobert-base"
   TEXT_EMBEDDING:
     ARCHITECTURE: UsualEmbedding
     DEVICE: cuda

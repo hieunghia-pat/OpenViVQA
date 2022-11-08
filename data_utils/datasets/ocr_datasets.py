@@ -93,7 +93,7 @@ class OcrFeatureDataset(FeatureDataset):
             image_id=item["image_id"],
             filename=item["filename"],
             ocr_tokens=ocr_tokens,
-            question=question,
+            question=" ".join(question),
             question_tokens=question_tokens,
             answer=answer,
             answer_tokens=answer_tokens,
@@ -181,7 +181,7 @@ class OcrDictionaryDataset(DictionaryDataset):
             image_id=image_id,
             filename=filename,
             ocr_tokens=ocr_tokens,
-            question=question,
+            question=" ".join(question),
             question_tokens=question_tokens,
             answers=answers
         )

@@ -54,6 +54,7 @@ class MMF_LanguageAdaptiveM4C(nn.Module):
             )
         else:
             self.text_bert_out_linear = nn.Identity()
+        self.text_bert_dropout = nn.Dropout(self.config.TEXT_BERT.DROPOUT)
 
     def _build_obj_encoding(self):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
@@ -159,7 +160,7 @@ class MMF_LanguageAdaptiveM4C(nn.Module):
     def _forward_mmt(self, items, fwd_results):
         # first forward the text BERT layers
         text_bert_out, txt_mask = self.text_bert(txt_str=fwd_results["txt_str"])
-        fwd_results["txt_emb"] = self.text_bert_out_linear(text_bert_out)
+        fwd_results["txt_emb"] = self.text_bert_dropout(self.text_bert_out_linear(text_bert_out))
         fwd_results["txt_mask"] = txt_mask
 
         mmt_results = self.mmt(

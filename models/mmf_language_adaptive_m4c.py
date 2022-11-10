@@ -2,7 +2,11 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch import nn
-from transformers.models.bert.modeling_bert import BertConfig
+from transformers.models.bert.modeling_bert import (
+    BertConfig, 
+    BertEncoder,
+    BertPreTrainedModel
+)
 from transformers import AutoModel, AutoTokenizer
 
 from utils.logging_utils import setup_logger
@@ -38,23 +42,10 @@ class MMF_LanguageAdaptiveM4C(nn.Module):
         self._build_output()
 
     def _build_txt_encoding(self):
-        TEXT_BERT_HIDDEN_SIZE = self.config.TEXT_BERT.D_LANGUAGE
-        self.text_bert = PretrainedAdaptiveTextBert(self.config.TEXT_BERT)
-
-        # if the text bert output dimension doesn't match the
-        # multimodal transformer (mmt) hidden dimension,
-        # add a linear projection layer between the two
-        if self.mmt_config.hidden_size != TEXT_BERT_HIDDEN_SIZE:
-            logger.info(
-                f"Projecting text_bert output to {self.mmt_config.hidden_size} dim"
-            )
-
-            self.text_bert_out_linear = nn.Linear(
-                self.config.TEXT_BERT.D_LANGUAGE, self.mmt_config.hidden_size
-            )
-        else:
-            self.text_bert_out_linear = nn.Identity()
-        self.text_bert_dropout = nn.Dropout(self.config.TEXT_BERT.DROPOUT)
+        self.text_bert_config = BertConfig(hidden_size=self.config.TEXT_BERT.HIDDEN_SIZE,
+                                            num_hidden_layers=self.config.TEXT_BERT.NUM_HIDDEN_LAYERS,
+                                            num_attention_heads=self.config.MMT.NUM_ATTENTION_HEADS)
+        self.text_bert = PretrainedAdaptiveTextBert(self.text_bert_config, self.config.TEXT_BERT.PRETRAINED_NAME, self.config.TEXT_BERT.D_LANGUAGE)
 
     def _build_obj_encoding(self):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
@@ -112,7 +103,10 @@ class MMF_LanguageAdaptiveM4C(nn.Module):
         return results
 
     def _forward_txt_encoding(self, items, fwd_results):
-        fwd_results["txt_str"] = items.question
+        question_str = items.question
+        txt_emb, txt_mask = self.text_bert(question_str)
+        fwd_results["txt_emb"] = txt_emb
+        fwd_results["txt_mask"] = txt_mask
 
     def _forward_obj_encoding(self, items, fwd_results):
         # object appearance feature
@@ -158,11 +152,6 @@ class MMF_LanguageAdaptiveM4C(nn.Module):
         fwd_results["ocr_mask"] = _get_mask(ocr_nums, ocr_mmt_in.size(1))
 
     def _forward_mmt(self, items, fwd_results):
-        # first forward the text BERT layers
-        text_bert_out, txt_mask = self.text_bert(txt_str=fwd_results["txt_str"])
-        fwd_results["txt_emb"] = self.text_bert_dropout(self.text_bert_out_linear(text_bert_out))
-        fwd_results["txt_mask"] = txt_mask
-
         mmt_results = self.mmt(
             txt_emb=fwd_results["txt_emb"],
             txt_mask=fwd_results["txt_mask"],
@@ -212,21 +201,51 @@ class MMF_LanguageAdaptiveM4C(nn.Module):
                 if last_ids.mean() == self.vocab.eos_idx:
                     break
 
-class PretrainedAdaptiveTextBert(nn.Module):
-    def __init__(self, config):
-        super().__init__()
+class PretrainedAdaptiveTextBert(BertPreTrainedModel):
+    def __init__(self, config, pretrained_name: str, pretrained_dim: int):
+        super().__init__(config)
 
-        self.device = config.DEVICE
-
-        self.pretrained_model = AutoModel.from_pretrained(config.PRETRAINED_NAME)
-        for param in self.pretrained_model.parameters():
+        self.pretrained_tokenizer = AutoTokenizer.from_pretrained(pretrained_name)
+        # embedding layer is the pretrained language model
+        self.embedding = AutoModel.from_pretrained(pretrained_name)
+        # freeze the pretrained language model
+        for param in self.embedding.parameters():
             param.require_grad = False
-        self.pretrained_tokenizer = AutoTokenizer.from_pretrained(config.PRETRAINED_NAME)
+
+        TEXT_BERT_HIDDEN_SIZE = pretrained_dim
+        # if the text bert output dimension doesn't match the
+        # multimodal transformer (mmt) hidden dimension,
+        # add a linear projection layer between the two
+        if self.config.hidden_size != TEXT_BERT_HIDDEN_SIZE:
+            logger.info(
+                f"Projecting text_bert output to {self.config.hidden_size} dim"
+            )
+
+            self.text_bert_out_linear = nn.Linear(
+                TEXT_BERT_HIDDEN_SIZE, self.config.hidden_size
+            )
+        else:
+            self.text_bert_out_linear = nn.Identity()
+
+        # fine tuning layer
+        self.encoder = BertEncoder(config)
+        self.init_weights()
 
     def forward(self, txt_str):
         tokenizer_outputs = self.pretrained_tokenizer(txt_str, return_tensors='pt', padding=True)
         txt_inds = tokenizer_outputs["input_ids"].to(self.device)
-        txt_mask = tokenizer_outputs["attention_mask"].to(self.device)
-        encoder_inputs = self.pretrained_model(txt_inds).last_hidden_state
+        attention_mask = tokenizer_outputs["attention_mask"].to(self.device)
 
-        return encoder_inputs, txt_mask
+        encoder_inputs = self.embedding(txt_inds).last_hidden_state
+        encoder_inputs = self.text_bert_out_linear(encoder_inputs)
+
+        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        assert not extended_attention_mask.requires_grad
+        head_mask = [None] * self.config.num_hidden_layers
+
+        encoder_outputs = self.encoder(
+            encoder_inputs, extended_attention_mask, head_mask=head_mask
+        )[0]
+
+        return encoder_outputs, attention_mask

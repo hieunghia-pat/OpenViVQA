@@ -64,12 +64,13 @@ TRAINING:
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: MMF_LanguageAdaptiveM4C
-  NAME: mmf_language_adaptive_m4c_x152++_faster_rcnn
+  ARCHITECTURE: MMF_Iterative_Multilevel_M4C
+  NAME: mmf_multilevel_iterative_m4c_x152++_faster_rcnn
   DEVICE: cuda
   D_MODEL: 512
   OBJECT_EMBEDDING:
     D_FEATURE: 1024
+    D_MODEL: 512
     DROPOUT: .1
   BOX_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
@@ -78,31 +79,29 @@ MODEL:
     D_MODEL: 512
     DROPOUT: .1
   OCR_TEXT_EMBEDDING:
+    D_MODEL: 512
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   OCR_EMBEDDING:
+    D_MODEL: 512
     D_FEATURE: 812 # 256 (det features) + 256 (rec features) + 300 (fasttext)
     DROPOUT: .1
   OCR_PTR_NET:
     HIDDEN_SIZE: 512
     QUERY_KEY_SIZE: 512
-  MMT:
-    HIDDEN_SIZE: 512
-    NUM_HIDDEN_LAYERS: 4
-    NUM_ATTENTION_HEADS: 8
-  TEXT_BERT:
-    D_LANGUAGE: 768
-    HIDDEN_SIZE: 512
-    DEVICE: cuda
-    NUM_HIDDEN_LAYERS: 4
-    NUM_ATTENTION_HEADS: 8
-    PRETRAINED_NAME: "vinai/phobert-base"
-    DROPOUT: .1
-  TEXT_EMBEDDING:
-    ARCHITECTURE: UsualEmbedding
-    DEVICE: cuda
-    D_EMBEDDING: 300
+  ENCODER:
     D_MODEL: 512
-    DROPOUT: .1
-    WORD_EMBEDDING: null
-    WORD_EMBEDDING_CACHE: null  
+    LAYERS: 4
+    HEAD: 8
+    DROPOUT: 0.1
+  DECODER:
+    D_MODEL: 512
+    LAYERS: 4
+    HEAD: 8
+    DROPOUT: 0.1
+  TEXT_BERT:
+    HIDDEN_SIZE: 512
+    NUM_HIDDEN_LAYERS: 4
+    NUM_ATTENTION_HEADS: 8
+    LOAD_PRETRAINED: False
+    PRETRAINED_NAME: "bert-base-uncased"

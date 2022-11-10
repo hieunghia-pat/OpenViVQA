@@ -3,7 +3,7 @@ TASK: TrainingMMF
 DATASET:
   FEATURE_DATASET:
     TYPE: OcrFeatureDataset
-    BATCH_SIZE: 4
+    BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn

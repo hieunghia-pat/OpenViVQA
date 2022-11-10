@@ -15,27 +15,51 @@ class MultiLevelBertDecoder(BertEncoder):
     """
         Redefined the BertEncoder to use with multi-level encoder outputs
     """
+    def __init__(self, config):
+        super().__init__(config)
+
+        self.prev_pred_embeddings = PrevPredEmbeddings(config)
+
     def forward(
         self,
-        hidden_states: torch.Tensor,
-        attention_mask: Optional[torch.FloatTensor] = None,
-        head_mask: Optional[torch.FloatTensor] = None,
-        encoder_hidden_states: Optional[List[torch.FloatTensor]] = None,
-        encoder_attention_mask: Optional[List[torch.FloatTensor]] = None,
+        items,
+        fwd_results,
         past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = False,
         output_hidden_states: Optional[bool] = False,
         return_dict: Optional[bool] = True,
     ) -> Union[Tuple[torch.Tensor], BaseModelOutputWithPastAndCrossAttentions]:
+
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
         all_cross_attentions = () if output_attentions and self.config.add_cross_attention else None
+
+        # build embeddings for predictions in previous decoding steps
+        # fixed_ans_emb is an embedding lookup table for each fixed vocabulary
+        fixed_ans_emb = fwd_results["fixed_ans_emb"]
+        ocr_emb = fwd_results["ocr_mmt_in"]
+        prev_inds = fwd_results["prev_inds"]
+        hidden_states = self.prev_pred_embeddings(fixed_ans_emb, ocr_emb, prev_inds)
+        # a zero mask for decoding steps, so the encoding steps elements can't
+        # attend to decoding steps.
+        # A triangular causal mask will be filled for the decoding steps
+        # later in extended_attention_mask
+        dec_max_num = hidden_states.shape[1]
+        attention_mask = _get_causal_mask(
+            dec_max_num, ocr_emb.device
+        ).unsqueeze(0).unsqueeze(1)
+        # flip the mask, so that invalid attention pairs have -10000.
+        attention_mask = (1. - attention_mask) * -10e4
+        head_mask = [None] * self.config.num_hidden_layers
 
         next_decoder_cache = () if use_cache else None
         for i, layer_module in enumerate(self.layer):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
+
+            encoder_hidden_states = fwd_results["mmt_encoder_outputs"][i]
+            encoder_attention_mask = fwd_results["mmt_encoder_mask"]
 
             layer_head_mask = head_mask[i] if head_mask is not None else None
             past_key_value = past_key_values[i] if past_key_values is not None else None
@@ -105,7 +129,7 @@ class MultiLevelBertDecoder(BertEncoder):
         )
 
 @META_ARCHITECTURE.register()
-class MMF_IterativeM4C(nn.Module):
+class MMF_Iterative_Multilevel_M4C(nn.Module):
     def __init__(self, config, vocab):
         super().__init__()
         self.vocab = vocab
@@ -187,8 +211,7 @@ class MMF_IterativeM4C(nn.Module):
             is_decoder=True,
             hidden_dropout_prob=config.DROPOUT
         )
-        self.prev_pred_embeddings = PrevPredEmbeddings(self.decoder_config)
-        self.decoder = BertEncoder(self.decoder_config)
+        self.decoder = MultiLevelBertDecoder(self.decoder_config)
 
     def forward(self, items):
         # fwd_results holds intermediate forward pass results
@@ -289,44 +312,17 @@ class MMF_IterativeM4C(nn.Module):
 
         encoder_outputs = self.encoder(
             encoder_inputs, extended_attention_mask, 
-            head_mask=head_mask, output_hidden_states=False,
-            return_dict=False
-        ).hidden_states
+            head_mask=head_mask, output_hidden_states=True
+        ).hidden_states[1:]
 
         mmt_encoder_outputs = encoder_outputs
-
         fwd_results["mmt_encoder_outputs"] = mmt_encoder_outputs
-        # keep the offset in order that we can extract ocr features from each-layer output
-        fwd_results["ocr_begin"] = ocr_begin
-        fwd_results["ocr_end"] = ocr_end
+        fwd_results["mmt_encoder_mask"] = extended_attention_mask
+        # only use the ocr features of the last encoder layer to produce the output
+        fwd_results["mmt_ocr_output"] = mmt_encoder_outputs[-1][:, ocr_begin:ocr_end]
 
     def _forward_decoder(self, items, fwd_results):
-        # build embeddings for predictions in previous decoding steps
-        # fixed_ans_emb is an embedding lookup table for each fixed vocabulary
-        fixed_ans_emb = fwd_results["fixed_ans_emb"]
-        ocr_emb = fwd_results["ocr_mmt_in"]
-        prev_inds = fwd_results["prev_inds"]
-        dec_emb = self.prev_pred_embeddings(fixed_ans_emb, ocr_emb, prev_inds)
-        # a zero mask for decoding steps, so the encoding steps elements can't
-        # attend to decoding steps.
-        # A triangular causal mask will be filled for the decoding steps
-        # later in extended_attention_mask
-        dec_max_num = dec_emb.shape[1]
-        dec_mask = _get_causal_mask(
-            dec_max_num, ocr_emb.device
-        ).unsqueeze(0).unsqueeze(1)
-        # flip the mask, so that invalid attention pairs have -10000.
-        dec_mask = (1. - dec_mask) * -10e4
-        head_mask = [None] * self.decoder_config.num_hidden_layers
-
-        decoder_outputs = self.decoder(
-            hidden_states=dec_emb,
-            attention_mask=dec_mask,
-            encoder_hidden_states=fwd_results["mmt_encoder_output"],
-            encoder_attention_mask=fwd_results["mmt_encoder_mask"],
-            head_mask=head_mask
-        )[0]
-
+        decoder_outputs = self.decoder(items, fwd_results)[0]
         fwd_results["mmt_dec_output"] = decoder_outputs
 
     def _forward_output(self, items, fwd_results):

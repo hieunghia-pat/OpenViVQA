@@ -8,7 +8,6 @@ from .unique_transformer import UniqueTransformer
 from .m4c import M4C
 from .mmf_iterative_m4c import MMF_IterativeM4C
 from .mmf_m4c import MMF_M4C
-from .mmf_improved_decoding_m4c import MMF_ImprovedDecodingM4C
 from .mmf_language_adaptive_m4c import MMF_LanguageAdaptiveM4C
 from .mmf_regional_m4c import MMF_REGIONAL_M4C
 from .mmf_lorra import MMF_LoRRA

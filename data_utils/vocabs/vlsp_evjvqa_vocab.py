@@ -11,12 +11,12 @@ class VlspEvjVqaVocab(MultilingualVocab):
     '''
     
     def __init__(self, config) -> None:
-        self.tokenizer = config.VOCAB.TOKENIZER
+        self.tokenizer = config.TOKENIZER
 
-        self.padding_token = config.VOCAB.PAD_TOKEN
-        self.bos_token = config.VOCAB.BOS_TOKEN
-        self.eos_token = config.VOCAB.EOS_TOKEN
-        self.unk_token = config.VOCAB.UNK_TOKEN
+        self.padding_token = config.PAD_TOKEN
+        self.bos_token = config.BOS_TOKEN
+        self.eos_token = config.EOS_TOKEN
+        self.unk_token = config.UNK_TOKEN
 
         self.make_vocab([
             config.JSON_PATH.TRAIN,
@@ -53,5 +53,5 @@ class VlspEvjVqaVocab(MultilingualVocab):
         self.unk_idx = self.stoi[self.unk_token]
 
         self.word_embeddings = None
-        if config.VOCAB.WORD_EMBEDDING is not None:
+        if config.WORD_EMBEDDING is not None:
             self.load_word_embeddings(build_word_embedding(config))

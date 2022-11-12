@@ -1,0 +1,1 @@
+python3 filter_results.py && python3 evaluate_metrics.py private_test private_test

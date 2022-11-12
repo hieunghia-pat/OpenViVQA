@@ -2,7 +2,7 @@
 features
 saved_models
 images
-
+*_test
 __pycache__
 
 examine*

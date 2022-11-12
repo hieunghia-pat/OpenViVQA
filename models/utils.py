@@ -66,11 +66,11 @@ def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
     return subsequent_mask.unsqueeze(0).unsqueeze(0) # (1, 1, seq_len, seq_len)
 
 def generate_self_attention_masks(padding_masks: torch.Tensor, sequential_masks: torch.Tensor):
-    return torch.logical_or(padding_masks, sequential_masks)
-
-def generate_cross_attention_masks(trg_masks: torch.Tensor, src_masks: torch.Tensor):
-    trg_masks = trg_masks.squeeze(-2).unsqueeze(-1)
-    return torch.logical_or(trg_masks, src_masks)
+    padding_masks = padding_masks != 0
+    sequential_masks = sequential_masks != 0
+    self_attention_masks = torch.logical_or(padding_masks, sequential_masks).long() * -10e4
+    
+    return self_attention_masks
 
 def get_relative_pos(x, norm_len):
     x = x.view(-1, 1)

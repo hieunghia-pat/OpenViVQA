@@ -4,14 +4,14 @@ DATASET:
   FEATURE_DATASET:
     TYPE: RawQuestionMultilingualFeatureDataset
     BATCH_SIZE: 60
-    WORKERS: 0
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/EVJVQA/vit
       IMAGE: null
   DICT_DATASET:
     TYPE: RawQuestionMultilingualDictionaryDataset
     BATCH_SIZE: 60
-    WORKERS: 0
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/EVJVQA/vit
       IMAGE: null
@@ -19,6 +19,7 @@ DATASET:
   VOCAB:
     TYPE: VlspEvjVqaVocab
     TOKENIZER: null
+    MIN_FREQ: 5
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
     BOS_TOKEN: <bos>

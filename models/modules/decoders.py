@@ -23,7 +23,7 @@ class DecoderLayer(Module):
         enc_att = self.enc_attn(self_att, keys, values, padding_mask=self_padding_mask, attention_mask=enc_attention_mask, **kwargs)
 
         ff = self.pwff(enc_att)
-        ff = ff.masked_fill(self_padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
+        ff = ff.masked_fill(self_padding_mask.squeeze(1).squeeze(1).unsqueeze(-1) != 0, value=0)
         
         return ff
 
@@ -58,7 +58,7 @@ class Decoder(Module):
             answer_self_attention_masks = self.running_mask_self_attention
 
         seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(answer_tokens.device)  # (b_s, seq_len)
-        seq = seq.masked_fill(answer_padding_masks.squeeze(1).squeeze(1), 0)
+        seq = seq.masked_fill(answer_padding_masks.squeeze(1).squeeze(1) != 0, 0)
         if self._is_stateful:
             self.running_seq.add_(1)
             seq = self.running_seq
@@ -111,7 +111,7 @@ class AdaptiveDecoder(Module):
             answer_self_attention_masks = self.running_mask_self_attention
 
         seq = torch.arange(1, seq_len + 1).view(1, -1).expand(b_s, -1).to(answer_tokens.device)  # (b_s, seq_len)
-        seq = seq.masked_fill(answer_padding_masks, 0)
+        seq = seq.masked_fill(answer_padding_masks != 0, 0)
         if self._is_stateful:
             self.running_seq.add_(1)
             seq = self.running_seq

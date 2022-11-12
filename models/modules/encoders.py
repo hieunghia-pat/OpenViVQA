@@ -15,7 +15,6 @@ class EncoderLayer(nn.Module):
     def forward(self, queries, keys, values, padding_mask, attention_mask, **kwargs):
         att = self.mhatt(queries=queries, keys=keys, values=values, padding_mask=padding_mask, attention_mask=attention_mask, **kwargs)
         ff = self.pwff(att)
-        ff = ff.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
 
         return ff
 
@@ -102,7 +101,6 @@ class GuidedEncoderLayer(nn.Module):
                                     )
 
         ff = self.pwff(guided_att)
-        ff = ff.masked_fill(self_padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
 
         return ff
 

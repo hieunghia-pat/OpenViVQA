@@ -316,7 +316,7 @@ class MultiHeadAttention(Module):
             self.register_state('running_keys', torch.zeros((0, d_model)))
             self.register_state('running_values', torch.zeros((0, d_model)))
 
-    def forward(self, queries, keys, values, padding_mask, attention_mask, **kwargs):
+    def forward(self, queries, keys, values, attention_mask, **kwargs):
         if self.can_be_stateful and self._is_stateful:
             self.running_keys = torch.cat([self.running_keys, keys], 1)
             keys = self.running_keys
@@ -325,7 +325,6 @@ class MultiHeadAttention(Module):
             values = self.running_values
 
         out, _ = self.attention(queries, keys, values, attention_mask, **kwargs)
-        out = out.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
         
         # normalization after residual connection
         out = self.dropout(out)
@@ -336,6 +335,5 @@ class MultiHeadAttention(Module):
             i = self.informative_attention(aoa_input)
             g = torch.sigmoid(self.gated_attention(aoa_input))
             out = i * g
-            out = out.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
             
         return out

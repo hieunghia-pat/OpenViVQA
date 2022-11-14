@@ -71,40 +71,6 @@ class CrossModalityEncoderLayer(nn.Module):
 
         return vision_attn, language_attn
 
-class SimpleCrossModalityEncoderLayer(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        
-        # cross-attention modules
-        self.vision_language_mhattn = MultiHeadAttention(config.VISION_LANGUAGE_ATTENTION)
-        self.language_vision_mhattn = MultiHeadAttention(config.LANGUAGE_VISION_ATTENTION)
-
-        # pff
-        self.vision_pff = PositionWiseFeedForward(config.VISION_SELF_ATTENTION)
-        self.language_pff = PositionWiseFeedForward(config.LANGUAGE_SELF_ATTENTION)
-
-    def forward(self, vision_features, vision_padding_mask, language_features, language_padding_mask, **kwargs):
-        # perform cross-attention
-        vision_attn = self.vision_language_mhattn(
-            queries=vision_features,
-            keys=language_features,
-            values=language_features,
-            attention_mask=language_padding_mask,
-            **kwargs
-        )
-        language_attn = self.language_vision_mhattn(
-            queries=language_features,
-            keys=vision_features,
-            values=vision_features,
-            attention_mask=vision_padding_mask
-        )
-
-        # perform pff
-        vision_attn = self.vision_pff(vision_attn)
-        language_attn = self.language_pff(language_attn)
-
-        return vision_attn, language_attn
-
 class GuidedEncoderLayer(nn.Module):
     def __init__(self, config):
         super(GuidedEncoderLayer, self).__init__()
@@ -272,32 +238,6 @@ class CrossModalityEncoder(nn.Module):
 
         self.d_model = config.D_MODEL
         self.layers = nn.ModuleList([CrossModalityEncoderLayer(config) for _ in range(config.LAYERS)])
-
-    def forward(self, vision_features: torch.Tensor, vision_padding_mask: torch.Tensor, 
-                language_features: torch.Tensor, language_padding_mask: torch.Tensor):
-        vision_features = self.vision_layer_norm(vision_features) + self.pos_embedding(vision_features)
-        language_features = self.language_layer_norm(language_features) + self.pos_embedding(language_features)
-        for layer in self.layers:
-            vision_features, language_features = layer(
-                vision_features=vision_features,
-                vision_padding_mask=vision_padding_mask,
-                language_features=language_features,
-                language_padding_mask=language_padding_mask
-            )
-
-        return vision_features, language_features
-
-@META_ENCODER.register()
-class SimpleCrossModalityEncoder(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-
-        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL)
-        self.vision_layer_norm = nn.LayerNorm(config.D_MODEL)
-        self.language_layer_norm = nn.LayerNorm(config.D_MODEL)
-
-        self.d_model = config.D_MODEL
-        self.layers = nn.ModuleList([SimpleCrossModalityEncoderLayer(config) for _ in range(config.LAYERS)])
 
     def forward(self, vision_features: torch.Tensor, vision_padding_mask: torch.Tensor, 
                 language_features: torch.Tensor, language_padding_mask: torch.Tensor):

@@ -142,3 +142,35 @@ class OcrVocab(Vocab):
                 answers.append(answer.strip().split())
 
         return answers
+
+    def decode_answer_with_determination(self, answer_vecs: torch.Tensor, list_ocr_tokens: List[List[str]], join_words=True) -> List[str]:
+        '''
+            This module is designed to determine if a selected token is in fixed vocab or from ocr token
+            params:
+                - answer_vecs: (bs, max_length)
+        '''
+        ocr_token_of = [{len(self.stoi)+idx: token for idx, token in enumerate(ocr_tokens)} for ocr_tokens in list_ocr_tokens]
+        answers = []
+        in_fixed_vocab = []
+        for batch, vec in enumerate(answer_vecs):
+            answer = []
+            in_fixed_vocab_per_batch = []
+            for idx in vec.tolist():
+                if idx in ocr_token_of[batch]:
+                    word = ocr_token_of[batch][idx]
+                    in_fixed_vocab_per_batch.append(False)
+                else:
+                    word = self.itos[idx]
+                    in_fixed_vocab_per_batch.append(True)
+                if word == self.eos_token:
+                    break
+                if word not in self.specials:
+                    answer.append(word)
+            answer = " ".join(answer)
+            if join_words:
+                answers.append(answer)
+            else:
+                answers.append(answer.strip().split())
+            in_fixed_vocab.append(in_fixed_vocab_per_batch)
+
+        return answers, in_fixed_vocab

@@ -43,7 +43,7 @@ class CrossModalityEncoderLayer(nn.Module):
             attention_mask=language_padding_mask,
             **kwargs
         )
-        language_attn = self.language_mhattn(
+        language_attn = self.language_vision_mhattn(
             queries=language_features,
             keys=vision_features,
             values=vision_features,
@@ -73,7 +73,7 @@ class CrossModalityEncoderLayer(nn.Module):
 
 class SimpleCrossModalityEncoderLayer(nn.Module):
     def __init__(self, config):
-        super(CrossModalityEncoderLayer, self).__init__()
+        super().__init__()
         
         # cross-attention modules
         self.vision_language_mhattn = MultiHeadAttention(config.VISION_LANGUAGE_ATTENTION)
@@ -92,7 +92,7 @@ class SimpleCrossModalityEncoderLayer(nn.Module):
             attention_mask=language_padding_mask,
             **kwargs
         )
-        language_attn = self.language_mhattn(
+        language_attn = self.language_vision_mhattn(
             queries=language_features,
             keys=vision_features,
             values=vision_features,
@@ -290,7 +290,7 @@ class CrossModalityEncoder(nn.Module):
 @META_ENCODER.register()
 class SimpleCrossModalityEncoder(nn.Module):
     def __init__(self, config):
-        super(CrossModalityEncoder, self).__init__()
+        super().__init__()
 
         self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL)
         self.vision_layer_norm = nn.LayerNorm(config.D_MODEL)

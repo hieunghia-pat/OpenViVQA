@@ -1,13 +1,28 @@
 import torch
+from torch import nn
+from torch.nn import functional as F
 
 from .base_transformer import BaseTransformer
-from utils.instance import Instance
-from models.modules.encoders import EncoderLayer
+from utils.instance import InstanceList
 from builders.encoder_builder import build_encoder
-from builders.decoder_builder import build_decoder
 from builders.text_embedding_builder import build_text_embedding
 from builders.vision_embedding_builder import build_vision_embedding
 from builders.model_builder import META_ARCHITECTURE
+
+class MLP(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+
+        self.fc1 = nn.Linear(config.D_MODEL, config.D_MODEL)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(config.DROPOUT)
+        self.fc2 = nn.Linear(config.D_MODEL, 1)
+
+    def forward(self, features: torch.Tensor):
+        output = self.dropout(self.relu(self.fc1(features)))
+        output = self.fc2(output)
+
+        return output
 
 @META_ARCHITECTURE.register()
 class CrossModalityTransformer(BaseTransformer):
@@ -25,22 +40,17 @@ class CrossModalityTransformer(BaseTransformer):
         self.text_embedding = build_text_embedding(config.TEXT_EMBEDDING, vocab)
 
         self.encoder = build_encoder(config.ENCODER)
-        self.fusion = EncoderLayer(config.MULTIMODAL_FUSION)
-        self.decoder = build_decoder(config.DECODER, vocab=vocab)
+        
+        self.vision_attr_reduce = MLP(config.VISION_ATTR_REDUCE)
+        self.text_attr_reduce = MLP(config.TEXT_ATTR_REDUCE)
 
-    def forward(self, input_features: Instance):
-        encoder_features, encoder_padding_mask = self.encoder_forward(input_features)
+        self.vision_proj = nn.Linear(config.D_MODEL, config.D_MODEL)
+        self.text_proj = nn.Linear(config.D_MODEL, config.D_MODEL)
+        self.layer_norm = nn.LayerNorm(config.D_MODEL)
 
-        answer_tokens = input_features.answer_tokens
-        output = self.decoder(
-            answer_tokens=answer_tokens,
-            encoder_features=encoder_features,
-            encoder_attention_mask=encoder_padding_mask
-        )
-
-        return output
-
-    def encoder_forward(self, input_features: Instance):
+        self.classify = nn.Linear(config.D_MODEL, vocab.total_answers)
+        
+    def forward(self, input_features: InstanceList):
         region_features = input_features.region_features
         region_features, region_padding_mask = self.region_embedding(region_features)
         region_feat_tokens = torch.ones((region_features.shape[0], region_features.shape[1])).long().to(region_features.device) * self.vocab.feat_idx
@@ -72,7 +82,7 @@ class CrossModalityTransformer(BaseTransformer):
         text_features, (text_padding_mask, _) = self.text_embedding(question_tokens)
 
         # Cross-Modality attention
-        vision_features, language_features = self.encoder(
+        vision_features, text_features = self.encoder(
             vision_features=vision_features,
             vision_padding_mask=vision_padding_mask,
             boxes=input_features.boxes,
@@ -81,13 +91,15 @@ class CrossModalityTransformer(BaseTransformer):
         )
 
         # Multimodal fusion
-        encoder_features = self.fusion(
-            queries=vision_features,
-            keys=language_features,
-            values=language_features,
-            padding_mask=vision_padding_mask,
-            attention_mask=text_padding_mask
-        )
-        encoder_padding_mask = vision_padding_mask
+        attended_vision_features = self.vision_attr_reduce(vision_features)
+        attended_vision_features = F.softmax(attended_vision_features, dim=1)
+        attended_text_features = self.text_attr_reduce(text_features)
+        attended_text_features = F.softmax(attended_text_features, dim=1)
 
-        return encoder_features, encoder_padding_mask
+        weighted_vision_features = (vision_features * attended_vision_features).sum(dim=1)
+        weighted_text_features = (text_features * attended_text_features).sum(dim=1)
+
+        output = self.layer_norm(self.vision_proj(weighted_vision_features) + self.text_proj(weighted_text_features))
+        output = self.classify(output)
+
+        return output

@@ -30,6 +30,7 @@ class FeatureClassificationDataset(BaseDataset):
                         question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
                         annotation = {
+                            "id": ann["id"],
                             "question": question,
                             "answer": answer,
                             "image_id": ann["image_id"],

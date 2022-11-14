@@ -79,10 +79,6 @@ class SimpleCrossModalityEncoderLayer(nn.Module):
         self.vision_language_mhattn = MultiHeadAttention(config.VISION_LANGUAGE_ATTENTION)
         self.language_vision_mhattn = MultiHeadAttention(config.LANGUAGE_VISION_ATTENTION)
 
-        # self-attention modules
-        self.vision_mhattn = MultiHeadAttention(config.VISION_SELF_ATTENTION)
-        self.language_mhattn = MultiHeadAttention(config.LANGUAGE_SELF_ATTENTION)
-
         # pff
         self.vision_pff = PositionWiseFeedForward(config.VISION_SELF_ATTENTION)
         self.language_pff = PositionWiseFeedForward(config.LANGUAGE_SELF_ATTENTION)
@@ -101,21 +97,6 @@ class SimpleCrossModalityEncoderLayer(nn.Module):
             keys=vision_features,
             values=vision_features,
             attention_mask=vision_padding_mask
-        )
-
-        # perform self-attention
-        vision_attn = self.vision_mhattn(
-            queries=vision_features,
-            keys=vision_features,
-            values=vision_features,
-            attention_mask=vision_padding_mask,
-            **kwargs
-        )
-        language_attn = self.language_mhattn(
-            queries=language_features,
-            keys=language_features,
-            values=language_features,
-            attention_mask=language_padding_mask
         )
 
         # perform pff
@@ -316,7 +297,7 @@ class SimpleCrossModalityEncoder(nn.Module):
         self.language_layer_norm = nn.LayerNorm(config.D_MODEL)
 
         self.d_model = config.D_MODEL
-        self.layers = nn.ModuleList([CrossModalityEncoderLayer(config) for _ in range(config.LAYERS)])
+        self.layers = nn.ModuleList([SimpleCrossModalityEncoderLayer(config) for _ in range(config.LAYERS)])
 
     def forward(self, vision_features: torch.Tensor, vision_padding_mask: torch.Tensor, 
                 language_features: torch.Tensor, language_padding_mask: torch.Tensor):

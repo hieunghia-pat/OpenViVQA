@@ -53,18 +53,6 @@ MODEL:
     D_FEATURE: 2048
     D_MODEL: 512
     DROPOUT: .1
-  GRID_EMBEDDING:
-    ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
-    D_FEATURE: 1024
-    D_MODEL: 512
-    DROPOUT: .1
-  BOX_EMBEDDING:
-    ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
-    D_FEATURE: 4
-    D_MODEL: 512
-    DROPOUT: .1
   TEXT_EMBEDDING:
     ARCHITECTURE: UsualEmbedding
     DEVICE: cuda

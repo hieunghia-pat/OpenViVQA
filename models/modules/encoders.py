@@ -185,7 +185,7 @@ class CoAttentionEncoder(nn.Module):
         self.vision_self_attn_layers = nn.ModuleList([EncoderLayer(config.VISION_SELF_ATTENTION) for _ in range(config.LAYERS)])
         self.language_self_attn_layers = nn.ModuleList([EncoderLayer(config.LANGUAGE_SELF_ATTENTION) for _ in range(config.LAYERS)])
 
-    def forward(self, vision_features: torch.Tensor, boxes: torch.Tensor, vision_padding_mask: torch.Tensor, 
+    def forward(self, vision_features: torch.Tensor, vision_padding_mask: torch.Tensor, 
                 language_features: torch.Tensor, language_padding_mask: torch.Tensor):
         vision_features = self.vision_layer_norm(vision_features) + self.pos_embedding(vision_features)
         language_features = self.language_layer_norm(language_features) + self.pos_embedding(language_features)
@@ -199,7 +199,6 @@ class CoAttentionEncoder(nn.Module):
                 queries=vision_features,
                 keys=language_features,
                 values=language_features,
-                boxes=boxes,
                 attention_mask=language_padding_mask
             )
             language_features = language_vision_attn_layer(
@@ -214,7 +213,6 @@ class CoAttentionEncoder(nn.Module):
                 queries=vision_features,
                 keys=vision_features,
                 values=vision_features,
-                boxes=boxes,
                 attention_mask=vision_padding_mask
             )
             language_features = language_self_attn_layer(
@@ -241,7 +239,7 @@ class CrossModalityEncoder(nn.Module):
         self.d_model = config.D_MODEL
         self.layers = nn.ModuleList([CrossModalityEncoderLayer(config) for _ in range(config.LAYERS)])
 
-    def forward(self, vision_features: torch.Tensor, boxes: torch.Tensor, vision_padding_mask: torch.Tensor, 
+    def forward(self, vision_features: torch.Tensor, vision_padding_mask: torch.Tensor, 
                 language_features: torch.Tensor, language_padding_mask: torch.Tensor):
         vision_features = self.vision_layer_norm(vision_features) + self.pos_embedding(vision_features)
         language_features = self.language_layer_norm(language_features) + self.pos_embedding(language_features)
@@ -249,7 +247,6 @@ class CrossModalityEncoder(nn.Module):
             vision_features, language_features = layer(
                 vision_features=vision_features,
                 vision_padding_mask=vision_padding_mask,
-                boxes=boxes,
                 language_features=language_features,
                 language_padding_mask=language_padding_mask
             )

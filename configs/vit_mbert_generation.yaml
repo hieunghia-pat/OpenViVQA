@@ -7,14 +7,14 @@ DATASET:
     WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/EVJVQA/vit
-      IMAGE: null
+      IMAGE: features/EVJVQA/images
   DICT_DATASET:
     TYPE: RawQuestionMultilingualDictionaryDataset
     BATCH_SIZE: 60
     WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/EVJVQA/vit
-      IMAGE: null
+      IMAGE: features/EVJVQA/images
   MIN_FREQ: 5
   VOCAB:
     TYPE: VlspEvjVqaVocab

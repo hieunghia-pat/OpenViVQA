@@ -3,7 +3,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from models.modules.attentions import MultiHeadAttention
-from models.utils import generate_padding_mask, generate_sequential_mask, sinusoid_encoding_table
+from models.utils import generate_padding_mask, generate_sequential_mask, generate_self_attention_masks, sinusoid_encoding_table
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.containers import Module, ModuleList
 from builders.decoder_builder import META_DECODER
@@ -50,7 +50,7 @@ class Decoder(Module):
         b_s, seq_len = answer_tokens.shape
         answer_padding_masks = generate_padding_mask(answer_tokens, self.padding_idx).to(answer_tokens.device)
         answer_self_attention_masks = generate_sequential_mask(seq_len).to(answer_tokens.device)
-        answer_self_attention_masks = torch.logical_or(answer_padding_masks, answer_self_attention_masks)
+        answer_self_attention_masks = generate_self_attention_masks(answer_padding_masks, answer_self_attention_masks)
         
         if self._is_stateful:
             self.running_mask_self_attention = torch.cat([self.running_mask_self_attention, answer_self_attention_masks], -1)
@@ -102,7 +102,7 @@ class AdaptiveDecoder(Module):
         b_s, seq_len = answer_tokens.shape
         answer_padding_masks = generate_padding_mask(answer_tokens, self.padding_idx).to(answer_tokens.device)
         answer_self_attention_masks = generate_sequential_mask(seq_len).to(answer_tokens.device)
-        answer_self_attention_masks = torch.logical_or(answer_padding_masks, answer_self_attention_masks)
+        answer_self_attention_masks = generate_self_attention_masks(answer_padding_masks, answer_self_attention_masks)
         
         if self._is_stateful:
             self.running_mask_self_attention = torch.cat([self.running_mask_self_attention, answer_self_attention_masks], -1)

@@ -205,7 +205,6 @@ class CoAttentionEncoder(nn.Module):
                 queries=language_features,
                 keys=vision_features,
                 values=vision_features,
-                padding_mask=language_padding_mask,
                 attention_mask=vision_padding_mask
             )
             # performing self-attention

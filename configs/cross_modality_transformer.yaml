@@ -44,27 +44,42 @@ TRAINING:
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: MCAN
-  NAME: mcan_region_x152++_faster_rcnn
+  ARCHITECTURE: CrossModalityTransformer
+  NAME: cross_modality_transformer
   DEVICE: cuda
-  D_MODEL: 512
-  VISION_EMBEDDING:
+  REGION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
+    DEVICE: cuda
+    D_FEATURE: 2048
+    D_MODEL: 512
+    DROPOUT: .1
+  GRID_EMBEDDING:
+    ARCHITECTURE: FeatureEmbedding
+    DEVICE: cuda
     D_FEATURE: 1024
     D_MODEL: 512
-    DROPOUT: 0.1
+    DROPOUT: .1
+  BOX_EMBEDDING:
+    ARCHITECTURE: FeatureEmbedding
+    DEVICE: cuda
+    D_FEATURE: 4
+    D_MODEL: 512
+    DROPOUT: .1
   TEXT_EMBEDDING:
     ARCHITECTURE: UsualEmbedding
-    D_MODEL: 512
+    DEVICE: cuda
     D_EMBEDDING: 300
-    DROPOUT: 0.1
+    D_MODEL: 512
+    DROPOUT: .1
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
-  SELF_ENCODER:
-    ARCHITECTURE: Encoder
+  D_MODEL: 512
+  DROPOUT: .1
+  ENCODER:
+    ARCHITECTURE: CrossModalityEncoder
     D_MODEL: 512
     LAYERS: 3
-    SELF_ATTENTION:
+    VISION_LANGUAGE_ATTENTION:
       ARCHITECTURE: ScaledDotProductAttention
       HEAD: 8
       D_MODEL: 512
@@ -75,11 +90,7 @@ MODEL:
       USE_AOA: False
       CAN_BE_STATEFUL: False
       DROPOUT: .1
-  GUIDED_ENCODER:
-    ARCHITECTURE: GuidedAttentionEncoder
-    D_MODEL: 512
-    LAYERS: 3
-    SELF_ATTENTION:
+    LANGUAGE_VISION_ATTENTION:
       ARCHITECTURE: ScaledDotProductAttention
       HEAD: 8
       D_MODEL: 512
@@ -90,7 +101,18 @@ MODEL:
       USE_AOA: False
       CAN_BE_STATEFUL: False
       DROPOUT: .1
-    GUIDED_ATTENTION:
+    VISION_SELF_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+    LANGUAGE_SELF_ATTENTION:
       ARCHITECTURE: ScaledDotProductAttention
       HEAD: 8
       D_MODEL: 512

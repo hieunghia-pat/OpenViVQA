@@ -184,7 +184,7 @@ class TrainingMMF(OpenEndedTask):
                 outs = result["scores"].argmax(dim=-1)
 
                 answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length),
+                answers_gen, in_fixed_vocab = self.vocab.decode_answer_with_determination(outs.contiguous().view(-1, self.vocab.max_answer_length),
                                                         items.ocr_tokens, join_words=False)
                 gts = {}
                 gens = {}
@@ -201,7 +201,8 @@ class TrainingMMF(OpenEndedTask):
                     "image_id": items.image_id,
                     "filename": items.filename,
                     "gens": gens,
-                    "gts": gts
+                    "gts": gts,
+                    "in_fixed_vocab": in_fixed_vocab
                 })
 
                 pbar.update()

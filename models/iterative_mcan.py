@@ -11,7 +11,7 @@ from builders.vision_embedding_builder import build_vision_embedding
 from builders.model_builder import META_ARCHITECTURE
 
 @META_ARCHITECTURE.register()
-class IterativeMCAN(BaseTransformer):
+class ReadableIterativeMCAN(BaseTransformer):
     def __init__(self, config, vocab):
         super().__init__(config, vocab)
 

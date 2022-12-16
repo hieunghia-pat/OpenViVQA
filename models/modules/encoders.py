@@ -109,7 +109,7 @@ class Encoder(nn.Module):
         self.d_model = config.D_MODEL
         self.layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
 
-    def forward(self, features: torch.Tensor, padding_mask: torch.Tensor):        
+    def forward(self, features: torch.Tensor, padding_mask: torch.Tensor):
         out = self.layer_norm(features) + self.pos_embedding(features)
         for layer in self.layers:
             out = layer(queries=out, keys=out, values=out, attention_mask=padding_mask)

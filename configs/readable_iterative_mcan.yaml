@@ -64,14 +64,14 @@ TRAINING:
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: IterativeMCAN
+  ARCHITECTURE: ReadableIterativeMCAN
   NAME: readable_iterative_mcan_region_x152++_faster_rcnn
   DEVICE: cuda
   D_MODEL: 512
   VISION_EMBEDDING:
     ARCHITECTURE: VisionOcrEmbedding
     D_OBJ_FEATURE: 1024
-    D_OCR_FEATURES: 812 # 256 (det features) + 256 (rec features) + 300 (fasttext)
+    D_OCR_FEATURE: 812 # 256 (det features) + 256 (rec features) + 300 (fasttext)
     D_MODEL: 512
     DROPOUT: 0.1
   TEXT_EMBEDDING:

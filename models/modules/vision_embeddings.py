@@ -24,7 +24,7 @@ class FeatureEmbedding(nn.Module):
 
         return features, masks
 
-@META_VISION_EMBEDDING
+@META_VISION_EMBEDDING.register()
 class VisionOcrEmbedding(nn.Module):
     def __init__(self, config):
         super(FeatureEmbedding, self).__init__()
@@ -51,9 +51,10 @@ class VisionOcrEmbedding(nn.Module):
         self.ocr_bbox_layer_norm = nn.LayerNorm(config.D_MODEL)
         self.ocr_text_layer_norm = nn.LayerNorm(config.D_MODEL)
         self.ocr_gelu = nn.GELU()
-        self.ocr_drop = nn.Dropout(config.D_OCR_FEATURE)
+        self.ocr_drop = nn.Dropout(config.DROPOUT)
 
-    def forward(self, features):
+    def forward(self, obj_features: torch.Tensor, obj_boxes: torch.Tensor, ocr_det_features: torch.Tensor, 
+                ocr_rec_features: torch.Tensor, ocr_fasttext: torch.Tensor, ocr_boxes: torch.Tensor):
         obj_features = features.region_features
         obj_boxes = features.region_boxes
         ocr_det_features = features.ocr_det_features

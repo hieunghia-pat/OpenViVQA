@@ -45,7 +45,7 @@ class ReadableIterativeMCAN(BaseTransformer):
         obj_boxes = input_features.region_boxes
         ocr_det_features = input_features.ocr_det_features
         ocr_rec_features = input_features.ocr_rec_features
-        ocr_fasttext = input_features.ocr_fasttext
+        ocr_fasttext = input_features.ocr_fasttext_features
         ocr_boxes = input_features.ocr_boxes
         vision_features, vision_padding_mask = self.vision_embedding(
             obj_features, obj_boxes, ocr_det_features,

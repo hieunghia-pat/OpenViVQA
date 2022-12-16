@@ -24,14 +24,14 @@ class FeatureEmbedding(nn.Module):
 
         return features, masks
 
-@META_VISION_EMBEDDING
+@META_VISION_EMBEDDING.register()
 class VisionOcrEmbedding(nn.Module):
     def __init__(self, config):
-        super(FeatureEmbedding, self).__init__()
+        super(VisionOcrEmbedding, self).__init__()
 
         self.linear_obj_feat_to_mmt_in = nn.Linear(config.D_OBJ_FEATURE, config.D_MODEL)
         # object location feature: relative bounding box coordinates (4-dim)
-        self.linear_obj_bbox_to_mmt_in = nn.Linear(4, config.D_OBJ_FEATURE)
+        self.linear_obj_bbox_to_mmt_in = nn.Linear(4, config.D_MODEL)
         self.obj_feat_layer_norm = nn.LayerNorm(config.D_MODEL)
         self.obj_bbox_layer_norm = nn.LayerNorm(config.D_MODEL)
         self.obj_gelu = nn.GELU()
@@ -51,19 +51,14 @@ class VisionOcrEmbedding(nn.Module):
         self.ocr_bbox_layer_norm = nn.LayerNorm(config.D_MODEL)
         self.ocr_text_layer_norm = nn.LayerNorm(config.D_MODEL)
         self.ocr_gelu = nn.GELU()
-        self.ocr_drop = nn.Dropout(config.D_OCR_FEATURE)
+        self.ocr_drop = nn.Dropout(config.DROPOUT)
 
-    def forward(self, features):
-        obj_features = features.region_features
-        obj_boxes = features.region_boxes
-        ocr_det_features = features.ocr_det_features
-        ocr_rec_features = features.ocr_rec_features
-        ocr_fasttext = features.ocr_fasttext
+    def forward(self, obj_features: torch.Tensor, obj_boxes: torch.Tensor, ocr_det_features: torch.Tensor, 
+                ocr_rec_features: torch.Tensor, ocr_fasttext: torch.Tensor, ocr_boxes: torch.Tensor):
         ocr_features = torch.cat([ocr_det_features, ocr_rec_features, ocr_fasttext], dim=-1)
-        ocr_boxes = features.ocr_boxes
 
-        obj_masks = generate_padding_mask(obj_features, padding_idx=0).to(features.device)
-        ocr_masks = generate_padding_mask(ocr_det_features, padding_idx=0).to(features.device)
+        obj_masks = generate_padding_mask(obj_features, padding_idx=0).to(obj_features.device)
+        ocr_masks = generate_padding_mask(ocr_det_features, padding_idx=0).to(ocr_features.device)
         masks = torch.cat([obj_masks, ocr_masks], dim=-1)
 
         obj_mmt_in = self.obj_feat_layer_norm(

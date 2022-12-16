@@ -1,6 +1,7 @@
 from .cross_modality_transformer import CrossModalityTransformer
 from .mcan import MCAN
 from .iterative_mcan import IterativeMCAN
+from .readable_iterative_mcan import ReadableIterativeMCAN
 from .saaa import SAAA
 from .iterative_saaa import IterativeSAAA
 from .joint_transformer import JointTransformer

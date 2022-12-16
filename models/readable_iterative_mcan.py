@@ -11,7 +11,7 @@ from builders.vision_embedding_builder import build_vision_embedding
 from builders.model_builder import META_ARCHITECTURE
 
 @META_ARCHITECTURE.register()
-class IterativeMCAN(BaseTransformer):
+class ReadableIterativeMCAN(BaseTransformer):
     def __init__(self, config, vocab):
         super().__init__(config, vocab)
 
@@ -41,8 +41,16 @@ class IterativeMCAN(BaseTransformer):
         return output
 
     def encoder_forward(self, input_features: Instance):
-        vision_features = input_features.region_features
-        vision_features, vision_padding_mask = self.vision_embedding(vision_features)
+        obj_features = input_features.region_features
+        obj_boxes = input_features.region_boxes
+        ocr_det_features = input_features.ocr_det_features
+        ocr_rec_features = input_features.ocr_rec_features
+        ocr_fasttext = input_features.ocr_fasttext_features
+        ocr_boxes = input_features.ocr_boxes
+        vision_features, vision_padding_mask = self.vision_embedding(
+            obj_features, obj_boxes, ocr_det_features,
+            ocr_rec_features, ocr_fasttext, ocr_boxes
+        )
 
         question_tokens = input_features.question_tokens
         text_features, (text_padding_mask, _) = self.text_embedding(question_tokens)

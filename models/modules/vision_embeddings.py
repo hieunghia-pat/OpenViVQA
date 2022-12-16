@@ -24,6 +24,70 @@ class FeatureEmbedding(nn.Module):
 
         return features, masks
 
+@META_VISION_EMBEDDING
+class VisionOcrEmbedding(nn.Module):
+    def __init__(self, config):
+        super(FeatureEmbedding, self).__init__()
+
+        self.linear_obj_feat_to_mmt_in = nn.Linear(config.D_OBJ_FEATURE, config.D_MODEL)
+        # object location feature: relative bounding box coordinates (4-dim)
+        self.linear_obj_bbox_to_mmt_in = nn.Linear(4, config.D_OBJ_FEATURE)
+        self.obj_feat_layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.obj_bbox_layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.obj_gelu = nn.GELU()
+        self.obj_dropout = nn.Dropout(config.DROPOUT)
+
+        self.linear_ocr_feat_to_mmt_in = nn.Linear(
+            config.D_OCR_FEATURE, config.D_MODEL
+        )
+
+        # OCR location feature: relative bounding box coordinates (4-dim)
+        self.linear_ocr_bbox_to_mmt_in = nn.Linear(4, config.D_MODEL)
+
+        # OCR word embedding features
+        # self.ocr_word_embedding = build_word_embedding(self.config.OCR_TEXT_EMBEDDING)
+
+        self.ocr_feat_layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.ocr_bbox_layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.ocr_text_layer_norm = nn.LayerNorm(config.D_MODEL)
+        self.ocr_gelu = nn.GELU()
+        self.ocr_drop = nn.Dropout(config.D_OCR_FEATURE)
+
+    def forward(self, features):
+        obj_features = features.region_features
+        obj_boxes = features.region_boxes
+        ocr_det_features = features.ocr_det_features
+        ocr_rec_features = features.ocr_rec_features
+        ocr_fasttext = features.ocr_fasttext
+        ocr_features = torch.cat([ocr_det_features, ocr_rec_features, ocr_fasttext], dim=-1)
+        ocr_boxes = features.ocr_boxes
+
+        obj_masks = generate_padding_mask(obj_features, padding_idx=0).to(features.device)
+        ocr_masks = generate_padding_mask(ocr_det_features, padding_idx=0).to(features.device)
+        masks = torch.cat([obj_masks, ocr_masks], dim=-1)
+
+        obj_mmt_in = self.obj_feat_layer_norm(
+            self.linear_obj_feat_to_mmt_in(obj_features)
+        ) + self.obj_bbox_layer_norm(
+            self.linear_obj_bbox_to_mmt_in(obj_boxes)
+        )
+        obj_mmt_in = self.obj_dropout(
+            self.obj_gelu(obj_mmt_in)
+        )
+
+        ocr_mmt_in = self.ocr_feat_layer_norm(
+            self.linear_ocr_feat_to_mmt_in(ocr_features)
+        ) + self.ocr_bbox_layer_norm(
+            self.linear_ocr_bbox_to_mmt_in(ocr_boxes)
+        )
+        ocr_mmt_in = self.ocr_drop(
+            self.ocr_gelu(ocr_mmt_in)
+        )
+
+        features = torch.cat([obj_mmt_in, ocr_mmt_in], dim=1)
+
+        return features, masks
+
 @META_VISION_EMBEDDING.register()
 class ViTEmbedding(nn.Module):
     def __init__(self, config):

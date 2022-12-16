@@ -6,23 +6,23 @@ DATASET:
     BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
-      FEATURES: features\OpenViVQA\vinvl_vinvl
-      SCENE_TEXT: features\OpenViVQA\swintextspotter
+      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.0
-    MAX_SCENE_TEXT: 100
+    SCENE_TEXT_THRESHOLD: 0.7
+    MAX_SCENE_TEXT: 50
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
     TYPE: OcrDictionaryDataset
     BATCH_SIZE: 64
-    WORKERS: 2
+    WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features\OpenViVQA\vinvl_vinvl
-      SCENE_TEXT: features\OpenViVQA\swintextspotter
+      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      SCENE_TEXT: features/OpenViVQA/features/swintextspotter
       IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.0
-    MAX_SCENE_TEXT: 100
+    SCENE_TEXT_THRESHOLD: 0.7
+    MAX_SCENE_TEXT: 50
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   MIN_FREQ: 1
@@ -31,7 +31,6 @@ DATASET:
     TOKENIZER: null
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
-    MIN_FREQ: 1
     BOS_TOKEN: <bos>
     EOS_TOKEN: <eos>
     PAD_TOKEN: <pad>
@@ -45,13 +44,13 @@ DATASET:
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
     JSON_PATH:
-      TRAIN: annotations\OpenViVQA\openvivqa_train_v2.json
-      DEV: annotations\OpenViVQA\openvivqa_dev_v2.json
-      TEST: annotations\OpenViVQA\openvivqa_test_v2.json
+      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
   JSON_PATH:
-    TRAIN: annotations\OpenViVQA\openvivqa_train_v2.json
-    DEV: annotations\OpenViVQA\openvivqa_dev_v2.json
-    TEST: annotations\OpenViVQA\openvivqa_test_v2.json
+    TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+    DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+    TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -64,12 +63,12 @@ TRAINING:
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: MMF_M4C
-  NAME: small_mmf_m4c_vinvl
+  ARCHITECTURE: experimental_MMF_M4C
+  NAME: experimental_mmf_m4c_x152++_faster_rcnn
   DEVICE: cuda
   D_MODEL: 512
   OBJECT_EMBEDDING:
-    D_FEATURE: 2048
+    D_FEATURE: 1024
     DROPOUT: .1
   BOX_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
@@ -78,23 +77,49 @@ MODEL:
     D_MODEL: 512
     DROPOUT: .1
   OCR_TEXT_EMBEDDING:
+    ARCHITECTURE: OcrWordEmbedding
+    DEVICE: cuda
+    D_MODEL: 512
+    D_EMBEDDING: 300
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
+    DROPOUT: .1
   OCR_EMBEDDING:
-    D_FEATURE: 812 # 256 (det features) + 256 (rec features) + 300 (fasttext)
+    D_FEATURE: 1024 # 256 (det features) + 256 (rec features) + 512 (word embedding)
     DROPOUT: .1
   OCR_PTR_NET:
     HIDDEN_SIZE: 512
     QUERY_KEY_SIZE: 512
+    OCR_MAX_NUM: 30
+  CLASSIFIER:
+    OCR_MAX_NUM: 30
   MMT:
     HIDDEN_SIZE: 512
     NUM_HIDDEN_LAYERS: 4
     NUM_ATTENTION_HEADS: 8
+  DYNAMIC_EMBEDDING:
+    ARCHITECTURE: FixedVocabDynamicEmbedding
+    D_MODEL: 512
+  ENCODER:
+    ARCHITECTURE: MultiModalEncoder
+    LAYERS: 4
+    SELF_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+    D_MODEL: 512
   TEXT_BERT:
     HIDDEN_SIZE: 512
     NUM_HIDDEN_LAYERS: 4
     NUM_ATTENTION_HEADS: 8
-    LOAD_PRETRAINED: False
+    LOAD_PRETRAINED: True
     PRETRAINED_NAME: "bert-base-uncased"
   TEXT_EMBEDDING:
     ARCHITECTURE: UsualEmbedding

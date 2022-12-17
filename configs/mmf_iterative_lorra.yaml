@@ -1,4 +1,4 @@
-TASK: MmfClassificationTask
+TASK: TrainingMMF
 
 DATASET:
   FEATURE_DATASET:

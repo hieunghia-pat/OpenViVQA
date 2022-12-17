@@ -5,10 +5,12 @@ from transformers.models.bert.modeling_bert import BertConfig
 
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
-from builders.encoder_builder import build_encoder
+from builders.attention_builder import build_attention
 from builders.text_embedding_builder import build_text_embedding
 from .utils import generate_padding_mask
-from .mmf_m4c import OcrPtrNet, MMT
+from .mmf_m4c import MMT
+
+import math
 
 logger = setup_logger()
 
@@ -64,9 +66,12 @@ class MMF_IterativeLoRRA(nn.Module):
         self.ocr_drop = nn.Dropout(self.config.OCR_EMBEDDING.DROPOUT)
 
     def _build_mmt(self):
-        self.self_attn = build_encoder(self.config.SELF_ATTENTION)
-        self.spatial_attn = build_encoder(self.config.SPATIAL_ATTENTION)
-        self.context_attn = build_encoder(self.config.CONTEXT_ATTENTION)
+        self.self_attn = build_attention(self.config.SELF_ATTENTION)
+        self.self_attn_layer_norm = nn.LayerNorm(self.config.D_MODEL)
+        self.spatial_attn = build_attention(self.config.SPATIAL_ATTENTION)
+        self.spatial_attn_layer_norm = nn.LayerNorm(self.config.D_MODEL)
+        self.context_attn = build_attention(self.config.CONTEXT_ATTENTION)
+        self.context_attn_layer_norm = nn.LayerNorm(self.config.D_MODEL)
         self.mmt = MMT(self.mmt_config)
 
     def _build_output(self):
@@ -130,24 +135,36 @@ class MMF_IterativeLoRRA(nn.Module):
     def _forward_mmt(self, items, fwd_results):
         txt_emb = fwd_results["txt_emb"]
         txt_padding_mask = fwd_results["txt_mask"]
-        self_attn_feat = self.self_attn(
-            txt_emb,
-            padding_mask=txt_padding_mask
+        self_attn_feat, _ = self.self_attn(
+            queries=txt_emb,
+            keys=txt_emb,
+            values=txt_emb,
+            padding_mask=txt_padding_mask,
+            attention_mask=txt_padding_mask
         )
+        self_attn_feat = self.self_attn_layer_norm(self_attn_feat)
 
         obj_feat_in = fwd_results["obj_feat_in"]
-        spatial_attn_feat = self.spatial_attn(
-            src=obj_feat_in,
-            tgt=self_attn_feat,
-            tgt_padding_mask=txt_padding_mask
+        obj_mask = fwd_results["obj_mask"]
+        spatial_attn_feat, _ = self.spatial_attn(
+            queries=obj_feat_in,
+            keys=self_attn_feat,
+            values=self_attn_feat,
+            padding_mask=obj_mask,
+            attention_mask=txt_padding_mask
         )
+        spatial_attn_feat = self.spatial_attn_layer_norm(spatial_attn_feat)
         
         ocr_feat_in = fwd_results["ocr_mmt_in"]
-        context_attn_feat = self.context_attn(
-            src=ocr_feat_in,
-            tgt=self_attn_feat,
-            tgt_padding_mask=txt_padding_mask
+        ocr_mask = fwd_results["ocr_mask"]
+        context_attn_feat, _ = self.context_attn(
+            queries=ocr_feat_in,
+            keys=self_attn_feat,
+            values=self_attn_feat,
+            padding_mask=ocr_mask,
+            attention_mask=txt_padding_mask
         )
+        context_attn_feat = self.context_attn_layer_norm(context_attn_feat)
 
         mmt_results = self.mmt(
             txt_emb=self_attn_feat,
@@ -197,3 +214,35 @@ class MMF_IterativeLoRRA(nn.Module):
                 last_ids = torch.where(last_ids == self.vocab.eos_idx, last_ids, argmax_inds[:, ith])
                 if last_ids.mean() == self.vocab.eos_idx:
                     break
+
+class OcrPtrNet(nn.Module):
+    def __init__(self, hidden_size, query_key_size=None):
+        super().__init__()
+
+        if query_key_size is None:
+            query_key_size = hidden_size
+        self.hidden_size = hidden_size
+        self.query_key_size = query_key_size
+
+        self.query = nn.Linear(hidden_size, query_key_size)
+        self.key = nn.Linear(hidden_size, query_key_size)
+
+    def forward(self, query_inputs, key_inputs, attention_mask):
+        assert attention_mask.dim() == 2
+        extended_attention_mask = attention_mask.unsqueeze(1)
+
+        query_layer = self.query(query_inputs)
+        if query_layer.dim() == 2:
+            query_layer = query_layer.unsqueeze(1)
+            squeeze_result = True
+        else:
+            squeeze_result = False
+        key_layer = self.key(key_inputs)
+
+        scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+        scores = scores / math.sqrt(self.query_key_size)
+        scores = scores + extended_attention_mask
+        if squeeze_result:
+            scores = scores.squeeze(1)
+
+        return scores

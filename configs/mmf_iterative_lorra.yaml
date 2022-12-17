@@ -91,50 +91,38 @@ MODEL:
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null  
   SELF_ATTENTION:
-    ARCHITECTURE: Encoder
+    ARCHITECTURE: ScaledDotProductAttention
+    HEAD: 8
     D_MODEL: 512
-    LAYERS: 1
-    SELF_ATTENTION:
-      ARCHITECTURE: ScaledDotProductAttention
-      HEAD: 8
-      D_MODEL: 512
-      D_KEY: 64
-      D_VALUE: 64
-      D_FF: 2048
-      D_FEATURE: 2048
-      USE_AOA: False
-      CAN_BE_STATEFUL: False
-      DROPOUT: .1
+    D_KEY: 64
+    D_VALUE: 64
+    D_FF: 2048
+    D_FEATURE: 2048
+    USE_AOA: False
+    CAN_BE_STATEFUL: False
+    DROPOUT: .1
   SPATIAL_ATTENTION:
-    ARCHITECTURE: MultiModalEncoder
+    ARCHITECTURE: ScaledDotProductAttention
+    HEAD: 8
     D_MODEL: 512
-    LAYERS: 1
-    SELF_ATTENTION:
-      ARCHITECTURE: ScaledDotProductAttention
-      HEAD: 8
-      D_MODEL: 512
-      D_KEY: 64
-      D_VALUE: 64
-      D_FF: 2048
-      D_FEATURE: 2048
-      USE_AOA: False
-      CAN_BE_STATEFUL: False
-      DROPOUT: .1
+    D_KEY: 64
+    D_VALUE: 64
+    D_FF: 2048
+    D_FEATURE: 2048
+    USE_AOA: False
+    CAN_BE_STATEFUL: False
+    DROPOUT: .1
   CONTEXT_ATTENTION:
-    ARCHITECTURE: MultiModalEncoder
+    ARCHITECTURE: ScaledDotProductAttention
+    HEAD: 8
     D_MODEL: 512
-    LAYERS: 1
-    SELF_ATTENTION:
-      ARCHITECTURE: ScaledDotProductAttention
-      HEAD: 8
-      D_MODEL: 512
-      D_KEY: 64
-      D_VALUE: 64
-      D_FF: 2048
-      D_FEATURE: 2048
-      USE_AOA: False
-      CAN_BE_STATEFUL: False
-      DROPOUT: .1
+    D_KEY: 64
+    D_VALUE: 64
+    D_FF: 2048
+    D_FEATURE: 2048
+    USE_AOA: False
+    CAN_BE_STATEFUL: False
+    DROPOUT: .1
   OCR_PTR_NET:
     HIDDEN_SIZE: 512
     QUERY_KEY_SIZE: 512

@@ -6,6 +6,7 @@ images
 __pycache__
 
 examine*
+*.json
 
 statistic.ipynb
 

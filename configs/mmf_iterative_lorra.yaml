@@ -6,8 +6,8 @@ DATASET:
     BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
-      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
-      SCENE_TEXT: features/OpenViVQA/features/swintextspotter
+      FEATURES: features\x152++_faster_rcnn
+      SCENE_TEXT: features\swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -18,8 +18,8 @@ DATASET:
     BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
-      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
-      SCENE_TEXT: features/OpenViVQA/features/swintextspotter
+      FEATURES: features\x152++_faster_rcnn
+      SCENE_TEXT: features\swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -45,13 +45,13 @@ DATASET:
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
     JSON_PATH:
-      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
-      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
-      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+      TRAIN: annotations\openvivqa_train_v2.json
+      DEV: annotations\openvivqa_dev_v2.json
+      TEST: annotations\openvivqa_test_v2.json
   JSON_PATH:
-    TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
-    DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
-    TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+    TRAIN: annotations\openvivqa_train_v2.json
+    DEV: annotations\openvivqa_dev_v2.json
+    TEST: annotations\openvivqa_test_v2.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -59,7 +59,8 @@ TRAINING:
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
   SCORE: CIDEr
-  GET_SCORES: True
+  TRAINING_BEAM_SIZE: 1
+  EVALUATING_BEAM_SIZE: 1
   PATIENCE: 5
 
 MODEL:
@@ -122,3 +123,12 @@ MODEL:
     USE_AOA: False
     CAN_BE_STATEFUL: False
     DROPOUT: .1
+  OCR_PTR_NET:
+    HIDDEN_SIZE: 512
+    QUERY_KEY_SIZE: 512
+  CLASSIFIER:
+    OCR_MAX_NUM: 30
+  MMT:
+    HIDDEN_SIZE: 768
+    NUM_HIDDEN_LAYERS: 4
+    NUM_ATTENTION_HEADS: 8

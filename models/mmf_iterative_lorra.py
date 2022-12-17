@@ -1,17 +1,19 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+from transformers.models.bert.modeling_bert import BertConfig
 
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
 from builders.attention_builder import build_attention
 from builders.text_embedding_builder import build_text_embedding
 from .utils import generate_padding_mask
+from .mmf_m4c import OcrPtrNet, MMT
 
 logger = setup_logger()
 
 @META_ARCHITECTURE.register()
-class MMF_IteratveLoRRA(nn.Module):
+class MMF_IterativeLoRRA(nn.Module):
     """
         This is the modified version of LoRRA method where we replaces the LSTM attention to self-attention of 
         transformer, and adapted decoding module of M4C method to model the OpenViVQA dataset.
@@ -19,9 +21,13 @@ class MMF_IteratveLoRRA(nn.Module):
     def __init__(self, config, vocab):
         super().__init__()
         self.config = config
+        self.mmt_config = BertConfig(hidden_size=self.config.MMT.HIDDEN_SIZE,
+                                        num_hidden_layers=self.config.MMT.NUM_HIDDEN_LAYERS,
+                                        num_attention_heads=self.config.MMT.NUM_ATTENTION_HEADS)
         self.vocab = vocab
         self.d_model = config.D_MODEL
         self.device = config.DEVICE
+        self.max_iter = vocab.max_answer_length
 
         self.build()
 
@@ -61,10 +67,18 @@ class MMF_IteratveLoRRA(nn.Module):
         self.self_attn = build_attention(self.config.SELF_ATTENTION)
         self.spatial_attn = build_attention(self.config.SPATIAL_ATTENTION)
         self.context_attn = build_attention(self.config.CONTEXT_ATTENTION)
+        self.mmt = MMT(self.mmt_config)
 
     def _build_output(self):
-        num_choices = self.vocab.total_answers + self.config.MAX_SCENE_TEXT
-        self.classifier = nn.Linear(self.d_model, num_choices)
+        # dynamic OCR-copying scores with pointer network
+        self.ocr_ptr_net = OcrPtrNet(hidden_size=self.config.OCR_PTR_NET.HIDDEN_SIZE,
+                                        query_key_size=self.config.OCR_PTR_NET.QUERY_KEY_SIZE)
+
+        # fixed answer vocabulary scores
+        num_choices = len(self.vocab)
+        # remove the OCR copying dimensions in LoRRA's classifier output
+        # (OCR copying will be handled separately)
+        self.classifier = nn.Linear(self.config.D_MODEL, num_choices)
 
     def forward(self, items):
         # fwd_results holds intermediate forward pass results
@@ -126,37 +140,40 @@ class MMF_IteratveLoRRA(nn.Module):
 
         obj_feat_in = fwd_results["obj_feat_in"]
         obj_mask = fwd_results["obj_mask"]
-        _, spatial_attn_weights = self.spatial_attn(
+        spatial_attn_feat, _ = self.spatial_attn(
             queries=obj_feat_in,
             keys=self_attn_feat,
             values=self_attn_feat,
             padding_mask=obj_mask,
             attention_mask=txt_padding_mask
         )
-        spatial_attn_weights = spatial_attn_weights.squeeze(1) # (bs, n_obj_feat_in, n_self_attn_feat)
         
         ocr_feat_in = fwd_results["ocr_mmt_in"]
         ocr_mask = fwd_results["ocr_mask"]
-        mmt_ocr_output, context_attn_weights = self.context_attn(
+        context_attn_feat, _ = self.context_attn(
             queries=ocr_feat_in,
             keys=self_attn_feat,
             values=self_attn_feat,
             padding_mask=ocr_mask,
             attention_mask=txt_padding_mask
         )
-        context_attn_weights = context_attn_weights.squeeze(1) # (bs, n_ocr_feat_in, n_self_attn_feat)
 
-        attended_spatial_feat = (spatial_attn_weights.unsqueeze(-1) * self_attn_feat.unsqueeze(1)).sum(dim=1)
-        attended_context_feat = (context_attn_weights.unsqueeze(-1) * self_attn_feat.unsqueeze(1)).sum(dim=1)
-        mmt_dec_output = attended_spatial_feat + attended_context_feat
-
-        fwd_results["mmt_dec_output"] = mmt_dec_output
-        fwd_results["mmt_ocr_output"] = mmt_ocr_output
+        mmt_results = self.mmt(
+            txt_emb=self_attn_feat,
+            txt_mask=fwd_results["txt_mask"],
+            obj_emb=spatial_attn_feat,
+            obj_mask=fwd_results["obj_mask"],
+            ocr_emb=context_attn_feat,
+            ocr_mask=fwd_results["ocr_mask"],
+            fixed_ans_emb=self.classifier.weight,
+            prev_inds=fwd_results["prev_inds"],
+        )
+        fwd_results.update(mmt_results)
 
     def _forward_output(self, items, fwd_results):
         mmt_dec_output = fwd_results["mmt_dec_output"]
         mmt_ocr_output = fwd_results["mmt_ocr_output"]
-        ocr_mask = fwd_results["ocr_mask"]
+        ocr_mask = fwd_results["ocr_mask"].squeeze(2).squeeze(1)
 
         fixed_scores = self.classifier(mmt_dec_output)
         dynamic_ocr_scores = self.ocr_ptr_net(mmt_dec_output, mmt_ocr_output, ocr_mask)

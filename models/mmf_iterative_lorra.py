@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 from torch.nn import functional as F
 
@@ -10,10 +11,10 @@ from .utils import generate_padding_mask
 logger = setup_logger()
 
 @META_ARCHITECTURE.register()
-class MMF_LoRRA(nn.Module):
+class MMF_IteratveLoRRA(nn.Module):
     """
         This is the modified version of LoRRA method where we replaces the LSTM attention to self-attention of 
-        transformer
+        transformer, and adapted decoding module of M4C method to model the OpenViVQA dataset.
     """
     def __init__(self, config, vocab):
         super().__init__()
@@ -136,7 +137,7 @@ class MMF_LoRRA(nn.Module):
         
         ocr_feat_in = fwd_results["ocr_mmt_in"]
         ocr_mask = fwd_results["ocr_mask"]
-        _, context_attn_weights = self.context_attn(
+        mmt_ocr_output, context_attn_weights = self.context_attn(
             queries=ocr_feat_in,
             keys=self_attn_feat,
             values=self_attn_feat,
@@ -147,17 +148,44 @@ class MMF_LoRRA(nn.Module):
 
         attended_spatial_feat = (spatial_attn_weights.unsqueeze(-1) * self_attn_feat.unsqueeze(1)).sum(dim=1)
         attended_context_feat = (context_attn_weights.unsqueeze(-1) * self_attn_feat.unsqueeze(1)).sum(dim=1)
-        mmt_feat = attended_spatial_feat + attended_context_feat
-        mmt_feat = mmt_feat.sum(dim=1)
+        mmt_dec_output = attended_spatial_feat + attended_context_feat
 
-        fwd_results["mmt_feat"] = mmt_feat
+        fwd_results["mmt_dec_output"] = mmt_dec_output
+        fwd_results["mmt_ocr_output"] = mmt_ocr_output
 
     def _forward_output(self, items, fwd_results):
-        mmt_feat = fwd_results["mmt_feat"]
-        output = self.classifier(mmt_feat)
+        mmt_dec_output = fwd_results["mmt_dec_output"]
+        mmt_ocr_output = fwd_results["mmt_ocr_output"]
+        ocr_mask = fwd_results["ocr_mask"]
 
-        fwd_results["scores"] = output
+        fixed_scores = self.classifier(mmt_dec_output)
+        dynamic_ocr_scores = self.ocr_ptr_net(mmt_dec_output, mmt_ocr_output, ocr_mask)
+        scores = torch.cat([fixed_scores, dynamic_ocr_scores], dim=-1)
+        fwd_results["scores"] = scores
 
     def _forward_mmt_and_output(self, items, fwd_results):
-        self._forward_mmt(items, fwd_results)
-        self._forward_output(items, fwd_results)
+        if self.training:
+            fwd_results["prev_inds"] = items.answer_tokens.clone()
+            self._forward_mmt(items, fwd_results)
+            self._forward_output(items, fwd_results)
+        else:
+            # fill prev_inds with bos_idx at index 0, and zeros elsewhere
+            fwd_results["prev_inds"] = torch.zeros((items.batch_size, self.max_iter)).long().to(self.device)
+            fwd_results["prev_inds"][:, 0] = self.vocab.bos_idx
+
+            # greedy decoding at test time
+            last_ids = torch.zeros((items.batch_size, )).to(self.device)
+            for ith in range(self.max_iter):
+                self._forward_mmt(items, fwd_results)
+                self._forward_output(items, fwd_results)
+
+                # find the highest scoring output (either a fixed vocab
+                # or an OCR), and add it to prev_inds for auto-regressive
+                # decoding
+                argmax_inds = fwd_results["scores"].argmax(dim=-1)
+                fwd_results["prev_inds"][:, 1:] = argmax_inds[:, :-1]
+                
+                # whether or not to interrupt the decoding process
+                last_ids = torch.where(last_ids == self.vocab.eos_idx, last_ids, argmax_inds[:, ith])
+                if last_ids.mean() == self.vocab.eos_idx:
+                    break

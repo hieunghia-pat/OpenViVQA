@@ -140,7 +140,7 @@ class MMF_IterativeLoRRA(nn.Module):
             padding_mask=txt_padding_mask,
             attention_mask=txt_padding_mask
         )
-        self_attn_feat = self.self_attn_layer_norm(self_attn_feat)
+        self_attn_feat = self.self_attn_layer_norm(self_attn_feat + txt_emb)
 
         obj_feat_in = fwd_results["obj_feat_in"]
         obj_mask = fwd_results["obj_mask"]
@@ -151,7 +151,7 @@ class MMF_IterativeLoRRA(nn.Module):
             padding_mask=obj_mask,
             attention_mask=txt_padding_mask
         )
-        spatial_attn_feat = self.spatial_attn_layer_norm(spatial_attn_feat)
+        spatial_attn_feat = self.spatial_attn_layer_norm(spatial_attn_feat + obj_feat_in)
         
         ocr_feat_in = fwd_results["ocr_mmt_in"]
         ocr_mask = fwd_results["ocr_mask"]
@@ -162,7 +162,7 @@ class MMF_IterativeLoRRA(nn.Module):
             padding_mask=ocr_mask,
             attention_mask=txt_padding_mask
         )
-        context_attn_feat = self.context_attn_layer_norm(context_attn_feat)
+        context_attn_feat = self.context_attn_layer_norm(context_attn_feat + ocr_feat_in)
 
         mmt_results = self.mmt(
             txt_emb=self_attn_feat,

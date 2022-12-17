@@ -65,8 +65,11 @@ class MMF_IterativeLoRRA(nn.Module):
 
     def _build_mmt(self):
         self.self_attn = build_attention(self.config.SELF_ATTENTION)
+        self.self_attn_layer_norm = nn.LayerNorm(self.config.D_MODEL)
         self.spatial_attn = build_attention(self.config.SPATIAL_ATTENTION)
+        self.spatial_attn_layer_norm = nn.LayerNorm(self.config.D_MODEL)
         self.context_attn = build_attention(self.config.CONTEXT_ATTENTION)
+        self.context_attn_layer_norm = nn.LayerNorm(self.config.D_MODEL)
         self.mmt = MMT(self.mmt_config)
 
     def _build_output(self):
@@ -137,6 +140,7 @@ class MMF_IterativeLoRRA(nn.Module):
             padding_mask=txt_padding_mask,
             attention_mask=txt_padding_mask
         )
+        self_attn_feat = self.self_attn_layer_norm(self_attn_feat)
 
         obj_feat_in = fwd_results["obj_feat_in"]
         obj_mask = fwd_results["obj_mask"]
@@ -147,6 +151,7 @@ class MMF_IterativeLoRRA(nn.Module):
             padding_mask=obj_mask,
             attention_mask=txt_padding_mask
         )
+        spatial_attn_feat = self.spatial_attn_layer_norm(spatial_attn_feat)
         
         ocr_feat_in = fwd_results["ocr_mmt_in"]
         ocr_mask = fwd_results["ocr_mask"]
@@ -157,14 +162,15 @@ class MMF_IterativeLoRRA(nn.Module):
             padding_mask=ocr_mask,
             attention_mask=txt_padding_mask
         )
+        context_attn_feat = self.context_attn_layer_norm(context_attn_feat)
 
         mmt_results = self.mmt(
             txt_emb=self_attn_feat,
-            txt_mask=fwd_results["txt_mask"],
+            txt_mask=fwd_results["txt_mask"].squeeze(2).squeeze(1),
             obj_emb=spatial_attn_feat,
-            obj_mask=fwd_results["obj_mask"],
+            obj_mask=fwd_results["obj_mask"].squeeze(2).squeeze(1),
             ocr_emb=context_attn_feat,
-            ocr_mask=fwd_results["ocr_mask"],
+            ocr_mask=fwd_results["ocr_mask"].squeeze(2).squeeze(1),
             fixed_ans_emb=self.classifier.weight,
             prev_inds=fwd_results["prev_inds"],
         )

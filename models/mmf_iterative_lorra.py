@@ -169,17 +169,13 @@ class MMF_IterativeLoRRA(nn.Module):
 
         attended_spatial_feat = (spatial_attn_weights.unsqueeze(-1) * self_attn_feat.unsqueeze(1)).sum(dim=1)
         attended_context_feat = (context_attn_weights.unsqueeze(-1) * self_attn_feat.unsqueeze(1)).sum(dim=1)
-        mm_feat = (attended_spatial_feat + attended_context_feat).sum(dim=1)
+        mm_feat = attended_spatial_feat + attended_context_feat
         mm_feat = self.mm_layer_norm(mm_feat)
-        
-        obj_mask = (obj_mask == 0)
-        ocr_mask = (ocr_mask == 0)
-        mm_mask = torch.logical_or(obj_mask, ocr_mask).long() * -10e4
 
         mmt_results = self.mmt(
             mm_feat=mm_feat,
-            mm_mask=mm_mask.squeeze(2).squeeze(1),
-            ocr_emb=attended_context_feat,
+            mm_mask=txt_padding_mask.squeeze(2).squeeze(1),
+            ocr_emb=ocr_feat_in,
             ocr_mask=fwd_results["ocr_mask"].squeeze(2).squeeze(1),
             fixed_ans_emb=self.classifier.weight,
             prev_inds=fwd_results["prev_inds"],
@@ -281,9 +277,9 @@ class MMT(BertPreTrainedModel):
         # attend to decoding steps.
         # A triangular causal mask will be filled for the decoding steps
         # later in extended_attention_mask
-        dec_mask = torch.zeros(
+        dec_mask = torch.ones(
             dec_emb.size(0), dec_emb.size(1), dtype=torch.float32, device=dec_emb.device
-        )
+        ) * -10e4
         encoder_inputs = torch.cat([mm_feat, ocr_emb, dec_emb], dim=1)
         attention_mask = torch.cat([mm_mask, ocr_mask, dec_mask], dim=1)
 

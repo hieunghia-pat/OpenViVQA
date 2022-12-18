@@ -92,7 +92,7 @@ MODEL:
     WORD_EMBEDDING_CACHE: null  
   SELF_ATTENTION:
     ARCHITECTURE: ScaledDotProductAttention
-    HEAD: 8
+    HEAD: 1
     D_MODEL: 512
     D_KEY: 64
     D_VALUE: 64
@@ -103,7 +103,7 @@ MODEL:
     DROPOUT: .1
   SPATIAL_ATTENTION:
     ARCHITECTURE: ScaledDotProductAttention
-    HEAD: 8
+    HEAD: 1
     D_MODEL: 512
     D_KEY: 64
     D_VALUE: 64
@@ -114,7 +114,7 @@ MODEL:
     DROPOUT: .1
   CONTEXT_ATTENTION:
     ARCHITECTURE: ScaledDotProductAttention
-    HEAD: 8
+    HEAD: 1
     D_MODEL: 512
     D_KEY: 64
     D_VALUE: 64

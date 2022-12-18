@@ -11,8 +11,8 @@ from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
 from builders.attention_builder import build_attention
 from builders.text_embedding_builder import build_text_embedding
-from .utils import generate_padding_mask
-from .mmf_m4c import PrevPredEmbeddings, _get_causal_mask
+from .utils import generate_padding_mask, generate_sequential_mask
+from .mmf_m4c import PrevPredEmbeddings
 
 import math
 
@@ -308,12 +308,10 @@ class MMT(BertPreTrainedModel):
             1, 1, from_seq_length, 1
         )
         # decoding step elements can attend to themselves in a causal manner
-        extended_attention_mask[:, :, -dec_max_num:, -dec_max_num:] = _get_causal_mask(
-            dec_max_num, encoder_inputs.device
-        )
+        extended_attention_mask[:, :, -dec_max_num:, -dec_max_num:] = generate_sequential_mask(
+            dec_max_num
+        ).squeeze(1).squeeze(0).to(encoder_inputs.device)
 
-        # flip the mask, so that invalid attention pairs have -10000.
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         assert not extended_attention_mask.requires_grad
         head_mask = [None] * self.config.num_hidden_layers
 

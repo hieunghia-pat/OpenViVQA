@@ -1,14 +1,18 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from transformers.models.bert.modeling_bert import BertConfig
+from transformers.models.bert.modeling_bert import (
+    BertConfig,
+    BertPreTrainedModel,
+    BertEncoder
+)
 
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
 from builders.attention_builder import build_attention
 from builders.text_embedding_builder import build_text_embedding
 from .utils import generate_padding_mask
-from .mmf_m4c import MMT
+from .mmf_m4c import PrevPredEmbeddings, _get_causal_mask
 
 import math
 
@@ -67,11 +71,9 @@ class MMF_IterativeLoRRA(nn.Module):
 
     def _build_mmt(self):
         self.self_attn = build_attention(self.config.SELF_ATTENTION)
-        self.self_attn_layer_norm = nn.LayerNorm(self.config.D_MODEL)
         self.spatial_attn = build_attention(self.config.SPATIAL_ATTENTION)
-        self.spatial_attn_layer_norm = nn.LayerNorm(self.config.D_MODEL)
         self.context_attn = build_attention(self.config.CONTEXT_ATTENTION)
-        self.context_attn_layer_norm = nn.LayerNorm(self.config.D_MODEL)
+        self.mm_layer_norm = nn.LayerNorm(self.config.D_MODEL)
         self.mmt = MMT(self.mmt_config)
 
     def _build_output(self):
@@ -142,36 +144,42 @@ class MMF_IterativeLoRRA(nn.Module):
             padding_mask=txt_padding_mask,
             attention_mask=txt_padding_mask
         )
-        self_attn_feat = self.self_attn_layer_norm(self_attn_feat)
 
         obj_feat_in = fwd_results["obj_feat_in"]
         obj_mask = fwd_results["obj_mask"]
-        spatial_attn_feat, _ = self.spatial_attn(
+        _, spatial_attn_weights = self.spatial_attn(
             queries=obj_feat_in,
             keys=self_attn_feat,
             values=self_attn_feat,
             padding_mask=obj_mask,
             attention_mask=txt_padding_mask
         )
-        spatial_attn_feat = self.spatial_attn_layer_norm(spatial_attn_feat)
+        spatial_attn_weights = spatial_attn_weights.squeeze(1) # (bs, n_obj_feat_in, n_self_attn_feat)
         
         ocr_feat_in = fwd_results["ocr_mmt_in"]
         ocr_mask = fwd_results["ocr_mask"]
-        context_attn_feat, _ = self.context_attn(
+        _, context_attn_weights = self.context_attn(
             queries=ocr_feat_in,
             keys=self_attn_feat,
             values=self_attn_feat,
             padding_mask=ocr_mask,
             attention_mask=txt_padding_mask
         )
-        context_attn_feat = self.context_attn_layer_norm(context_attn_feat)
+        context_attn_weights = context_attn_weights.squeeze(1) # (bs, n_ocr_feat_in, n_self_attn_feat)
+
+        attended_spatial_feat = (spatial_attn_weights.unsqueeze(-1) * self_attn_feat.unsqueeze(1)).sum(dim=1)
+        attended_context_feat = (context_attn_weights.unsqueeze(-1) * self_attn_feat.unsqueeze(1)).sum(dim=1)
+        mm_feat = (attended_spatial_feat + attended_context_feat).sum(dim=1)
+        mm_feat = self.mm_layer_norm(mm_feat)
+        
+        obj_mask = (obj_mask == 0)
+        ocr_mask = (ocr_mask == 0)
+        mm_mask = torch.logical_or(obj_mask, ocr_mask).long() * -10e4
 
         mmt_results = self.mmt(
-            txt_emb=self_attn_feat,
-            txt_mask=fwd_results["txt_mask"].squeeze(2).squeeze(1),
-            obj_emb=spatial_attn_feat,
-            obj_mask=fwd_results["obj_mask"].squeeze(2).squeeze(1),
-            ocr_emb=context_attn_feat,
+            mm_feat=mm_feat,
+            mm_mask=mm_mask.squeeze(2).squeeze(1),
+            ocr_emb=attended_context_feat,
             ocr_mask=fwd_results["ocr_mask"].squeeze(2).squeeze(1),
             fixed_ans_emb=self.classifier.weight,
             prev_inds=fwd_results["prev_inds"],
@@ -246,3 +254,80 @@ class OcrPtrNet(nn.Module):
             scores = scores.squeeze(1)
 
         return scores
+
+class MMT(BertPreTrainedModel):
+    def __init__(self, config):
+        super().__init__(config)
+
+        self.prev_pred_embeddings = PrevPredEmbeddings(config)
+        self.encoder = BertEncoder(config)
+        self.init_weights()
+
+    def forward(
+        self,
+        mm_feat,
+        mm_mask,
+        ocr_emb,
+        ocr_mask,
+        fixed_ans_emb,
+        prev_inds,
+    ):
+
+        # build embeddings for predictions in previous decoding steps
+        # fixed_ans_emb is an embedding lookup table for each fixed vocabulary
+        dec_emb = self.prev_pred_embeddings(fixed_ans_emb, ocr_emb, prev_inds)
+
+        # a zero mask for decoding steps, so the encoding steps elements can't
+        # attend to decoding steps.
+        # A triangular causal mask will be filled for the decoding steps
+        # later in extended_attention_mask
+        dec_mask = torch.zeros(
+            dec_emb.size(0), dec_emb.size(1), dtype=torch.float32, device=dec_emb.device
+        )
+        encoder_inputs = torch.cat([mm_feat, ocr_emb, dec_emb], dim=1)
+        attention_mask = torch.cat([mm_mask, ocr_mask, dec_mask], dim=1)
+
+        # offsets of each modality in the joint embedding space
+        mm_max_num = mm_mask.size(-1)
+        ocr_max_num = ocr_mask.size(-1)
+        dec_max_num = dec_mask.size(-1)
+        ocr_begin = mm_max_num
+        ocr_end = ocr_begin + ocr_max_num
+
+        # We create a 3D attention mask from a 2D tensor mask.
+        # Sizes are [batch_size, 1, from_seq_length, to_seq_length]
+        # So we can broadcast to
+        # [batch_size, num_heads, from_seq_length, to_seq_length]
+        to_seq_length = attention_mask.size(1)
+        from_seq_length = to_seq_length
+
+        # generate the attention mask similar to prefix LM
+        # all elements can attend to the elements in encoding steps
+        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+        extended_attention_mask = extended_attention_mask.repeat(
+            1, 1, from_seq_length, 1
+        )
+        # decoding step elements can attend to themselves in a causal manner
+        extended_attention_mask[:, :, -dec_max_num:, -dec_max_num:] = _get_causal_mask(
+            dec_max_num, encoder_inputs.device
+        )
+
+        # flip the mask, so that invalid attention pairs have -10000.
+        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
+        assert not extended_attention_mask.requires_grad
+        head_mask = [None] * self.config.num_hidden_layers
+
+        encoder_outputs = self.encoder(
+            encoder_inputs, extended_attention_mask, head_mask=head_mask
+        )
+
+        mmt_seq_output = encoder_outputs[0]
+        mmt_ocr_output = mmt_seq_output[:, ocr_begin:ocr_end]
+        mmt_dec_output = mmt_seq_output[:, -dec_max_num:]
+
+        results = {
+            "mmt_seq_output": mmt_seq_output,
+            "mmt_ocr_output": mmt_ocr_output,
+            "mmt_dec_output": mmt_dec_output,
+        }
+        return results

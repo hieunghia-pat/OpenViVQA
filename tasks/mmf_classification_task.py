@@ -129,7 +129,7 @@ class MmfClassificationTask(BaseTask):
                 out = results["scores"].contiguous()
                 answer = items.answer
                 self.optim.zero_grad()
-                loss = self.loss_fn(out.view(-1, self.vocab.num_choices), answer.view(-1))
+                loss = self.loss_fn(out, answer.view(-1))
                 loss.backward()
 
                 self.optim.step()
@@ -211,8 +211,9 @@ class MmfClassificationTask(BaseTask):
                     result = self.model(items)
                 outs = result["scores"].contiguous()
 
-                answers_gt = self.vocab.decode_answer(items.answer, join_word=True)
-                answers_gen = self.vocab.decode_answer(outs.argmax(dim=-1), join_word=True)
+                question = self.vocab.decode_question(items.question_tokens, join_words=True)
+                answers_gt = self.vocab.decode_answer(items.answer, items.ocr_texts, join_word=True)
+                answers_gen = self.vocab.decode_answer(outs.argmax(dim=-1, keepdim=True), items.ocr_texts, join_word=True)
                 gts = {}
                 gens = {}
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
@@ -223,11 +224,10 @@ class MmfClassificationTask(BaseTask):
                 pbar.update()
 
                 results.append({
-                    "id": items.question_id,
                     "filename": items.filename,
+                    "question": question,
                     "gens": gens,
-                    "gts": gts,
-                    "scores": scores
+                    "gts": gts
                 })
 
                 pbar.update()

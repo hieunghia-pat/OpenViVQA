@@ -36,7 +36,8 @@ class ClassificationTask(BaseTask):
         super().__init__(config)
 
         # use multi-label loss
-        self.loss_fn = BCEWithLogitsLoss()
+        # self.loss_fn = BCEWithLogitsLoss()
+        self.loss_fn = nn.NLLLoss(ignore_index=self.vocab.padding_idx)
 
     def configuring_hyperparameters(self, config):
         self.epoch = 0

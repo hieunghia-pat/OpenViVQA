@@ -122,4 +122,4 @@ class SAAA(BaseClassificationModel):
         combined = torch.cat([v, q], dim=1)
         out = self.classifier(combined)
 
-        return out
+        return F.log_softmax(out, dim=-1)

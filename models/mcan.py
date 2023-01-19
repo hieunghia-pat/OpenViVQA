@@ -78,4 +78,4 @@ class MCAN(BaseClassificationModel):
         output = self.layer_norm(self.vision_proj(weighted_vision_features) + self.text_proj(weighted_text_features))
         output = self.classify(output)
 
-        return output
+        return F.log_softmax(output, dim=-1)

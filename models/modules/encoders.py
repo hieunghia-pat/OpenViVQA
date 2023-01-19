@@ -117,27 +117,6 @@ class Encoder(nn.Module):
         return out
 
 @META_ENCODER.register()
-class MultiModalEncoder(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        
-        self.pos_embedding = SinusoidPositionalEmbedding(config.D_MODEL)
-        self.src_layer_norm = nn.LayerNorm(config.D_MODEL)
-        self.tgt_layer_norm = nn.LayerNorm(config.D_MODEL)
-
-        self.d_model = config.D_MODEL
-        self.layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
-
-    def forward(self, src: torch.Tensor, tgt: torch.Tensor, tgt_padding_mask: torch.Tensor):
-        src = self.src_layer_norm(src) + self.pos_embedding(src)
-        tgt = self.tgt_layer_norm(tgt) + self.pos_embedding(tgt)
-        out = src
-        for layer in self.layers:
-            out = layer(queries=out, keys=tgt, values=tgt, attention_mask=tgt_padding_mask)
-
-        return out
-
-@META_ENCODER.register()
 class GeometricEncoder(nn.Module):
     def __init__(self, config):
         super(Encoder, self).__init__()

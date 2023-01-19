@@ -227,22 +227,22 @@ class VlspEvjVqaTask(BaseTask):
     def start(self):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
             checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
-            use_rl = checkpoint["use_rl"]
+            # use_rl = checkpoint["use_rl"]
             best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"] + 1
             self.optim.load_state_dict(checkpoint['optimizer'])
             self.scheduler.load_state_dict(checkpoint['scheduler'])
         else:
-            use_rl = False
+            # use_rl = False
             best_val_score = .0
             patience = 0
 
         while True:
-            if not use_rl:
-                self.train()
-            else:
-                self.train_scst()
+            # if not use_rl:
+            self.train()
+            # else:
+            #     self.train_scst()
 
             self.evaluate_loss(self.dev_dataloader)
 
@@ -260,27 +260,27 @@ class VlspEvjVqaTask(BaseTask):
             else:
                 patience += 1
 
-            switch_to_rl = False
+            # switch_to_rl = False
             exit_train = False
 
             if patience == self.patience:
-                if not use_rl:
-                    use_rl = True
-                    switch_to_rl = True
-                    patience = 0
-                    self.optim = Adam(self.model.parameters(), lr=self.rl_learning_rate)
-                    logger.info("Switching to RL")
-                else:
-                    logger.info('patience reached.')
-                    exit_train = True
+                # if not use_rl:
+                #     use_rl = True
+                #     switch_to_rl = True
+                #     patience = 0
+                #     self.optim = Adam(self.model.parameters(), lr=self.rl_learning_rate)
+                #     logger.info("Switching to RL")
+                # else:
+                logger.info('patience reached.')
+                exit_train = True
 
-            if switch_to_rl and not best:
-                self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
+            # if switch_to_rl and not best:
+            #     self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
 
             self.save_checkpoint({
                 'best_val_score': best_val_score,
                 'patience': patience,
-                'use_rl': use_rl
+                # 'use_rl': use_rl
             })
 
             if best:

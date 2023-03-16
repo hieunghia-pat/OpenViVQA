@@ -1,4 +1,5 @@
 from .vocab import Vocab
+from .character_vocab import CharacterVocab
 from .multilingual_classification_vocab import MultilingualClassificationVocab
 from .multilingual_multimodal_vocab import MultilingualMultiModalVocab
 from .multimodal_vocab import MultiModalVocab

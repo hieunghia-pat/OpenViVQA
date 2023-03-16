@@ -156,10 +156,9 @@ class ClassificationTask(BaseTask):
         while True:
             self.train()
 
-            # self.evaluate_loss(self.dev_dataloader)
-
             # val scores
             scores = self.evaluate_metrics(self.dev_dataloader)
+            scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
@@ -229,6 +228,7 @@ class ClassificationTask(BaseTask):
                 pbar.update()
 
         scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+        scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
         logger.info("Evaluation scores on test: %s", scores)
 
         json.dump({

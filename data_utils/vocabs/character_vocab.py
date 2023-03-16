@@ -72,7 +72,7 @@ class CharacterVocab(object):
                     question = preprocess_sentence(ann["question"], self.tokenizer)
                     answer = " ".join(preprocess_sentence(answer, self.tokenizer))
                     self.freqs.update(question)
-                    self.freqs.update(answer)
+                    self.freqs.update(list(answer))
                     if len(question) + 2 > self.max_question_length:
                             self.max_question_length = len(question) + 2
                     if len(answer) + 2 > self.max_answer_length:

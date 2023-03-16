@@ -1,5 +1,6 @@
 from .cross_modality_transformer import CrossModalityTransformer
 from .mcan import MCAN
+from .hierarchical_co_attention import HierarchicalCoAttention
 from .iterative_mcan import IterativeMCAN
 from .readable_iterative_mcan import ReadableIterativeMCAN
 from .saaa import SAAA

@@ -39,7 +39,7 @@ class HierarchicalFeaturesExtractor(nn.Module):
     def forward(self, features: torch.Tensor):
         ngrams_features = []
         for conv in self.convs:
-            ngrams_features.append(conv(features))
+            ngrams_features.append(conv(features.permute((0, -1, 1))).permute((0, -1, 1)))
         
         features_len = features.shape[-1]
         unigram_features = ngrams_features[0]

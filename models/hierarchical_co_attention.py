@@ -46,10 +46,10 @@ class HierarchicalFeaturesExtractor(nn.Module):
         # for each token in the unigram
         for ith in range(features_len):
             # for each n-gram, we ignore the unigram
-            for ngram in self.ngrams[1:]:
+            for ngram in range(1, max(self.ngrams)):
                 # summing all possible n-gram tokens into the unigram
-                for prev_ith in range(max(0, ith-ngram+1), min(ith+1, len(ngrams_features[ngram]))):
-                    unigram_features[:, ith] += ngrams_features[ngram][prev_ith][:, prev_ith]
+                for prev_ith in range(max(0, ith-ngram+1), min(ith+1, ngrams_features[ngram].shape[1])):
+                    unigram_features[:, ith] += ngrams_features[ngram][:, prev_ith]
 
         return unigram_features
 
@@ -81,7 +81,7 @@ class HierarchicalCoAttention(nn.Module):
     def forward(self, input_features: InstanceList):
         # embedding input features
         vision_features, vision_padding_masks = self.vision_embedding(input_features.region_features)
-        text_features, (text_padding_masks, ) = self.question_embedding(input_features.question_tokens)
+        text_features, (text_padding_masks, _) = self.question_embedding(input_features.question_tokens)
 
         # performing hierarchical feature extraction
         text_features = self.hierarchical_extractor(text_features)

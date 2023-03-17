@@ -47,7 +47,7 @@ TRAINING:
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: HierarchicalCoAttention
+  ARCHITECTURE: ParallelAttentionTransformer
   NAME: hierarchical_co_attention
   DEVICE: cuda
   D_MODEL: 512
@@ -63,14 +63,6 @@ MODEL:
     DROPOUT: 0.1
     WORD_EMBEDDING: Null
     WORD_EMBEDDING_CACHE: null
-  HIERARCHICAL:
-    D_MODEL: 300
-    WORD_EMBEDDING_DIM: 300
-    N_GRAMS:
-     - 1
-     - 2
-     - 3
-     - 4
   ENCODER:
     ARCHITECTURE: CoAttentionEncoder
     D_MODEL: 512

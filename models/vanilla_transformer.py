@@ -23,47 +23,14 @@ class MLP(nn.Module):
 
         return output
 
-class HierarchicalFeaturesExtractor(nn.Module):
-    def __init__(self, config) -> None:
-        super().__init__()
-
-        self.ngrams = config.N_GRAMS
-        self.convs = nn.ModuleList()
-        for ngram in self.ngrams:
-            self.convs.append(
-                nn.Conv1d(in_channels=config.WORD_EMBEDDING_DIM, out_channels=config.D_MODEL, kernel_size=ngram)
-            )
-
-        self.reduce_features = nn.Linear(config.D_MODEL, config.D_MODEL)
-
-    def forward(self, features: torch.Tensor):
-        ngrams_features = []
-        for conv in self.convs:
-            ngrams_features.append(conv(features.permute((0, -1, 1))).permute((0, -1, 1)))
-        
-        features_len = features.shape[-1]
-        unigram_features = ngrams_features[0]
-        # for each token in the unigram
-        for ith in range(features_len):
-            # for each n-gram, we ignore the unigram
-            for ngram in range(1, max(self.ngrams)):
-                # summing all possible n-gram tokens into the unigram
-                for prev_ith in range(max(0, ith-ngram+1), min(ith+1, ngrams_features[ngram].shape[1])):
-                    unigram_features[:, ith] += ngrams_features[ngram][:, prev_ith]
-
-        return unigram_features
-
 @META_ARCHITECTURE.register()
-class HierarchicalCoAttention(nn.Module):
+class VanillaTransformer(nn.Module):
     def __init__(self, config, vocab) -> None:
         super().__init__()
 
         # embedding module
         self.vision_embedding = build_vision_embedding(config.VISION_EMBEDDING)
         self.question_embedding = build_text_embedding(config.TEXT_EMBEDDING, vocab)
-        
-        # hierarchical feature extractors for texts
-        self.hierarchical_extractor = HierarchicalFeaturesExtractor(config.HIERARCHICAL)
 
         # co-attention module
         self.encoder = build_encoder(config.ENCODER)
@@ -82,9 +49,6 @@ class HierarchicalCoAttention(nn.Module):
         # embedding input features
         vision_features, vision_padding_masks = self.vision_embedding(input_features.region_features)
         text_features, (text_padding_masks, _) = self.question_embedding(input_features.question_tokens)
-
-        # performing hierarchical feature extraction
-        text_features = self.hierarchical_extractor(text_features)
 
         # performing co-attention
         vision_features, text_features = self.encoder(vision_features, vision_padding_masks, 

@@ -36,11 +36,9 @@ class VanillaTransformer(nn.Module):
         self.encoder = build_encoder(config.ENCODER)
 
         # attributes reduction and classifier
-        self.vision_attr_reduce = MLP(config.VISION_ATTR_REDUCE)
-        self.text_attr_reduce = MLP(config.TEXT_ATTR_REDUCE)
+        self.attr_reduce = MLP(config.ATTR_REDUCE)
 
-        self.vision_proj = nn.Linear(config.D_MODEL, config.D_MODEL)
-        self.text_proj = nn.Linear(config.D_MODEL, config.D_MODEL)
+        self.proj = nn.Linear(config.D_MODEL, config.D_MODEL)
         self.layer_norm = nn.LayerNorm(config.D_MODEL)
 
         self.classify = nn.Linear(config.D_MODEL, vocab.total_answers)
@@ -50,19 +48,17 @@ class VanillaTransformer(nn.Module):
         vision_features, vision_padding_masks = self.vision_embedding(input_features.region_features)
         text_features, (text_padding_masks, _) = self.question_embedding(input_features.question_tokens)
 
-        # performing co-attention
-        vision_features, text_features = self.encoder(vision_features, vision_padding_masks, 
-                                                        text_features, text_padding_masks)
+        fused_features = torch.cat([vision_features, text_features], dim=-1)
+        fused_padding_masks = torch.cat([vision_padding_masks, text_padding_masks], dim=-1)
+
+        fused_features = self.encoder(fused_features, fused_padding_masks)
         
-        attended_vision_features = self.vision_attr_reduce(vision_features)
-        attended_vision_features = F.softmax(attended_vision_features, dim=1)
-        attended_text_features = self.text_attr_reduce(text_features)
-        attended_text_features = F.softmax(attended_text_features, dim=1)
+        attended_features = self.attr_reduce(fused_features)
+        attended_features = F.softmax(attended_features, dim=1)
 
-        weighted_vision_features = (vision_features * attended_vision_features).sum(dim=1)
-        weighted_text_features = (text_features * attended_text_features).sum(dim=1)
+        weighted_features = (fused_features * attended_features).sum(dim=1)
 
-        output = self.layer_norm(self.vision_proj(weighted_vision_features) + self.text_proj(weighted_text_features))
+        output = self.layer_norm(self.proj(weighted_features))
         output = self.classify(output)
 
         return F.log_softmax(output, dim=-1)

@@ -48,7 +48,7 @@ class VanillaTransformer(nn.Module):
         vision_features, vision_padding_masks = self.vision_embedding(input_features.region_features)
         text_features, (text_padding_masks, _) = self.question_embedding(input_features.question_tokens)
 
-        fused_features = torch.cat([vision_features, text_features], dim=-1)
+        fused_features = torch.cat([vision_features, text_features], dim=1)
         fused_padding_masks = torch.cat([vision_padding_masks, text_padding_masks], dim=-1)
 
         fused_features = self.encoder(fused_features, fused_padding_masks)

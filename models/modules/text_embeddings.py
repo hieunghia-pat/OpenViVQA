@@ -206,10 +206,10 @@ class LSTMTextEmbedding(nn.Module):
 
 @META_TEXT_EMBEDDING.register()
 class HierarchicalFeaturesExtractor(nn.Module):
-    def __init__(self, config) -> None:
+    def __init__(self, config, vocab) -> None:
         super().__init__()
 
-        self.embedding = UsualEmbedding(config)
+        self.embedding = UsualEmbedding(config, vocab)
 
         self.ngrams = config.N_GRAMS
         self.convs = nn.ModuleList()

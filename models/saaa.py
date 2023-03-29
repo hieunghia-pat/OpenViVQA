@@ -5,6 +5,7 @@ from torch.nn import init, functional as F
 from models.base_classification import BaseClassificationModel
 from builders.model_builder import META_ARCHITECTURE
 from builders.vision_embedding_builder import build_vision_embedding
+from builders.text_embedding_builder import build_text_embedding
 from utils.instance import InstanceList
 
 class CoAttention(nn.Module):
@@ -25,35 +26,35 @@ class CoAttention(nn.Module):
         x = self.x_conv(self.drop(x))
         return x
 
-class TextProcessor(nn.Module):
-    def __init__(self, config, vocab):
-        super(TextProcessor, self).__init__()
-        self.embedding = nn.Embedding(len(vocab.stoi), config.D_EMBEDDING, padding_idx=0)
-        if vocab.word_embeddings is not None:
-            self.embedding.from_pretrained(vocab.vectors, padding_idx=vocab.stoi["<pad>"])
-        self.drop = nn.Dropout(config.DROPOUT)
-        self.tanh = nn.Tanh()
-        self.lstm = nn.LSTM(input_size=config.D_EMBEDDING,
-                            hidden_size=config.D_MODEL,
-                            num_layers=1,
-                            batch_first=True)
+# class TextProcessor(nn.Module):
+#     def __init__(self, config, vocab):
+#         super(TextProcessor, self).__init__()
+#         self.embedding = nn.Embedding(len(vocab.stoi), config.D_EMBEDDING, padding_idx=0)
+#         if vocab.word_embeddings is not None:
+#             self.embedding.from_pretrained(vocab.vectors, padding_idx=vocab.stoi["<pad>"])
+#         self.drop = nn.Dropout(config.DROPOUT)
+#         self.tanh = nn.Tanh()
+#         self.lstm = nn.LSTM(input_size=config.D_EMBEDDING,
+#                             hidden_size=config.D_MODEL,
+#                             num_layers=1,
+#                             batch_first=True)
 
-        self._init_lstm(self.lstm.weight_ih_l0)
-        self._init_lstm(self.lstm.weight_hh_l0)
-        self.lstm.bias_ih_l0.data.zero_()
-        self.lstm.bias_hh_l0.data.zero_()
+#         self._init_lstm(self.lstm.weight_ih_l0)
+#         self._init_lstm(self.lstm.weight_hh_l0)
+#         self.lstm.bias_ih_l0.data.zero_()
+#         self.lstm.bias_hh_l0.data.zero_()
 
-        init.xavier_uniform_(self.embedding.weight)
+#         init.xavier_uniform_(self.embedding.weight)
 
-    def _init_lstm(self, weight):
-        for w in weight.chunk(4, 0):
-            init.xavier_uniform_(w)
+#     def _init_lstm(self, weight):
+#         for w in weight.chunk(4, 0):
+#             init.xavier_uniform_(w)
 
-    def forward(self, q):
-        embedded = self.embedding(q)
-        tanhed = self.tanh(self.drop(embedded))
-        _, (_, c) = self.lstm(tanhed)
-        return c.squeeze(0)
+#     def forward(self, q):
+#         embedded = self.embedding(q)
+#         tanhed = self.tanh(self.drop(embedded))
+#         _, (_, c) = self.lstm(tanhed)
+#         return c.squeeze(0)
 
 class Classifier(nn.Sequential):
     def __init__(self, in_features, mid_features, out_features, drop=0.0):
@@ -76,7 +77,7 @@ class SAAA(BaseClassificationModel):
         self.device = torch.device(config.DEVICE)
 
         self.vision = build_vision_embedding(config.VISION_PROCESSOR)
-        self.text = TextProcessor(config.TEXT_PROCESSOR, vocab)
+        self.text = build_text_embedding(config.TEXT_PROCESSOR, vocab)
         self.attention = CoAttention(config.ATTENTION)
 
         self.classifier = Classifier(
@@ -113,7 +114,7 @@ class SAAA(BaseClassificationModel):
         q = input_features.question_tokens
 
         v, _ = self.vision(v)
-        q = self.text(q)
+        q, _ = self.text(q)
 
         v = v / (v.norm(p=2, dim=1, keepdim=True).expand_as(v) + 1e-8)
         a = self.attention(v, q)

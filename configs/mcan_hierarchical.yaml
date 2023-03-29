@@ -3,7 +3,7 @@ TASK: ClassificationTask
 DATASET:
   FEATURE_DATASET:
     TYPE: FeatureClassificationDataset
-    BATCH_SIZE: 60
+    BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
       FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
@@ -35,32 +35,80 @@ DATASET:
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
-  LEARNING_RATE: 0.01
+  LEARNING_RATE: 1.
   WARMUP: 10000
   SCORE: CIDEr
   GET_SCORES: True
+  TRAINING_BEAM_SIZE: 5
+  EVALUATING_BEAM_SIZE: 3
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: SAAA
-  NAME: saaa_region_x152++_faster_rcnn
+  ARCHITECTURE: MCAN
+  NAME: mcan_region_x152++_faster_rcnn
   DEVICE: cuda
   D_MODEL: 512
-  VISION_PROCESSOR:
+  VISION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
     D_FEATURE: 1024
     D_MODEL: 512
-    DROPOUT: .1
-  TEXT_PROCESSOR:
-    ARCHITECTURE: LSTMTextEmbedding
+    DROPOUT: 0.1
+  TEXT_EMBEDDING:
+    ARCHITECTURE: HierarchicalFeaturesExtractor
     D_MODEL: 512
     D_EMBEDDING: 300
+    N_GRAMS:
+     - 1
+     - 2
+     - 3
+     - 4
     DROPOUT: 0.1
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
-  ATTENTION:
-    D_VISION: 512
-    D_LANGUAGE: 512
+  SELF_ENCODER:
+    ARCHITECTURE: Encoder
     D_MODEL: 512
-    DROPOUT: .1
-    GLIMPSES: 2
+    LAYERS: 3
+    SELF_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+  GUIDED_ENCODER:
+    ARCHITECTURE: GuidedAttentionEncoder
+    D_MODEL: 512
+    LAYERS: 3
+    SELF_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+    GUIDED_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+  VISION_ATTR_REDUCE:
+    D_MODEL: 512
+    DROPOUT: 0.1
+  TEXT_ATTR_REDUCE:
+    D_MODEL: 512
+    DROPOUT: 0.1

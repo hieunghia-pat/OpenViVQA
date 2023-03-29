@@ -52,9 +52,14 @@ MODEL:
     D_MODEL: 512
     DROPOUT: .1
   TEXT_PROCESSOR:
-    ARCHITECTURE: LSTMTextEmbedding
+    ARCHITECTURE: HierarchicalFeaturesExtractor
     D_MODEL: 512
     D_EMBEDDING: 300
+    N_GRAMS:
+     - 1
+     - 2
+     - 3
+     - 4
     DROPOUT: 0.1
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null

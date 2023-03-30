@@ -215,7 +215,7 @@ class HierarchicalFeaturesExtractor(nn.Module):
         self.convs = nn.ModuleList()
         for ngram in self.ngrams:
             self.convs.append(
-                nn.Conv1d(in_channels=config.D_EMBEDDING, out_channels=config.D_MODEL, kernel_size=ngram)
+                nn.Conv1d(in_channels=config.D_MODEL, out_channels=config.D_MODEL, kernel_size=ngram)
             )
 
         self.reduce_features = nn.Linear(config.D_MODEL, config.D_MODEL)

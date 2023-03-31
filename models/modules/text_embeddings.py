@@ -215,7 +215,7 @@ class HierarchicalFeaturesExtractor(nn.Module):
         self.convs = nn.ModuleList()
         for ngram in self.ngrams:
             self.convs.append(
-                nn.Conv1d(in_channels=config.D_EMBEDDING, out_channels=config.D_MODEL, kernel_size=ngram)
+                nn.Conv1d(in_channels=config.D_MODEL, out_channels=config.D_MODEL, kernel_size=ngram)
             )
 
         self.reduce_features = nn.Linear(config.D_MODEL, config.D_MODEL)
@@ -227,15 +227,20 @@ class HierarchicalFeaturesExtractor(nn.Module):
         for conv in self.convs:
             ngrams_features.append(conv(features.permute((0, -1, 1))).permute((0, -1, 1)))
         
-        features_len = features.shape[-1]
-        unigram_features = ngrams_features[0]
+        features_len = features.shape[1]
+        # by default we copy the unigram features to separate vectors
+        if self.ngrams[0] == 1:
+            unigram_features = ngrams_features[0]
+            ngrams_features[0] = 0
+        else:
+            # else the unigram features are the features extracted from the pretrained word embedding
+            unigram_features = features
         # for each token in the unigram
         for ith in range(features_len):
-            # for each n-gram, we ignore the unigram
-            for ngram in range(1, max(self.ngrams)):
+            for ngram in self.ngrams:
                 # summing all possible n-gram tokens into the unigram
-                for prev_ith in range(max(0, ith-ngram+1), min(ith+1, ngrams_features[ngram].shape[1])):
-                    unigram_features[:, ith] += ngrams_features[ngram][:, prev_ith]
+                for prev_ith in range(max(0, ith-ngram+1), min(ith+1, ngrams_features[ith].shape[1])):
+                    unigram_features[:, ith] += ngrams_features[ith][:, prev_ith]
 
         return unigram_features, (padding_masks, sequential_masks)
 

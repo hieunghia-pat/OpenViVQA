@@ -228,19 +228,24 @@ class HierarchicalFeaturesExtractor(nn.Module):
             ngrams_features.append(conv(features.permute((0, -1, 1))).permute((0, -1, 1)))
         
         features_len = features.shape[1]
-        # by default we copy the unigram features to separate vectors
+        batch_size = tokens.shape[0]
+        d_model = features.shape[-1]
+        total_ngrams = len(self.ngrams)
+        ngram_for_unigram_features = torch.zeros((total_ngrams, batch_size, features_len, d_model))
         if self.ngrams[0] == 1:
-            unigram_features = ngrams_features[0]
-            ngrams_features[0] = 0
+            ngram_for_unigram_features[0] = ngrams_features[0]
         else:
-            # else the unigram features are the features extracted from the pretrained word embedding
-            unigram_features = features
-        # for each token in the unigram
-        for ith in range(features_len):
-            for ngram in self.ngrams:
-                # summing all possible n-gram tokens into the unigram
-                for prev_ith in range(max(0, ith-ngram+1), min(ith+1, ngrams_features[ith].shape[1])):
-                    unigram_features[:, ith] += ngrams_features[ith][:, prev_ith]
+            ngram_for_unigram_features[0] = features
+
+        # for each ngram features
+        for ngram_ith, ngram in enumerate(self.ngrams):
+            # summing all possible n-gram tokens into the unigram
+            ngram_features_len = ngrams_features[ngram_ith].shape[1]
+            for prev_ith in range(ngram_features_len):
+                for ith in range(prev_ith, prev_ith+ngram-1):
+                    ngram_for_unigram_features[ngram_ith, :, ith, :] = ngrams_features[ngram_ith][:, prev_ith]
+
+        unigram_features = ngram_for_unigram_features.sum(0).to(tokens.device)
 
         return unigram_features, (padding_masks, sequential_masks)
 

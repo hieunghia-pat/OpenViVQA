@@ -1,4 +1,3 @@
-import functools
 import math
 
 import torch
@@ -7,13 +6,14 @@ import torch.nn.functional as F
 from torch import nn
 from transformers.models.bert.modeling_bert import (
     BertConfig,
-    BertEmbeddings,
     BertEncoder,
     BertPreTrainedModel,
 )
 
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
+from models.utils import generate_padding_mask, generate_sequential_mask
+from models.modules.text_embeddings import TextBert
 
 logger = setup_logger()
 
@@ -129,9 +129,9 @@ class MMF_M4C(nn.Module):
         fwd_results["txt_inds"] = items.question_tokens
 
         # binary mask of valid text (question words) vs padding
-        text_len = (items.question_tokens != self.vocab.padding_idx).sum(dim=-1)
-        fwd_results["txt_mask"] = _get_mask(
-            text_len, items.question_tokens.size(1)
+        fwd_results["txt_mask"] = generate_padding_mask(
+            items.question_tokens,
+            padding_idx=self.vocab.padding_idx
         )
 
     def _forward_obj_encoding(self, items, fwd_results):
@@ -145,8 +145,10 @@ class MMF_M4C(nn.Module):
         fwd_results["obj_mmt_in"] = obj_mmt_in
 
         # binary mask of valid object vs padding
-        obj_nums = (items.region_features.sum(dim=-1) != 0).sum(dim=-1)
-        fwd_results["obj_mask"] = _get_mask(obj_nums, obj_mmt_in.size(1))
+        fwd_results["obj_mask"] = generate_padding_mask(
+            obj_feat,
+            padding_idx=0
+        )
 
     def _forward_ocr_encoding(self, items, fwd_results):
         # OCR FastText feature (300-dim)
@@ -174,8 +176,10 @@ class MMF_M4C(nn.Module):
         fwd_results["ocr_mmt_in"] = ocr_mmt_in
 
         # binary mask of valid OCR vs padding
-        ocr_nums = (items.ocr_det_features.sum(dim=-1) != 0).sum(dim=-1)
-        fwd_results["ocr_mask"] = _get_mask(ocr_nums, ocr_mmt_in.size(1))
+        fwd_results["ocr_mask"] = generate_padding_mask(
+            ocr_feat,
+            padding_idx=0
+        )
 
     def _forward_mmt(self, items, fwd_results):
         # first forward the text BERT layers
@@ -232,30 +236,6 @@ class MMF_M4C(nn.Module):
                 last_ids = torch.where(last_ids == self.vocab.eos_idx, last_ids, argmax_inds[:, ith])
                 if last_ids.mean() == self.vocab.eos_idx:
                     break
-
-class TextBert(BertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
-
-        self.embeddings = BertEmbeddings(config)
-        self.encoder = BertEncoder(config)
-        self.init_weights()
-
-    def forward(self, txt_inds, txt_mask):
-        encoder_inputs = self.embeddings(txt_inds)
-        attention_mask = txt_mask
-
-        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
-        assert not extended_attention_mask.requires_grad
-        head_mask = [None] * self.config.num_hidden_layers
-
-        encoder_outputs = self.encoder(
-            encoder_inputs, extended_attention_mask, head_mask=head_mask
-        )
-        seq_output = encoder_outputs[0]
-
-        return seq_output
 
 
 class MMT(BertPreTrainedModel):
@@ -316,12 +296,8 @@ class MMT(BertPreTrainedModel):
             1, 1, from_seq_length, 1
         )
         # decoding step elements can attend to themselves in a causal manner
-        extended_attention_mask[:, :, -dec_max_num:, -dec_max_num:] = _get_causal_mask(
-            dec_max_num, encoder_inputs.device
-        )
+        extended_attention_mask[:, :, -dec_max_num:, -dec_max_num:] = generate_sequential_mask(dec_max_num)
 
-        # flip the mask, so that invalid attention pairs have -10000.
-        extended_attention_mask = (1.0 - extended_attention_mask) * -10000.0
         assert not extended_attention_mask.requires_grad
         head_mask = [None] * self.config.num_hidden_layers
 
@@ -356,10 +332,6 @@ class OcrPtrNet(nn.Module):
         self.key = nn.Linear(hidden_size, query_key_size)
 
     def forward(self, query_inputs, key_inputs, attention_mask):
-        extended_attention_mask = (1.0 - attention_mask) * -10000.0
-        assert extended_attention_mask.dim() == 2
-        extended_attention_mask = extended_attention_mask.unsqueeze(1)
-
         query_layer = self.query(query_inputs)
         if query_layer.dim() == 2:
             query_layer = query_layer.unsqueeze(1)
@@ -370,7 +342,7 @@ class OcrPtrNet(nn.Module):
 
         scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
         scores = scores / math.sqrt(self.query_key_size)
-        scores = scores + extended_attention_mask
+        scores = scores + attention_mask
         if squeeze_result:
             scores = scores.squeeze(1)
 
@@ -424,25 +396,6 @@ class PrevPredEmbeddings(nn.Module):
         dec_emb = raw_dec_emb + embeddings
 
         return dec_emb
-
-def _get_mask(nums, max_num):
-    # non_pad_mask: b x lq, torch.float32, 0. on PAD
-    batch_size = nums.size(0)
-    arange = torch.arange(0, max_num).unsqueeze(0).expand(batch_size, -1)
-    non_pad_mask = arange.to(nums.device).lt(nums.unsqueeze(-1))
-    non_pad_mask = non_pad_mask.type(torch.float32)
-    return non_pad_mask
-
-
-@functools.lru_cache(maxsize=32)
-def _get_causal_mask(seq_length, device):
-    # generate a lower triangular mask
-    mask = torch.zeros(seq_length, seq_length, device=device)
-    for i in range(seq_length):
-        for j in range(i + 1):
-            mask[i, j] = 1.0
-    return mask
-
 
 def _batch_gather(x, inds):
     assert x.dim() == 3

@@ -309,8 +309,8 @@ class BertEmbedding(nn.Module):
 
         bert_config = BertConfig(
             hidden_size=config.HIDDEN_SIZE,
-            num_hidden_layers=config.LAYERS,
-            num_attention_heads=config.HEAD
+            num_hidden_layers=config.NUM_HIDDEN_LAYERS,
+            num_attention_heads=config.NUM_ATTENTION_HEADS
         )
 
         self.tokenizer = BertTokenizer.from_pretrained(config.PRETRAINED_NAME)
@@ -368,8 +368,8 @@ class AlbertEmbedding(nn.Module):
 
         albert_config = AlbertConfig(
             hidden_size=config.HIDDEN_SIZE,
-            num_hidden_layers=config.LAYERS,
-            num_attention_heads=config.HEAD
+            num_hidden_layers=config.NUM_HIDDEN_LAYERS,
+            num_attention_heads=config.NUM_ATTENTION_HEADS
         )
 
         self.tokenizer = AlbertTokenizer.from_pretrained(config.PRETRAINED_NAME)
@@ -425,8 +425,8 @@ class RobertaEmbedding(nn.Module):
 
         roberta_config = RobertaConfig(
             hidden_size=config.HIDDEN_SIZE,
-            num_hidden_layers=config.LAYERS,
-            num_attention_heads=config.HEAD
+            num_hidden_layers=config.NUM_HIDDEN_LAYERS,
+            num_attention_heads=config.NUM_ATTENTION_HEADS
         )
 
         self.tokenizer = RobertaTokenizer.from_pretrained(config.PRETRAINED_NAME)
@@ -482,8 +482,8 @@ class DebertaEmbedding(nn.Module):
 
         deberta_config = DebertaV2Config(
             hidden_size=config.HIDDEN_SIZE,
-            num_hidden_layers=config.LAYERS,
-            num_attention_heads=config.HEAD
+            num_hidden_layers=config.NUM_HIDDEN_LAYERS,
+            num_attention_heads=config.NUM_ATTENTION_HEADS
         )
 
         self.tokenizer = DebertaTokenizer.from_pretrained(config.PRETRAINED_NAME)
@@ -539,8 +539,8 @@ class XLMRobertaEmbedding(nn.Module):
 
         xlm_config = XLMRobertaConfig(
             hidden_size=config.HIDDEN_SIZE,
-            num_hidden_layers=config.LAYERS,
-            num_attention_heads=config.HEAD
+            num_hidden_layers=config.NUM_HIDDEN_LAYERS,
+            num_attention_heads=config.NUM_ATTENTION_HEADS
         )
 
         self.tokenizer = XLMTokenizer.from_pretrained(config.PRETRAINED_NAME)

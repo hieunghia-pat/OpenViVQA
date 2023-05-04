@@ -133,6 +133,7 @@ class TrainingMMF(OpenEndedTask):
 
             # val scores
             scores = self.evaluate_metrics(self.dev_dict_dataloader)
+            scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
@@ -207,6 +208,7 @@ class TrainingMMF(OpenEndedTask):
                 pbar.update()
 
         scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+        scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
         logger.info("Evaluation scores on test: %s", scores)
 
         json.dump({

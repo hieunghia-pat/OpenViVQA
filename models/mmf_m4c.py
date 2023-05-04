@@ -103,11 +103,9 @@ class MMF_M4C(nn.Module):
 
     def _forward_txt_encoding(self, items, fwd_results):
         fwd_results["txt_inputs"] = items.question
-
-        # binary mask of valid text (question words) vs padding
-        fwd_results["txt_mask"] = generate_padding_mask(
-            items.question_tokens,
-            padding_idx=self.vocab.padding_idx
+        
+        fwd_results["txt_emb"], fwd_results["txt_mask"] = self.text_bert(
+            fwd_results["txt_inputs"]
         )
 
     def _forward_obj_encoding(self, items, fwd_results):
@@ -158,11 +156,6 @@ class MMF_M4C(nn.Module):
         )
 
     def _forward_mmt(self, items, fwd_results):
-        # first forward the text BERT layers
-        fwd_results["txt_emb"], fwd_results["txt_mask"] = self.text_bert(
-            fwd_results["txt_inputs"]
-        )
-
         mmt_results = self.mmt(
             txt_emb=fwd_results["txt_emb"],
             txt_mask=fwd_results["txt_mask"],

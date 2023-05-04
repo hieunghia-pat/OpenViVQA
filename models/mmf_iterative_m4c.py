@@ -3,8 +3,8 @@ from torch import nn
 from torch.nn import functional as F
 from transformers.models.bert.modeling_bert import BertConfig, BertEncoder
 
-from .mmf_regional_m4c import PrevPredEmbeddings, _get_causal_mask, _get_mask
-from .mmf_m4c import OcrPtrNet, TextBert
+from .mmf_regional_m4c import PrevPredEmbeddings
+from .mmf_m4c import OcrPtrNet
 from builders.model_builder import META_ARCHITECTURE
 from utils.logging_utils import setup_logger
 

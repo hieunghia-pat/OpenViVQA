@@ -6,8 +6,8 @@ DATASET:
     BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
-      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
-      SCENE_TEXT: features/OpenViVQA/features/swintextspotter
+      FEATURES: vinvl_vinvl
+      SCENE_TEXT: swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -18,8 +18,8 @@ DATASET:
     BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
-      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
-      SCENE_TEXT: features/OpenViVQA/features/swintextspotter
+      FEATURES: vinvl_vinvl
+      SCENE_TEXT: swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -45,13 +45,13 @@ DATASET:
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
     JSON_PATH:
-      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
-      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
-      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+      TRAIN: openvivqa_train_v2.json
+      DEV: openvivqa_dev_v2.json
+      TEST: openvivqa_test_v2.json
   JSON_PATH:
-    TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
-    DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
-    TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+    TRAIN: openvivqa_train_v2.json
+    DEV: openvivqa_dev_v2.json
+    TEST: openvivqa_test_v2.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -69,7 +69,7 @@ MODEL:
   DEVICE: cuda
   D_MODEL: 768
   OBJECT_EMBEDDING:
-    D_FEATURE: 1024
+    D_FEATURE: 2048
     DROPOUT: .1
   BOX_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
@@ -86,27 +86,21 @@ MODEL:
   OCR_PTR_NET:
     HIDDEN_SIZE: 768
     QUERY_KEY_SIZE: 768
-    OCR_MAX_NUM: 30
+    OCR_MAX_NUM: 100
   CLASSIFIER:
-    OCR_MAX_NUM: 30
+    OCR_MAX_NUM: 100
   MMT:
     HIDDEN_SIZE: 768
     NUM_HIDDEN_LAYERS: 4
-    NUM_ATTENTION_HEADS: 8
+    NUM_ATTENTION_HEADS: 12
   TEXT_BERT:
+    ARCHITECTURE: BertEmbedding
     HIDDEN_SIZE: 768
     NUM_HIDDEN_LAYERS: 12
     NUM_ATTENTION_HEADS: 12
-    D_MODEL: 512
+    D_MODEL: 768
     DROPOUT: .1
     LOAD_PRETRAINED: True
     FREEZE_WEIGHTS: True
     PRETRAINED_NAME: "bert-base-uncased"
-  TEXT_EMBEDDING:
-    ARCHITECTURE: UsualEmbedding
     DEVICE: cuda
-    D_EMBEDDING: 300
-    D_MODEL: 768
-    DROPOUT: .1
-    WORD_EMBEDDING: null
-    WORD_EMBEDDING_CACHE: null  

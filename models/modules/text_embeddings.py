@@ -317,6 +317,7 @@ class BertEmbedding(nn.Module):
         self.embedding = TextBert(bert_config)
         if config.LOAD_PRETRAINED:
             self.embedding = self.embedding.from_pretrained(config.PRETRAINED_NAME)
+        if config.FREEZE_WEIGHTS:
             # freeze all parameters of pretrained model
             for param in self.embedding.parameters():
                 param.requires_grad = False
@@ -376,6 +377,7 @@ class AlbertEmbedding(nn.Module):
         self.embedding = TextAlbert(albert_config)
         if config.LOAD_PRETRAINED:
             self.embedding = self.embedding.from_pretrained(config.PRETRAINED_NAME)
+        if config.FREEZE_WEIGHTS:
             # freeze all parameters of pretrained model
             for param in self.embedding.parameters():
                 param.requires_grad = False
@@ -433,6 +435,7 @@ class RobertaEmbedding(nn.Module):
         self.embedding = TextRoberta(roberta_config)
         if config.LOAD_PRETRAINED:
             self.embedding = self.embedding.from_pretrained(config.PRETRAINED_NAME)
+        if config.FREEZE_WEIGHTS:
             # freeze all parameters of pretrained model
             for param in self.embedding.parameters():
                 param.requires_grad = False
@@ -490,6 +493,7 @@ class DebertaEmbedding(nn.Module):
         self.embedding = TextDeberta_v2(deberta_config)
         if config.LOAD_PRETRAINED:
             self.embedding = self.embedding.from_pretrained(config.PRETRAINED_NAME)
+        if config.FREEZE_WEIGHTS:
             # freeze all parameters of pretrained model
             for param in self.embedding.parameters():
                 param.requires_grad = False
@@ -547,6 +551,7 @@ class XLMRobertaEmbedding(nn.Module):
         self.embedding = TextXLM(xlm_config)
         if config.LOAD_PRETRAINED:
             self.embedding = self.embedding.from_pretrained(config.PRETRAINED_NAME)
+        if config.FREEZE_WEIGHTS:
             # freeze all parameters of pretrained model
             for param in self.embedding.parameters():
                 param.requires_grad = False

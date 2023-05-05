@@ -6,8 +6,8 @@ DATASET:
     BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
-      FEATURES: vinvl_vinvl
-      SCENE_TEXT: swintextspotter
+      FEATURES: features/OpenViVQA/vinvl_vinvl
+      SCENE_TEXT: features/OpenViVQA/swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -18,8 +18,8 @@ DATASET:
     BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
-      FEATURES: vinvl_vinvl
-      SCENE_TEXT: swintextspotter
+      FEATURES: features/OpenViVQA/vinvl_vinvl
+      SCENE_TEXT: features/OpenViVQA/swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -71,7 +71,7 @@ TRAINING:
 
 MODEL:
   ARCHITECTURE: MMF_M4C
-  NAME: mmf_m4c_x152++_faster_rcnn
+  NAME: mmf_m4c_vinvl
   DEVICE: cuda
   D_MODEL: 768
   OBJECT_EMBEDDING:

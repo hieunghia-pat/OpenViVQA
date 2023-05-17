@@ -11,7 +11,7 @@ from transformers import AutoModel, AutoTokenizer
 
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
-from .mmf_m4c import OcrPtrNet, MMT, _get_mask
+from .mmf_m4c import OcrPtrNet, MMT
 
 logger = setup_logger()
 

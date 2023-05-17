@@ -103,11 +103,9 @@ class MMF_M4C(nn.Module):
 
     def _forward_txt_encoding(self, items, fwd_results):
         fwd_results["txt_inputs"] = items.question
-
-        # binary mask of valid text (question words) vs padding
-        fwd_results["txt_mask"] = generate_padding_mask(
-            items.question_tokens,
-            padding_idx=self.vocab.padding_idx
+        
+        fwd_results["txt_emb"], fwd_results["txt_mask"] = self.text_bert(
+            fwd_results["txt_inputs"]
         )
 
     def _forward_obj_encoding(self, items, fwd_results):
@@ -158,11 +156,6 @@ class MMF_M4C(nn.Module):
         )
 
     def _forward_mmt(self, items, fwd_results):
-        # first forward the text BERT layers
-        fwd_results["txt_emb"], fwd_results["txt_mask"] = self.text_bert(
-            fwd_results["txt_inputs"]
-        )
-
         mmt_results = self.mmt(
             txt_emb=fwd_results["txt_emb"],
             txt_mask=fwd_results["txt_mask"],
@@ -243,9 +236,9 @@ class MMT(BertPreTrainedModel):
         # later in extended_attention_mask
         dec_mask = torch.zeros(
             dec_emb.size(0), dec_emb.size(1), dtype=torch.float32, device=dec_emb.device
-        )
+        ).unsqueeze(1).unsqueeze(2)
         encoder_inputs = torch.cat([txt_emb, obj_emb, ocr_emb, dec_emb], dim=1)
-        attention_mask = torch.cat([txt_mask, obj_mask, ocr_mask, dec_mask], dim=1)
+        attention_mask = torch.cat([txt_mask, obj_mask, ocr_mask, dec_mask], dim=-1)
 
         # offsets of each modality in the joint embedding space
         txt_max_num = txt_mask.size(-1)
@@ -261,12 +254,12 @@ class MMT(BertPreTrainedModel):
         # Sizes are [batch_size, 1, from_seq_length, to_seq_length]
         # So we can broadcast to
         # [batch_size, num_heads, from_seq_length, to_seq_length]
-        to_seq_length = attention_mask.size(1)
+        to_seq_length = attention_mask.size(-1)
         from_seq_length = to_seq_length
 
         # generate the attention mask similar to prefix LM
         # all elements can attend to the elements in encoding steps
-        extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+        extended_attention_mask = attention_mask
         extended_attention_mask = extended_attention_mask.repeat(
             1, 1, from_seq_length, 1
         )
@@ -317,6 +310,7 @@ class OcrPtrNet(nn.Module):
 
         scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
         scores = scores / math.sqrt(self.query_key_size)
+        attention_mask = attention_mask.squeeze(1)
         scores = scores + attention_mask
         if squeeze_result:
             scores = scores.squeeze(1)

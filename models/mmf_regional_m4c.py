@@ -6,7 +6,7 @@ from transformers.models.bert.modeling_bert import (
     BertPreTrainedModel,
 )
 
-from .mmf_m4c import MMF_M4C, PrevPredEmbeddings, _get_mask, _get_causal_mask
+from .mmf_m4c import MMF_M4C, PrevPredEmbeddings
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
 

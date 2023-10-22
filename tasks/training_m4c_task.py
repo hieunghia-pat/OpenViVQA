@@ -99,7 +99,6 @@ class TrainingM4C(OpenEndedTask):
 
         while True:
             self.train()
-            # self.evaluate_loss(self.dev_dataloader)
 
             # val scores
             scores = self.evaluate_metrics(self.dev_dict_dataloader)

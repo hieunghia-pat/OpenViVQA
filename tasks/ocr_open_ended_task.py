@@ -1,7 +1,6 @@
 import torch
 
 from utils.logging_utils import setup_logger
-from utils.instance import Instance
 from .open_ended_task import OpenEndedTask
 from builders.task_builder import META_TASK
 import evaluation

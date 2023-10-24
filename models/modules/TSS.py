@@ -11,9 +11,11 @@ class TextSemanticSeparate(nn.Module):
 
         t5_model = AutoModel.from_pretrained(config.PRETRAINED_EMBEDDING)
         self.ocr_embedding = t5_model.shared
+        self.ocr_embedding.requires_grad = False
 
         self.t5_tokenizer = AutoTokenizer.from_pretrained(config.PRETRAINED_EMBEDDING)
-        self.context_token = self.t5_tokenizer.pad_token # <pad> will be used as <context>
+        # <pad> will be used as <context>
+        self.context_token = self.t5_tokenizer.pad_token
 
         self.device = torch.device(config.DEVICE)
 

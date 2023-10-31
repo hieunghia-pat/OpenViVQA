@@ -56,7 +56,6 @@ class OcrFeatureDataset(FeatureDataset):
         return {
             "ocr_det_features": features["det_features"],
             "ocr_rec_features": features["rec_features"],
-            "ocr_fasttext_features": features["fasttext_features"],
             "ocr_texts": features["texts"],
             "ocr_boxes": features["boxes"],
             "ocr_scores": features["scores"]
@@ -147,7 +146,6 @@ class OcrDictionaryDataset(DictionaryDataset):
         return {
             "ocr_det_features": features["det_features"],
             "ocr_rec_features": features["rec_features"],
-            "ocr_fasttext_features": features["fasttext_features"],
             "ocr_texts": features["texts"],
             "ocr_boxes": features["boxes"],
             "ocr_scores": features["scores"]

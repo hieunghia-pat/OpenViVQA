@@ -6,22 +6,20 @@ import torch.nn.functional as F
 from torch import nn
 from transformers.models.bert.modeling_bert import (
     BertConfig,
-    BertEmbeddings,
     BertEncoder,
     BertPreTrainedModel,
 )
 
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
+from builders.word_embedding_builder import build_word_embedding
+from builders.text_embedding_builder import build_text_embedding
 from models.utils import generate_padding_mask, generate_sequential_mask
 
 logger = setup_logger()
 
 @META_ARCHITECTURE.register()
-class MMF_M4C(nn.Module):
-    '''
-        This is the original version of M4C method copied directly from https://github.com/ronghanghu/mmf
-    '''
+class MMF_SAL(nn.Module):
     def __init__(self, config, vocab):
         super().__init__()
         self.config = config
@@ -44,31 +42,7 @@ class MMF_M4C(nn.Module):
         self._build_output()
 
     def _build_txt_encoding(self):
-        TEXT_BERT_HIDDEN_SIZE = 768
-
-        self.text_bert_config = BertConfig(hidden_size=self.config.TEXT_BERT.HIDDEN_SIZE,
-                                            num_hidden_layers=self.config.TEXT_BERT.NUM_HIDDEN_LAYERS,
-                                            num_attention_heads=self.config.MMT.NUM_ATTENTION_HEADS)
-        if self.config.TEXT_BERT.LOAD_PRETRAINED:
-            self.text_bert = TextBert.from_pretrained(
-                self.config.TEXT_BERT.PRETRAINED_NAME, config=self.text_bert_config
-            )
-        else:
-            self.text_bert = TextBert(self.text_bert_config)
-
-        # if the text bert output dimension doesn't match the
-        # multimodal transformer (mmt) hidden dimension,
-        # add a linear projection layer between the two
-        if self.mmt_config.hidden_size != TEXT_BERT_HIDDEN_SIZE:
-            logger.info(
-                f"Projecting text_bert output to {self.mmt_config.hidden_size} dim"
-            )
-
-            self.text_bert_out_linear = nn.Linear(
-                self.config.TEXT_BERT.HIDDEN_SIZE, self.mmt_config.hidden_size
-            )
-        else:
-            self.text_bert_out_linear = nn.Identity()
+        self.text_bert = build_text_embedding(self.config.TEXT_BERT, self.vocab)
 
     def _build_obj_encoding(self):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
@@ -83,15 +57,15 @@ class MMF_M4C(nn.Module):
         self.obj_drop = nn.Dropout(self.config.OBJECT_EMBEDDING.DROPOUT)
 
     def _build_ocr_encoding(self):
+        # OCR word embedding features
+        self.ocr_word_embedding = build_word_embedding(self.config.OCR_TEXT_EMBEDDING)
+        
         self.linear_ocr_feat_to_mmt_in = nn.Linear(
             self.config.OCR_EMBEDDING.D_FEATURE, self.mmt_config.hidden_size
         )
 
         # OCR location feature: relative bounding box coordinates (4-dim)
         self.linear_ocr_bbox_to_mmt_in = nn.Linear(4, self.mmt_config.hidden_size)
-
-        # OCR word embedding features
-        # self.ocr_word_embedding = build_word_embedding(self.config.OCR_TEXT_EMBEDDING)
 
         self.ocr_feat_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
         self.ocr_bbox_layer_norm = nn.LayerNorm(self.mmt_config.hidden_size)
@@ -126,19 +100,11 @@ class MMF_M4C(nn.Module):
         return results
 
     def _forward_txt_encoding(self, items, fwd_results):
-        fwd_results["txt_inds"] = items.question_tokens
-
-        # binary mask of valid text (question words) vs padding
-        # mask = generate_padding_mask(
-        #     items.question_tokens,
-        #     padding_idx=self.vocab.padding_idx
-        # ) == 0.
-        # mask = mask.float()
-        mask = generate_padding_mask(
-            items.question_tokens,
-            padding_idx=self.vocab.padding_idx
+        fwd_results["txt_inputs"] = items.question
+        
+        fwd_results["txt_emb"], fwd_results["txt_mask"] = self.text_bert(
+            fwd_results["txt_inputs"]
         )
-        fwd_results["txt_mask"] = mask
 
     def _forward_obj_encoding(self, items, fwd_results):
         # object appearance feature
@@ -151,16 +117,10 @@ class MMF_M4C(nn.Module):
         fwd_results["obj_mmt_in"] = obj_mmt_in
 
         # binary mask of valid object vs padding
-        # mask = generate_padding_mask(
-        #     obj_feat,
-        #     padding_idx=0
-        # ) == 0.
-        # mask = mask.float()
-        mask = generate_padding_mask(
+        fwd_results["obj_mask"] = generate_padding_mask(
             obj_feat,
             padding_idx=0
         )
-        fwd_results["obj_mask"] = mask
 
     def _forward_ocr_encoding(self, items, fwd_results):
         # OCR FastText feature (300-dim)
@@ -188,24 +148,12 @@ class MMF_M4C(nn.Module):
         fwd_results["ocr_mmt_in"] = ocr_mmt_in
 
         # binary mask of valid OCR vs padding
-        # mask = generate_padding_mask(
-        #     ocr_feat,
-        #     padding_idx=0
-        # ) == 0.
-        # mask = mask.float()
-        mask = generate_padding_mask(
+        fwd_results["ocr_mask"] = generate_padding_mask(
             ocr_feat,
             padding_idx=0
         )
-        fwd_results["ocr_mask"] = mask
 
     def _forward_mmt(self, items, fwd_results):
-        # first forward the text BERT layers
-        text_bert_out = self.text_bert(
-            txt_inds=fwd_results["txt_inds"], txt_mask=fwd_results["txt_mask"]
-        )
-        fwd_results["txt_emb"] = self.text_bert_out_linear(text_bert_out)
-
         mmt_results = self.mmt(
             txt_emb=fwd_results["txt_emb"],
             txt_mask=fwd_results["txt_mask"],
@@ -254,29 +202,6 @@ class MMF_M4C(nn.Module):
                 last_ids = torch.where(last_ids == self.vocab.eos_idx, last_ids, argmax_inds[:, ith])
                 if last_ids.mean() == self.vocab.eos_idx:
                     break
-
-class TextBert(BertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
-
-        self.embeddings = BertEmbeddings(config)
-        self.encoder = BertEncoder(config)
-        self.init_weights()
-
-    def forward(self, txt_inds, txt_mask):
-        encoder_inputs = self.embeddings(txt_inds)
-        attention_mask = txt_mask
-
-        extended_attention_mask = attention_mask
-        assert not extended_attention_mask.requires_grad
-        head_mask = [None] * self.config.num_hidden_layers
-
-        encoder_outputs = self.encoder(
-            encoder_inputs, extended_attention_mask, head_mask=head_mask
-        )
-        seq_output = encoder_outputs[0]
-
-        return seq_output
 
 
 class MMT(BertPreTrainedModel):
@@ -337,12 +262,8 @@ class MMT(BertPreTrainedModel):
             1, 1, from_seq_length, 1
         )
         # decoding step elements can attend to themselves in a causal manner
-        # mask = generate_sequential_mask(dec_max_num) == 0
-        # mask = mask.float()
-        mask = generate_sequential_mask(dec_max_num)
-        extended_attention_mask[:, :, -dec_max_num:, -dec_max_num:] = mask
+        extended_attention_mask[:, :, -dec_max_num:, -dec_max_num:] = generate_sequential_mask(dec_max_num)
 
-        # flip the mask, so that invalid attention pairs have -10000.
         assert not extended_attention_mask.requires_grad
         head_mask = [None] * self.config.num_hidden_layers
 
@@ -377,8 +298,6 @@ class OcrPtrNet(nn.Module):
         self.key = nn.Linear(hidden_size, query_key_size)
 
     def forward(self, query_inputs, key_inputs, attention_mask):
-        extended_attention_mask = attention_mask.squeeze(1)
-
         query_layer = self.query(query_inputs)
         if query_layer.dim() == 2:
             query_layer = query_layer.unsqueeze(1)
@@ -389,7 +308,8 @@ class OcrPtrNet(nn.Module):
 
         scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
         scores = scores / math.sqrt(self.query_key_size)
-        scores = scores + extended_attention_mask
+        attention_mask = attention_mask.squeeze(1)
+        scores = scores + attention_mask
         if squeeze_result:
             scores = scores.squeeze(1)
 

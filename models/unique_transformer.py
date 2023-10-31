@@ -3,7 +3,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from .base_unique_transformer import BaseUniqueTransformer
-from utils.instances import Instances
+from utils.instance import Instance
 from builders.encoder_builder import build_encoder
 from builders.text_embedding_builder import build_text_embedding
 from builders.vision_embedding_builder import build_vision_embedding
@@ -25,7 +25,7 @@ class UniqueTransformer(BaseUniqueTransformer):
         self.encoder = build_encoder(config.ENCODER)
         self.fc = nn.Linear(config.D_MODEL, len(vocab), bias=False)
 
-    def embed_features(self, input_features: Instances):
+    def embed_features(self, input_features: Instance):
         region_features = input_features.region_features
         region_features, region_padding_mask = self.region_embedding(region_features)
         region_feat_tokens = torch.ones((region_features.shape[0], region_features.shape[1])).long().to(region_features.device) * self.vocab.feat_idx
@@ -67,17 +67,17 @@ class UniqueTransformer(BaseUniqueTransformer):
 
         return joint_features, (joint_padding_mask, joint_attention_mask)
 
-    def forward(self, input_features: Instances):
+    def forward(self, input_features: Instance):
         joint_features, (joint_padding_mask, joint_attention_mask) = self.embed_features(input_features)
         joint_features_len = joint_features.shape[1]
         answer_tokens = input_features.answer_tokens
         joint_features, (joint_padding_mask, joint_attention_mask) = self.append_answer(joint_features, (joint_padding_mask, joint_attention_mask), answer_tokens)
 
-        out = self.encoder(Instances(
+        out = self.encoder(
             features=joint_features,
             features_padding_mask=joint_padding_mask,
             features_attention_mask=joint_attention_mask
-        ))
+        )
         out = out[:, joint_features_len:]
         out = self.fc(out)
 

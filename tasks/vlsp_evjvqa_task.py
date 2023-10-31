@@ -3,13 +3,11 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 
 from utils.logging_utils import setup_logger
-from utils.instances import Instances
 from data_utils.utils import collate_fn
 from .base_task import BaseTask
 from builders.task_builder import META_TASK
 from builders.dataset_builder import build_dataset
 import evaluation
-from data_utils import vocab
 from evaluation import Cider
 
 import os
@@ -32,28 +30,16 @@ class VlspEvjVqaTask(BaseTask):
     def load_feature_datasets(self, config):
         train_dataset = build_dataset(config.JSON_PATH.TRAIN, self.vocab, config.FEATURE_DATASET)
         dev_dataset = build_dataset(config.JSON_PATH.DEV, self.vocab, config.FEATURE_DATASET)
-        if config.JSON_PATH.PUBLIC_TEST is not None:
-            public_test_dataset = build_dataset(config.JSON_PATH.PUBLIC_TEST, self.vocab, config.FEATURE_DATASET)
-        else:
-            public_test_dataset = None
-        if config.JSON_PATH.PRIVATE_TEST is not None:
-            private_test_dataset = build_dataset(config.JSON_PATH.PRIVATE_TEST, self.vocab, config.FEATURE_DATASET)
-        else:
-            private_test_dataset = None
+        public_test_dataset = build_dataset(config.JSON_PATH.PUBLIC_TEST, self.vocab, config.FEATURE_DATASET)
+        private_test_dataset = build_dataset(config.JSON_PATH.PRIVATE_TEST, self.vocab, config.FEATURE_DATASET)
 
         return train_dataset, dev_dataset, public_test_dataset, private_test_dataset
 
     def load_dict_datasets(self, config):
         train_dataset = build_dataset(config.JSON_PATH.TRAIN, self.vocab, config.DICT_DATASET)
         dev_dataset = build_dataset(config.JSON_PATH.DEV, self.vocab, config.DICT_DATASET)
-        if config.JSON_PATH.PUBLIC_TEST is not None:
-            public_test_dataset = build_dataset(config.JSON_PATH.PUBLIC_TEST, self.vocab, config.DICT_DATASET)
-        else:
-            public_test_dataset = None
-        if config.JSON_PATH.PRIVATE_TEST is not None:
-            private_test_dataset = build_dataset(config.JSON_PATH.PRIVATE_TEST, self.vocab, config.DICT_DATASET)
-        else:
-            private_test_dataset = None
+        public_test_dataset = build_dataset(config.JSON_PATH.PUBLIC_TEST, self.vocab, config.DICT_DATASET)
+        private_test_dataset = build_dataset(config.JSON_PATH.PRIVATE_TEST, self.vocab, config.DICT_DATASET)
 
         return train_dataset, dev_dataset, public_test_dataset, private_test_dataset
 
@@ -108,13 +94,13 @@ class VlspEvjVqaTask(BaseTask):
         )
         self.public_test_dict_dataloader = DataLoader(
             dataset=self.public_test_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
+            batch_size=1,
             shuffle=True,
             collate_fn=collate_fn
         ) if self.public_test_dataset else None
         self.private_test_dict_dataloader = DataLoader(
             dataset=self.private_test_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
+            batch_size=1,
             shuffle=True,
             collate_fn=collate_fn
         ) if self.private_test_dataset else None
@@ -165,16 +151,13 @@ class VlspEvjVqaTask(BaseTask):
                 items = items.to(self.device)
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
-  
-                answers_gt = items.answer
+
+                answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
-                #print('\n',len(answers_gt),"gt: ",answers_gt)
-                #print(len(answers_gen),"gen: ",answers_gen)
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
-
                 pbar.update()
 
         scores, _ = evaluation.compute_scores(gts, gens)
@@ -219,8 +202,8 @@ class VlspEvjVqaTask(BaseTask):
                 self.optim.zero_grad()
 
                 # Rewards
-                bs = items.question_tokens.shape[0]
-                answers_gt = items.answer
+                bs = items.batch_size
+                answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
                 answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
                 gens = {f"{idx}": [answer_gen, ] for idx, answer_gen in enumerate(answers_gen)}
@@ -244,23 +227,22 @@ class VlspEvjVqaTask(BaseTask):
     def start(self):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
             checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
-            use_rl = checkpoint["use_rl"]
+            # use_rl = checkpoint["use_rl"]
             best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"] + 1
             self.optim.load_state_dict(checkpoint['optimizer'])
             self.scheduler.load_state_dict(checkpoint['scheduler'])
         else:
-            use_rl = False
+            # use_rl = False
             best_val_score = .0
             patience = 0
 
         while True:
             # if not use_rl:
-            #     self.train()
+            self.train()
             # else:
             #     self.train_scst()
-            self.train() #khi dừng train muốn predict thì cmt từ dòng này tới 279
 
             self.evaluate_loss(self.dev_dataloader)
 
@@ -269,47 +251,45 @@ class VlspEvjVqaTask(BaseTask):
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
-            # # Prepare for next epoch
-            best = False # đừng cmt dòng này
-            if val_score >= best_val_score:
+            # Prepare for next epoch
+            best = False
+            if val_score > best_val_score:
                 best_val_score = val_score
                 patience = 0
                 best = True
             else:
                 patience += 1
 
-            switch_to_rl = False
+            # switch_to_rl = False
             exit_train = False
 
             if patience == self.patience:
-                if not use_rl:
-                    use_rl = True
-                    switch_to_rl = True
-                    patience = 0
-                    self.optim = Adam(self.model.parameters(), lr=self.rl_learning_rate)
-                    logger.info("Switching to RL")
-                else:
-                    logger.info('patience reached.')
-                    exit_train = True
+                # if not use_rl:
+                #     use_rl = True
+                #     switch_to_rl = True
+                #     patience = 0
+                #     self.optim = Adam(self.model.parameters(), lr=self.rl_learning_rate)
+                #     logger.info("Switching to RL")
+                # else:
+                logger.info('patience reached.')
+                exit_train = True
 
-            if switch_to_rl and not best:
-                self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
+            # if switch_to_rl and not best:
+            #     self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
 
             self.save_checkpoint({
                 'best_val_score': best_val_score,
                 'patience': patience,
-                'use_rl': use_rl
+                # 'use_rl': use_rl
             })
 
             if best:
                 copyfile(os.path.join(self.checkpoint_path, "last_model.pth"), 
                         os.path.join(self.checkpoint_path, "best_model.pth"))
-                copyfile(os.path.join(self.checkpoint_path, "last_model.pth"), 
-                        os.path.join('/content/drive/MyDrive/', "best_model.pth"))
 
-            if exit_train: #sửa chữ exit_train thành 1(if 1:)
+            if exit_train:
                 break
-            
+
             self.epoch += 1
 
     def get_predictions(self):
@@ -325,14 +305,13 @@ class VlspEvjVqaTask(BaseTask):
             results = []
             overall_gens = {}
             overall_gts = {}
-            with tqdm(desc='Getting predictions on public test: ', unit='it', total=len(self.public_test_dict_dataset)) as pbar:
-                for it, items in enumerate(self.public_test_dict_dataset):
-                    items = Instances.cat([items])
+            with tqdm(desc='Getting predictions on public test: ', unit='it', total=len(self.public_test_dict_dataloader)) as pbar:
+                for it, items in enumerate(self.public_test_dict_dataloader):
                     items = items.to(self.device)
                     with torch.no_grad():
                         outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
 
-                    answers_gt = items.answer
+                    answers_gt = items.answers
                     answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
                     gts = {}
                     gens = {}
@@ -341,38 +320,38 @@ class VlspEvjVqaTask(BaseTask):
                         gens['%d_%d' % (it, i)] = gen_i
                         gts['%d_%d' % (it, i)] = gts_i
                         overall_gens['%d_%d' % (it, i)] = [gen_i, ]
-                        overall_gts['%d_%d' % (it, i)] = [gts_i, ]
+                        overall_gts['%d_%d' % (it, i)] = gts_i
                     pbar.update()
 
                     results.append({
                         "id": items.question_id,
-                        # "image_id": items.image_id,
-                        # "filename": items.filename,
+                        "image_id": items.image_id,
+                        "filename": items.filename,
                         "gens": gens,
-                        # "gts": gts
+                        "gts": gts
                     })
 
                     pbar.update()
 
-            # scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
-            # logger.info("Evaluation score on public test: %s", scores)
+            scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+            logger.info("Evaluation score on public test: %s", scores)
 
             json.dump({
-                "results": results
+                "results": results,
+                **scores
             }, open(os.path.join(self.checkpoint_path, "public_test_results.json"), "w+"), ensure_ascii=False)
 
         if self.private_test_dict_dataset is not None:
             results = []
             overall_gens = {}
             overall_gts = {}
-            with tqdm(desc='Getting predictions on private test: ', unit='it', total=len(self.private_test_dict_dataset)) as pbar:
-                for it, items in enumerate(self.private_test_dict_dataset):
-                    items = items.unsqueeze(dim=0)
+            with tqdm(desc='Getting predictions on private test: ', unit='it', total=len(self.private_test_dict_dataloader)) as pbar:
+                for it, items in enumerate(self.private_test_dict_dataloader):
                     items = items.to(self.device)
                     with torch.no_grad():
                         outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
 
-                    answers_gt = items.answer
+                    answers_gt = items.answers
                     answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
                     gts = {}
                     gens = {}

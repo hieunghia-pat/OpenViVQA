@@ -6,16 +6,20 @@ DATASET:
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: /content/vinvl_vinvl
-      IMAGE: /content/train-images
+      FEATURES: features/EVJVQA/vinvl_vinvl
+      SCENE_TEXT: null
+      IMAGE: features/EVJVQA/images
+    SCENE_TEXT_THRESHOLD: 0.3
   DICT_DATASET:
     TYPE: MultilingualDictionaryDataset
     BATCH_SIZE: 60
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: /content/vinvl_vinvl
-      IMAGE: /content/train-images
-  MIN_FREQ: 2
+      FEATURES: features/EVJVQA/vinvl_vinvl
+      SCENE_TEXT: null
+      IMAGE: features/EVJVQA/images
+    SCENE_TEXT_THRESHOLD: 0.3
+  MIN_FREQ: 1
   VOCAB:
     TYPE: VlspVqaMultiModalVocab
     TOKENIZER: null
@@ -30,19 +34,22 @@ DATASET:
     BOX_TOKEN: <box>
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
-    PRETRAINED_LANGUAGE_MODEL: bert-base-multilingual-cased
+    JSON_PATH:
+      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
   JSON_PATH:
-    TRAIN: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/train_data.json
-    DEV: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/Splitted_Data/dev_data.json
-    PUBLIC_TEST: /content/drive/MyDrive/VQA/ENVJ_VQA/Data/official_evjvqa_public_test.json
-    PRIVATE_TEST: null
+    TRAIN: features/EVJVQA/annotations/evjvqa_train.json
+    DEV: features/EVJVQA/annotations/evjvqa_dev.json
+    PUBLIC_TEST: features/EVJVQA/annotations/evjvqa_public_test.json
+    PRIVATE_TEST: features/EVJVQA/annotations/evjvqa_private_test.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
   LEARNING_RATE: 1
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
-  SCORE: Accuracy
+  SCORE: CIDEr
   TRAINING_BEAM_SIZE: 5
   EVALUATING_BEAM_SIZE: 3
   PATIENCE: 5
@@ -82,7 +89,7 @@ MODEL:
   ENCODER:
     ARCHITECTURE: Encoder
     D_MODEL: 512
-    LAYERS: 6
+    LAYERS: 3
     SELF_ATTENTION:
       ARCHITECTURE: ScaledDotProductAttention
       HEAD: 8
@@ -97,7 +104,7 @@ MODEL:
   DECODER:
     ARCHITECTURE: Decoder
     D_MODEL: 512
-    LAYERS: 6
+    LAYERS: 3
     ATTENTION:
       SELF_ATTENTION:
         ARCHITECTURE: ScaledDotProductAttention

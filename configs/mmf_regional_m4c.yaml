@@ -1,0 +1,112 @@
+TASK: TrainingMMF
+
+DATASET:
+  FEATURE_DATASET:
+    TYPE: OcrFeatureDataset
+    BATCH_SIZE: 64
+    WORKERS: 2
+    FEATURE_PATH:
+      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      SCENE_TEXT: features/OpenViVQA/features/swintextspotter
+      IMAGE: null
+    SCENE_TEXT_THRESHOLD: 0.3
+    MAX_SCENE_TEXT: 50
+    WORD_EMBEDDING: ViFastText
+    WORD_EMBEDDING_CACHE: null
+  DICT_DATASET:
+    TYPE: OcrDictionaryDataset
+    BATCH_SIZE: 64
+    WORKERS: 0
+    FEATURE_PATH:
+      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      SCENE_TEXT: features/OpenViVQA/features/swintextspotter
+      IMAGE: null
+    SCENE_TEXT_THRESHOLD: 0.3
+    MAX_SCENE_TEXT: 50
+    WORD_EMBEDDING: ViFastText
+    WORD_EMBEDDING_CACHE: null
+  MIN_FREQ: 1
+  VOCAB:
+    TYPE: OcrVocab
+    TOKENIZER: null
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
+    MIN_FREQ: 1
+    BOS_TOKEN: <bos>
+    EOS_TOKEN: <eos>
+    PAD_TOKEN: <pad>
+    UNK_TOKEN: <unk>
+    IMG_TOKEN: <img>
+    FEAT_TOKEN: <feat>
+    BOX_TOKEN: <box>
+    OCR_TOKEN: <ocr>
+    OCR_DET_TOKEN: <ocr_det>
+    OCR_REC_TOKEN: <ocr_rec>
+    QUESTION_TOKEN: <question>
+    ANSWER_TOKEN: <answer>
+    JSON_PATH:
+      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+  JSON_PATH:
+    TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+    DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+    TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+
+TRAINING:
+  CHECKPOINT_PATH: saved_models
+  LEARNING_RATE: 1.
+  RL_LEARNING_RATE: 0.000005
+  WARMUP: 10000
+  SCORE: CIDEr
+  TRAINING_BEAM_SIZE: 1
+  EVALUATING_BEAM_SIZE: 1
+  PATIENCE: 5
+
+MODEL:
+  ARCHITECTURE: MMF_REGIONAL_M4C
+  NAME: mmf_m4c_x152++_faster_rcnn
+  DEVICE: cuda
+  D_MODEL: 768
+  OBJECT_EMBEDDING:
+    D_FEATURE: 1024
+    DROPOUT: .1
+  REGION_EMBEDDING:
+    D_FEATURE: 2048
+    DROPOUT: .1
+  BOX_EMBEDDING:
+    ARCHITECTURE: FeatureEmbedding
+    DEVICE: cuda
+    D_FEATURE: 4
+    D_MODEL: 768
+    DROPOUT: .1
+  OCR_TEXT_EMBEDDING:
+    WORD_EMBEDDING: ViFastText
+    WORD_EMBEDDING_CACHE: null
+  OCR_EMBEDDING:
+    D_FEATURE: 812 # 256 (det features) + 256 (rec features) + 300 (fasttext)
+    DROPOUT: .1
+  OCR_PTR_NET:
+    HIDDEN_SIZE: 768
+    QUERY_KEY_SIZE: 768
+    OCR_MAX_NUM: 30
+  CLASSIFIER:
+    OCR_MAX_NUM: 30
+  MMT:
+    HIDDEN_SIZE: 768
+    NUM_HIDDEN_LAYERS: 4
+    NUM_ATTENTION_HEADS: 8
+  TEXT_BERT:
+    HIDDEN_SIZE: 768
+    NUM_HIDDEN_LAYERS: 12
+    NUM_ATTENTION_HEADS: 12
+    LOAD_PRETRAINED: True
+    PRETRAINED_NAME: "bert-base-uncased"
+  TEXT_EMBEDDING:
+    ARCHITECTURE: UsualEmbedding
+    DEVICE: cuda
+    D_EMBEDDING: 300
+    D_MODEL: 768
+    DROPOUT: .1
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null  

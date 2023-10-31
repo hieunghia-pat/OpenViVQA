@@ -1,9 +1,9 @@
 from torch import nn
 
-from utils.instances import Instances
+from utils.instance import Instance
 
-class BaseClassification(nn.Module):
-    def __init__(self, config):
+class BaseClassificationModel(nn.Module):
+    def __init__(self, config, vocab):
         super().__init__()
 
         self.d_model = config.D_MODEL
@@ -13,5 +13,5 @@ class BaseClassification(nn.Module):
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
 
-    def forward(self, input_features: Instances):
+    def forward(self, input_features: Instance):
         raise NotImplementedError

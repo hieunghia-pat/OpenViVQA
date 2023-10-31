@@ -1,0 +1,120 @@
+TASK: ClassificationTask
+
+DATASET:
+  FEATURE_DATASET:
+    TYPE: FeatureClassificationDataset
+    BATCH_SIZE: 64
+    WORKERS: 2
+    FEATURE_PATH:
+      FEATURES: features/ViVQA/vinvl_vinvl
+      SCENE_TEXT: null
+      IMAGE: null
+  VOCAB:
+    TYPE: ClassificationVocab
+    TOKENIZER: null
+    MIN_FREQ: 1
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
+    BOS_TOKEN: <bos>
+    EOS_TOKEN: <eos>
+    PAD_TOKEN: <pad>
+    UNK_TOKEN: <unk>
+    IMG_TOKEN: <img>
+    FEAT_TOKEN: <feat>
+    BOX_TOKEN: <box>
+    QUESTION_TOKEN: <question>
+    ANSWER_TOKEN: <answer>
+    JSON_PATH:
+      TRAIN: features/ViVQA/vivqa_train.json
+      DEV: features/ViVQA/vivqa_dev.json
+      TEST: features/ViVQA/vivqa_test.json
+  JSON_PATH:
+    TRAIN: features/ViVQA/vivqa_train.json
+    DEV: features/ViVQA/vivqa_dev.json
+    TEST: features/ViVQA/vivqa_test.json
+
+TRAINING:
+  CHECKPOINT_PATH: saved_models
+  LEARNING_RATE: 1.
+  WARMUP: 10000
+  SCORE: Accuracy
+  VERBOSE_SCORES:
+    - Accuracy
+  TRAINING_BEAM_SIZE: 5
+  EVALUATING_BEAM_SIZE: 3
+  PATIENCE: 5
+
+MODEL:
+  ARCHITECTURE: CrossModalityTransformer
+  NAME: cross_modality_transformer
+  DEVICE: cuda
+  REGION_EMBEDDING:
+    ARCHITECTURE: FeatureEmbedding
+    DEVICE: cuda
+    D_FEATURE: 2048
+    D_MODEL: 512
+    DROPOUT: .1
+  TEXT_EMBEDDING:
+    ARCHITECTURE: UsualEmbedding
+    DEVICE: cuda
+    D_EMBEDDING: 300
+    D_MODEL: 512
+    DROPOUT: .1
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
+  D_MODEL: 512
+  DROPOUT: .1
+  ENCODER:
+    ARCHITECTURE: CrossModalityEncoder
+    D_MODEL: 512
+    LAYERS: 3
+    VISION_LANGUAGE_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+    LANGUAGE_VISION_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+    VISION_SELF_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+    LANGUAGE_SELF_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+  VISION_ATTR_REDUCE:
+    D_MODEL: 512
+    DROPOUT: 0.1
+  TEXT_ATTR_REDUCE:
+    D_MODEL: 512
+    DROPOUT: 0.1

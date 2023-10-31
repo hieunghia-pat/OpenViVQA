@@ -16,6 +16,10 @@ DATASET:
     PAD_TOKEN: <pad>
     UNK_TOKEN: <unk>
     USE_MAPPING: False
+    JSON_PATH:
+      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
   JSON_PATH:
     TRAIN: features/EVJVQA/annotations/evjvqa_train.json
     DEV: features/EVJVQA/annotations/evjvqa_dev.json

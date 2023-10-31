@@ -1,0 +1,71 @@
+TASK: ClassificationTask
+
+DATASET:
+  FEATURE_DATASET:
+    TYPE: FeatureClassificationDataset
+    BATCH_SIZE: 60
+    WORKERS: 2
+    FEATURE_PATH:
+      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      SCENE_TEXT: null
+      IMAGE: null
+  VOCAB:
+    TYPE: ClassificationVocab
+    TOKENIZER: null
+    MIN_FREQ: 1
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
+    BOS_TOKEN: <bos>
+    EOS_TOKEN: <eos>
+    PAD_TOKEN: <pad>
+    UNK_TOKEN: <unk>
+    IMG_TOKEN: <img>
+    FEAT_TOKEN: <feat>
+    BOX_TOKEN: <box>
+    QUESTION_TOKEN: <question>
+    ANSWER_TOKEN: <answer>
+    JSON_PATH:
+      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+  JSON_PATH:
+    TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+    DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+    TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+
+TRAINING:
+  CHECKPOINT_PATH: saved_models
+  LEARNING_RATE: 0.01
+  WARMUP: 10000
+  SCORE: CIDEr
+  GET_SCORES: True
+  PATIENCE: 5
+
+MODEL:
+  ARCHITECTURE: SAAA
+  NAME: saaa_region_x152++_faster_rcnn
+  DEVICE: cuda
+  D_MODEL: 512
+  VISION_PROCESSOR:
+    ARCHITECTURE: FeatureEmbedding
+    D_FEATURE: 1024
+    D_MODEL: 512
+    DROPOUT: .1
+  TEXT_PROCESSOR:
+    ARCHITECTURE: UsualEmbedding
+    D_MODEL: 512
+    D_EMBEDDING: 300
+    N_GRAMS:
+     - 1
+     - 2
+     - 3
+     - 4
+    DROPOUT: 0.1
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
+  ATTENTION:
+    D_VISION: 512
+    D_LANGUAGE: 512
+    D_MODEL: 512
+    DROPOUT: .1
+    GLIMPSES: 2

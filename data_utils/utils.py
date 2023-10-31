@@ -2,7 +2,7 @@ import torch
 import re
 from typing import List
 
-from utils.instances import Instances
+from utils.instance import Instance, InstanceList
 
 def get_tokenizer(tokenizer):
     if callable(tokenizer):
@@ -31,7 +31,8 @@ def get_tokenizer(tokenizer):
     elif tokenizer == "vncorenlp":
         try:
             from vncorenlp import VnCoreNLP
-            # annotator = VnCoreNLP(r"data_utils/vncorenlp/VnCoreNLP-1.1.1.jar", port=9000, annotators="wseg", max_heap_size='-Xmx500m')
+            # before using vncorenlp, please run this command in your terminal:
+            # vncorenlp -Xmx500m data_utils/vncorenlp/VnCoreNLP-1.1.1.jar -p 9000 -annotators wseg &
             annotator = VnCoreNLP(address="http://127.0.0.1", port=9000, max_heap_size='-Xmx500m')
 
             def tokenize(s: str):
@@ -117,8 +118,8 @@ def unk_init(token, dim):
 def default_value():
     return None
 
-def collate_fn(samples: List[Instances]):
-    return Instances.cat(samples)
+def collate_fn(samples: List[Instance]):
+    return InstanceList(samples)
 
 def is_japanese_sentence(text: str):
     # REFERENCE UNICODE TABLES: 

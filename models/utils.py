@@ -53,7 +53,7 @@ def generate_padding_mask(sequences: TensorOrNone, padding_idx: int) -> torch.Bo
     else:
         __seq = sequences
 
-    mask = (torch.sum(__seq, dim=-1) == padding_idx) # (b_s, seq_len)
+    mask = (torch.sum(__seq, dim=-1) == (padding_idx*__seq.shape[-1])).long() * -10e4 # (b_s, seq_len)
     return mask.unsqueeze(1).unsqueeze(1) # (bs, 1, 1, seq_len)
 
 def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
@@ -61,16 +61,16 @@ def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
         Mask out subsequent positions
     '''
     attn_shape = (seq_len, seq_len)
-    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).to(torch.bool) # (seq_len, seq_len)
+    subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1) * -10e4 # (seq_len, seq_len)
 
     return subsequent_mask.unsqueeze(0).unsqueeze(0) # (1, 1, seq_len, seq_len)
 
 def generate_self_attention_masks(padding_masks: torch.Tensor, sequential_masks: torch.Tensor):
-    return torch.logical_or(padding_masks, sequential_masks)
-
-def generate_cross_attention_masks(trg_masks: torch.Tensor, src_masks: torch.Tensor):
-    trg_masks = trg_masks.squeeze(-2).unsqueeze(-1)
-    return torch.logical_or(trg_masks, src_masks)
+    padding_masks = padding_masks != 0
+    sequential_masks = sequential_masks != 0
+    self_attention_masks = torch.logical_or(padding_masks, sequential_masks).long() * -10e4
+    
+    return self_attention_masks
 
 def get_relative_pos(x, norm_len):
     x = x.view(-1, 1)
@@ -160,15 +160,3 @@ def box_relational_embedding(f_g, dim_g=64, wave_len=1000, trignometric_embeddin
         embedding = position_mat
         
     return embedding # (batch_size, max_nr_bounding_boxes, max_nr_bounding_boxes, dim_g)
-
-def apply_attention(input, attention):
-    """ Apply any number of attention maps over the input. """
-    n = input.shape[0]
-
-    input = input.unsqueeze(1).permute(0, 1, -1, -2) # [n, 1, dim, s]
-    attention = attention.permute(0, -1, 1) # [n, g, s]
-    attention = F.softmax(attention, dim=-1).unsqueeze(2) # [n, g, 1, s]
-    weighted = attention * input # [n, g, dim, s]
-    weighted = weighted.sum(dim=1).permute(0, -1, 1) # [n, s, dim]
-    
-    return weighted

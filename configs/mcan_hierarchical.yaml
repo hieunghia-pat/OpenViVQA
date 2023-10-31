@@ -1,0 +1,114 @@
+TASK: ClassificationTask
+
+DATASET:
+  FEATURE_DATASET:
+    TYPE: FeatureClassificationDataset
+    BATCH_SIZE: 64
+    WORKERS: 2
+    FEATURE_PATH:
+      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      SCENE_TEXT: null
+      IMAGE: null
+  VOCAB:
+    TYPE: ClassificationVocab
+    TOKENIZER: null
+    MIN_FREQ: 1
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
+    BOS_TOKEN: <bos>
+    EOS_TOKEN: <eos>
+    PAD_TOKEN: <pad>
+    UNK_TOKEN: <unk>
+    IMG_TOKEN: <img>
+    FEAT_TOKEN: <feat>
+    BOX_TOKEN: <box>
+    QUESTION_TOKEN: <question>
+    ANSWER_TOKEN: <answer>
+    JSON_PATH:
+      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+  JSON_PATH:
+    TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
+    DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
+    TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+
+TRAINING:
+  CHECKPOINT_PATH: saved_models
+  LEARNING_RATE: 1.
+  WARMUP: 10000
+  SCORE: CIDEr
+  GET_SCORES: True
+  TRAINING_BEAM_SIZE: 5
+  EVALUATING_BEAM_SIZE: 3
+  PATIENCE: 5
+
+MODEL:
+  ARCHITECTURE: MCAN
+  NAME: mcan_region_x152++_faster_rcnn
+  DEVICE: cuda
+  D_MODEL: 512
+  VISION_EMBEDDING:
+    ARCHITECTURE: FeatureEmbedding
+    D_FEATURE: 1024
+    D_MODEL: 512
+    DROPOUT: 0.1
+  TEXT_EMBEDDING:
+    ARCHITECTURE: HierarchicalFeaturesExtractor
+    D_MODEL: 512
+    D_EMBEDDING: 300
+    N_GRAMS:
+     - 1
+     - 2
+     - 3
+     - 4
+    DROPOUT: 0.1
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
+  SELF_ENCODER:
+    ARCHITECTURE: Encoder
+    D_MODEL: 512
+    LAYERS: 3
+    SELF_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+  GUIDED_ENCODER:
+    ARCHITECTURE: GuidedAttentionEncoder
+    D_MODEL: 512
+    LAYERS: 3
+    SELF_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+    GUIDED_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
+  VISION_ATTR_REDUCE:
+    D_MODEL: 512
+    DROPOUT: 0.1
+  TEXT_ATTR_REDUCE:
+    D_MODEL: 512
+    DROPOUT: 0.1

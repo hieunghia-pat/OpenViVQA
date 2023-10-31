@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from torch.optim import Adam
 
 from utils.logging_utils import setup_logger
-from utils.instances import Instances
+from utils.instance import Instance
 from data_utils.utils import collate_fn
 from .base_task import BaseTask
 from builders.task_builder import META_TASK
@@ -61,7 +61,7 @@ class OpenEndedTask(BaseTask):
         )
         self.test_dataloader = DataLoader(
             dataset=self.test_dataset,
-            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
+            batch_size=1,
             shuffle=True,
             num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
             collate_fn=collate_fn
@@ -77,13 +77,13 @@ class OpenEndedTask(BaseTask):
         )
         self.dev_dict_dataloader = DataLoader(
             dataset=self.dev_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         )
         self.test_dict_dataloader = DataLoader(
             dataset=self.test_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=1,
             shuffle=True,
             collate_fn=collate_fn
         )
@@ -98,7 +98,6 @@ class OpenEndedTask(BaseTask):
         self.score = config.TRAINING.SCORE
         self.learning_rate = config.TRAINING.LEARNING_RATE
         self.rl_learning_rate = config.TRAINING.RL_LEARNING_RATE
-        self.get_scores = config.TRAINING.GET_SCORES
         self.training_beam_size = config.TRAINING.TRAINING_BEAM_SIZE
         self.evaluating_beam_size = config.TRAINING.EVALUATING_BEAM_SIZE
         self.patience = config.TRAINING.PATIENCE
@@ -115,7 +114,7 @@ class OpenEndedTask(BaseTask):
                         out = self.model(items).contiguous()
                     
                     shifted_right_answer_tokens = items.shifted_right_answer_tokens
-                    loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
+                    loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
 
@@ -158,7 +157,7 @@ class OpenEndedTask(BaseTask):
                 out = self.model(items).contiguous()
                 shifted_right_answer_tokens = items.shifted_right_answer_tokens
                 self.optim.zero_grad()
-                loss = self.loss_fn(out.view(-1, len(self.vocab)), shifted_right_answer_tokens.view(-1))
+                loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
                 loss.backward()
 
                 self.optim.step()
@@ -211,24 +210,26 @@ class OpenEndedTask(BaseTask):
     def start(self):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
             checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
-            use_rl = checkpoint["use_rl"]
+            # use_rl = checkpoint["use_rl"]
             best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"] + 1
             self.optim.load_state_dict(checkpoint['optimizer'])
             self.scheduler.load_state_dict(checkpoint['scheduler'])
         else:
-            use_rl = False
+            # use_rl = False
             best_val_score = .0
             patience = 0
 
         while True:
-            if not use_rl:
-                self.train()
-            else:
-                self.train_scst()
+            # if not use_rl:
+            #     self.train()
+            # else:
+            #     self.train_scst()
 
-            self.evaluate_loss(self.dev_dataloader)
+            self.train()
+
+            # self.evaluate_loss(self.dev_dataloader)
 
             # val scores
             scores = self.evaluate_metrics(self.dev_dict_dataloader)
@@ -237,34 +238,37 @@ class OpenEndedTask(BaseTask):
 
             # Prepare for next epoch
             best = False
-            if val_score >= best_val_score:
+            if val_score > best_val_score:
                 best_val_score = val_score
                 patience = 0
                 best = True
             else:
                 patience += 1
 
-            switch_to_rl = False
+            # switch_to_rl = False
             exit_train = False
 
             if patience == self.patience:
-                if not use_rl:
-                    use_rl = True
-                    switch_to_rl = True
-                    patience = 0
-                    self.optim = Adam(self.model.parameters(), lr=self.rl_learning_rate)
-                    logger.info("Switching to RL")
-                else:
-                    logger.info('patience reached.')
-                    exit_train = True
+                # if not use_rl:
+                #     use_rl = True
+                #     switch_to_rl = True
+                #     patience = 0
+                #     self.optim = Adam(self.model.parameters(), lr=self.rl_learning_rate)
+                #     logger.info("Switching to RL")
+                # else:
+                #     logger.info('patience reached.')
+                #     exit_train = True
 
-            if switch_to_rl and not best:
-                self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
+                logger.info('patience reached.')
+                exit_train = True
+
+            # if switch_to_rl and not best:
+            #     self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
 
             self.save_checkpoint({
                 'best_val_score': best_val_score,
                 'patience': patience,
-                'use_rl': use_rl
+                # 'use_rl': use_rl
             })
 
             if best:
@@ -287,9 +291,8 @@ class OpenEndedTask(BaseTask):
         results = []
         overall_gens = {}
         overall_gts = {}
-        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataset)) as pbar:
-            for it, items in enumerate(self.test_dict_dataset):
-                items = Instances.cat([items])
+        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataloader)) as pbar:
+            for it, items in enumerate(self.test_dict_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
                     outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)

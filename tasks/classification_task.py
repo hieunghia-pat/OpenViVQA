@@ -1,8 +1,9 @@
 import torch
+from torch import nn
+from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 from data_utils.utils import collate_fn
-from utils.instances import Instances
 from .base_task import BaseTask
 from builders.dataset_builder import build_dataset
 from builders.task_builder import META_TASK
@@ -16,10 +17,27 @@ import json
 
 logger = setup_logger()
 
+class BCEWithLogitsLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor):
+        source = torch.ones_like(input)
+        scattered_target = torch.zeros_like(input)
+        scattered_target.scatter_(dim=-1, index=target.unsqueeze(-1), src=source)
+
+        loss = F.binary_cross_entropy_with_logits(input, scattered_target, reduction="mean")
+
+        return loss
+
 @META_TASK.register()
 class ClassificationTask(BaseTask):
     def __init__(self, config):
         super().__init__(config)
+
+        # use multi-label loss
+        # self.loss_fn = BCEWithLogitsLoss()
+        self.loss_fn = nn.NLLLoss(ignore_index=self.vocab.padding_idx)
 
     def configuring_hyperparameters(self, config):
         self.epoch = 0
@@ -29,30 +47,30 @@ class ClassificationTask(BaseTask):
         self.patience = config.TRAINING.PATIENCE
 
     def load_datasets(self, config):
-        self.train_dataset = build_dataset(config.JSON_PATH.TRAIN, self.vocab, config)
-        self.dev_dataset = build_dataset(config.JSON_PATH.DEV, self.vocab, config)
-        self.test_dataset = build_dataset(config.JSON_PATH.TEST, self.vocab, config)
+        self.train_dataset = build_dataset(config.JSON_PATH.TRAIN, self.vocab, config.FEATURE_DATASET)
+        self.dev_dataset = build_dataset(config.JSON_PATH.DEV, self.vocab, config.FEATURE_DATASET)
+        self.test_dataset = build_dataset(config.JSON_PATH.TEST, self.vocab, config.FEATURE_DATASET)
 
     def create_dataloaders(self, config):
         self.train_dataloader = DataLoader(
             dataset=self.train_dataset,
-            batch_size=config.DATASET.BATCH_SIZE,
+            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
             shuffle=True,
-            num_workers=config.DATASET.WORKERS,
+            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
             collate_fn=collate_fn
         )
         self.dev_dataloader = DataLoader(
             dataset=self.dev_dataset,
-            batch_size=config.DATASET.BATCH_SIZE,
+            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
             shuffle=True,
-            num_workers=config.DATASET.WORKERS,
+            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
             collate_fn=collate_fn
         )
         self.test_dataloader = DataLoader(
             dataset=self.test_dataset,
-            batch_size=config.DATASET.BATCH_SIZE,
+            batch_size=1,
             shuffle=True,
-            num_workers=config.DATASET.WORKERS,
+            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
             collate_fn=collate_fn
         )
 
@@ -66,7 +84,7 @@ class ClassificationTask(BaseTask):
                     with torch.no_grad():
                         out = self.model(items).contiguous()
                     
-                    answer = items.answer_tokens
+                    answer = items.answer
                     loss = self.loss_fn(out.view(-1, self.vocab.total_answers), answer.view(-1))
                     this_loss = loss.item()
                     running_loss += this_loss
@@ -88,8 +106,8 @@ class ClassificationTask(BaseTask):
                 with torch.no_grad():
                     outs = self.model(items).contiguous()
 
-                answers_gt = items.answer
-                answers_gen = self.vocab.decode_answer(outs.argmax(dim=-1))
+                answers_gt = self.vocab.decode_answer(items.answer.squeeze(-1), join_word=True)
+                answers_gen = self.vocab.decode_answer(outs.argmax(dim=-1), join_word=True)
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = [gts_i, ]
@@ -107,7 +125,7 @@ class ClassificationTask(BaseTask):
             for it, items in enumerate(self.train_dataloader):
                 items = items.to(self.device)
                 out = self.model(items).contiguous()
-                answer = items.answer_tokens
+                answer = items.answer
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, self.vocab.total_answers), answer.view(-1))
                 loss.backward()
@@ -138,16 +156,15 @@ class ClassificationTask(BaseTask):
         while True:
             self.train()
 
-            self.evaluate_loss(self.dev_dataloader)
-
             # val scores
             scores = self.evaluate_metrics(self.dev_dataloader)
+            scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
             # Prepare for next epoch
             best = False
-            if val_score >= best_val_score:
+            if val_score > best_val_score:
                 best_val_score = val_score
                 patience = 0
                 best = True
@@ -184,15 +201,14 @@ class ClassificationTask(BaseTask):
         results = []
         overall_gens = {}
         overall_gts = {}
-        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dataset)) as pbar:
-            for it, items in enumerate(self.test_dataset):
-                items = Instances.cat([items])
+        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dataloader)) as pbar:
+            for it, items in enumerate(self.test_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
                     outs = self.model(items)
 
-                answers_gt = items.answer
-                answers_gen = self.vocab.decode_answer(outs.argmax(dim=-1))
+                answers_gt = self.vocab.decode_answer(items.answer.squeeze(-1), join_word=True)
+                answers_gen = self.vocab.decode_answer(outs.argmax(dim=-1), join_word=True)
                 gts = {}
                 gens = {}
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
@@ -206,13 +222,13 @@ class ClassificationTask(BaseTask):
                     "id": items.question_id,
                     "filename": items.filename,
                     "gens": gens,
-                    "gts": gts,
-                    "scores": scores
+                    "gts": gts
                 })
 
                 pbar.update()
 
         scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+        scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
         logger.info("Evaluation scores on test: %s", scores)
 
         json.dump({

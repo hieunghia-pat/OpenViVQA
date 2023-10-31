@@ -1,10 +1,10 @@
+import torch
 from torch import nn
 
 from models.modules.positionwise_feed_forward import PositionWiseFeedForward
 from models.modules.attentions import MultiHeadAttention
 from models.modules.pos_embeddings import SinusoidPositionalEmbedding
 from builders.encoder_builder import META_ENCODER
-from utils.instances import Instances
 
 class EncoderLayer(nn.Module):
     def __init__(self, config):
@@ -12,10 +12,9 @@ class EncoderLayer(nn.Module):
         self.mhatt = MultiHeadAttention(config)
         self.pwff = PositionWiseFeedForward(config)
 
-    def forward(self, queries, keys, values, padding_mask, attention_mask, **kwargs):
-        att = self.mhatt(queries=queries, keys=keys, values=values, padding_mask=padding_mask, attention_mask=attention_mask, **kwargs)
+    def forward(self, queries, keys, values, attention_mask, **kwargs):
+        att = self.mhatt(queries=queries, keys=keys, values=values, attention_mask=attention_mask, **kwargs)
         ff = self.pwff(att)
-        ff = ff.masked_fill(padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
 
         return ff
 
@@ -41,15 +40,13 @@ class CrossModalityEncoderLayer(nn.Module):
             queries=vision_features,
             keys=language_features,
             values=language_features,
-            padding_mask=vision_padding_mask,
             attention_mask=language_padding_mask,
             **kwargs
         )
-        language_attn = self.language_mhattn(
+        language_attn = self.language_vision_mhattn(
             queries=language_features,
             keys=vision_features,
             values=vision_features,
-            padding_mask=language_padding_mask,
             attention_mask=vision_padding_mask
         )
 
@@ -58,7 +55,6 @@ class CrossModalityEncoderLayer(nn.Module):
             queries=vision_features,
             keys=vision_features,
             values=vision_features,
-            padding_mask=vision_padding_mask,
             attention_mask=vision_padding_mask,
             **kwargs
         )
@@ -66,7 +62,6 @@ class CrossModalityEncoderLayer(nn.Module):
             queries=language_features,
             keys=language_features,
             values=language_features,
-            padding_mask=language_padding_mask,
             attention_mask=language_padding_mask
         )
 
@@ -83,12 +78,11 @@ class GuidedEncoderLayer(nn.Module):
         self.guided_mhatt = MultiHeadAttention(config)
         self.pwff = PositionWiseFeedForward(config)
 
-    def forward(self, queries, keys, values, self_padding_mask, self_attention_mask, guided_attention_mask, **kwargs):
+    def forward(self, queries, keys, values, self_attention_mask, guided_attention_mask, **kwargs):
         self_att = self.self_mhatt(
                                     queries=queries,
                                     keys=queries, 
                                     values=queries,
-                                    padding_mask=self_padding_mask,
                                     attention_mask=self_attention_mask,
                                     **kwargs
                                 )
@@ -96,13 +90,11 @@ class GuidedEncoderLayer(nn.Module):
                                         queries=self_att, 
                                         keys=keys, 
                                         values=values,
-                                        padding_mask=self_padding_mask,
                                         attention_mask=guided_attention_mask,
                                         **kwargs
                                     )
 
         ff = self.pwff(guided_att)
-        ff = ff.masked_fill(self_padding_mask.squeeze(1).squeeze(1).unsqueeze(-1), value=0)
 
         return ff
 
@@ -117,29 +109,10 @@ class Encoder(nn.Module):
         self.d_model = config.D_MODEL
         self.layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
 
-    def forward(self, input_features: Instances):
-        features = input_features.features
-        padding_mask = input_features.features_padding_mask
-        
+    def forward(self, features: torch.Tensor, padding_mask: torch.Tensor):
         out = self.layer_norm(features) + self.pos_embedding(features)
         for layer in self.layers:
-            out = layer(queries=out, keys=out, values=out, padding_mask=padding_mask, attention_mask=padding_mask)
-
-        return out
-
-@META_ENCODER.register()
-class MultiModalEncoder(Encoder):
-    def __init__(self, config) -> None:
-        super().__init__(config)
-
-    def forward(self, input_features: Instances):
-        features = input_features.features
-        padding_mask = input_features.features_padding_mask
-        attention_mask = input_features.features_attention_mask
-        
-        out = self.layer_norm(features) + self.pos_embedding(features)
-        for layer in self.layers:
-            out = layer(queries=out, keys=out, values=out, padding_mask=padding_mask, attention_mask=attention_mask)
+            out = layer(queries=out, keys=out, values=out, attention_mask=padding_mask)
 
         return out
 
@@ -154,14 +127,10 @@ class GeometricEncoder(nn.Module):
         self.d_model = config.D_MODEL
         self.layers = nn.ModuleList([EncoderLayer(config.SELF_ATTENTION) for _ in range(config.LAYERS)])
 
-    def forward(self, input_features: Instances):
-        features = input_features.features
-        boxes = input_features.boxes
-        padding_mask = input_features.features_padding_mask
-        
+    def forward(self, features: torch.Tensor, boxes: torch.Tensor, padding_mask: torch.Tensor):    
         out = self.layer_norm(features) + self.pos_embedding(features)
         for layer in self.layers:
-            out = layer(queries=out, keys=out, values=out, boxes=boxes, padding_mask=padding_mask, attention_mask=padding_mask)
+            out = layer(queries=out, keys=out, values=out, boxes=boxes, attention_mask=padding_mask)
 
         return out
 
@@ -180,22 +149,14 @@ class GuidedAttentionEncoder(nn.Module):
 
         self.guided_attn_layers = nn.ModuleList([GuidedEncoderLayer(config.GUIDED_ATTENTION) for _ in range(config.LAYERS)])
 
-    def forward(self, input_features: Instances):
-        vision_features = input_features.vision_features
-        boxes = input_features.boxes
-        vision_padding_mask = input_features.vision_padding_mask
-
-        language_features = input_features.language_features
-        language_padding_mask = input_features.language_padding_mask
-
+    def forward(self, vision_features: torch.Tensor, vision_padding_mask: torch.Tensor, 
+                language_features: torch.Tensor, language_padding_mask: torch.Tensor):
         out = self.layer_norm(vision_features) + self.pos_embedding(vision_features)
         for guided_attn_layer in self.guided_attn_layers:
             out = guided_attn_layer(
                 queries=out,
                 keys=language_features,
                 values=language_features,
-                boxes=boxes,
-                self_padding_mask=vision_padding_mask,
                 self_attention_mask=vision_padding_mask,
                 guided_attention_mask=language_padding_mask
             )
@@ -224,14 +185,8 @@ class CoAttentionEncoder(nn.Module):
         self.vision_self_attn_layers = nn.ModuleList([EncoderLayer(config.VISION_SELF_ATTENTION) for _ in range(config.LAYERS)])
         self.language_self_attn_layers = nn.ModuleList([EncoderLayer(config.LANGUAGE_SELF_ATTENTION) for _ in range(config.LAYERS)])
 
-    def forward(self, input_features):
-        vision_features = input_features.vision_features
-        boxes = input_features.boxes
-        vision_padding_mask = input_features.vision_padding_mask
-
-        language_features = input_features.language_features
-        language_padding_mask = input_features.language_padding_mask
-
+    def forward(self, vision_features: torch.Tensor, vision_padding_mask: torch.Tensor, 
+                language_features: torch.Tensor, language_padding_mask: torch.Tensor):
         vision_features = self.vision_layer_norm(vision_features) + self.pos_embedding(vision_features)
         language_features = self.language_layer_norm(language_features) + self.pos_embedding(language_features)
         for layers in zip(self.vision_language_attn_layers, 
@@ -244,15 +199,12 @@ class CoAttentionEncoder(nn.Module):
                 queries=vision_features,
                 keys=language_features,
                 values=language_features,
-                boxes=boxes,
-                padding_mask=vision_padding_mask,
                 attention_mask=language_padding_mask
             )
             language_features = language_vision_attn_layer(
                 queries=language_features,
                 keys=vision_features,
                 values=vision_features,
-                padding_mask=language_padding_mask,
                 attention_mask=vision_padding_mask
             )
             # performing self-attention
@@ -260,15 +212,12 @@ class CoAttentionEncoder(nn.Module):
                 queries=vision_features,
                 keys=vision_features,
                 values=vision_features,
-                boxes=boxes,
-                padding_mask=vision_padding_mask,
                 attention_mask=vision_padding_mask
             )
             language_features = language_self_attn_layer(
                 queries=language_features,
                 keys=language_features,
                 values=language_features,
-                padding_mask=language_padding_mask,
                 attention_mask=language_padding_mask
             )
 
@@ -289,21 +238,14 @@ class CrossModalityEncoder(nn.Module):
         self.d_model = config.D_MODEL
         self.layers = nn.ModuleList([CrossModalityEncoderLayer(config) for _ in range(config.LAYERS)])
 
-    def forward(self, input_features: Instances):
-        vision_features = input_features.vision_features
-        boxes = input_features.boxes
-        vision_padding_mask = input_features.vision_padding_mask
-
-        language_features = input_features.language_features
-        language_padding_mask = input_features.language_padding_mask
-
+    def forward(self, vision_features: torch.Tensor, vision_padding_mask: torch.Tensor, 
+                language_features: torch.Tensor, language_padding_mask: torch.Tensor):
         vision_features = self.vision_layer_norm(vision_features) + self.pos_embedding(vision_features)
         language_features = self.language_layer_norm(language_features) + self.pos_embedding(language_features)
         for layer in self.layers:
             vision_features, language_features = layer(
                 vision_features=vision_features,
                 vision_padding_mask=vision_padding_mask,
-                boxes=boxes,
                 language_features=language_features,
                 language_padding_mask=language_padding_mask
             )

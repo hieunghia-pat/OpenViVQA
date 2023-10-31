@@ -1,0 +1,13 @@
+.vector_cache
+features
+saved_models
+images
+*_test
+__pycache__
+
+*.json
+examine*
+
+statistic.ipynb
+
+*.zip

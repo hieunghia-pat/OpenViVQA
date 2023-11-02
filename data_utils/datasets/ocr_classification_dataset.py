@@ -99,29 +99,29 @@ class OcrClassificationDataset(FeatureClassificationDataset):
             for key, feature in features.items():
                 if isinstance(feature, torch.Tensor):
                     feature = feature[topk_scores.indices]
-                if not isinstance(feature, int):
+                elif not isinstance(feature, int):
                     feature = [feature[idx] for idx in topk_scores.indices]
                 features[key] = feature
 
         if len(features["det_features"]) == 0:
             det_features=self.pad_tensor(torch.zeros(1,256),self.max_scene_text,0)
         else:
-            det_features=self.pad_tensor(torch.stack(features["det_features"]),self.max_scene_text,0)
+            det_features=self.pad_tensor(features["det_features"],self.max_scene_text,0)
         
         if len(features["rec_features"]) ==0:
             rec_features=self.pad_tensor(torch.zeros(1,256),self.max_scene_text,0)
         else:
-            rec_features=self.pad_tensor(torch.stack(features["rec_features"]),self.max_scene_text,0)
+            rec_features=self.pad_tensor(features["rec_features"],self.max_scene_text,0)
 
         if len(features["fasttext_features"]) == 0:
             fasttext_features=self.pad_tensor(torch.zeros(1,300),self.max_scene_text,0)
         else:
-            fasttext_features=self.pad_tensor(torch.stack(features["fasttext_features"]),self.max_scene_text,0)
+            fasttext_features=self.pad_tensor(features["fasttext_features"],self.max_scene_text,0)
 
         if len(features["boxes"]) ==0 :
             boxes=self.pad_tensor(torch.zeros(1,4),self.max_scene_text,0)
         else:
-            boxes=self.pad_tensor(torch.stack(features["boxes"]),self.max_scene_text,0)
+            boxes=self.pad_tensor(features["boxes"],self.max_scene_text,0)
 
         return {
             "ocr_det_features": det_features,

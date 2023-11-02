@@ -56,9 +56,13 @@ class MMF_IterativeM4C(nn.Module):
         self._build_output(config.OCR_PTR_NET)
 
     def _build_txt_encoding(self, config):
-        text_bert_config = BertConfig(hidden_size=config.HIDDEN_SIZE,
-                                            num_hidden_layers=config.NUM_HIDDEN_LAYERS,
-                                            num_attention_heads=config.NUM_ATTENTION_HEADS)
+        text_bert_config = BertConfig.from_pretrained(self.config.TEXT_BERT.PRETRAINED_NAME)
+        # self.text_bert_config = BertConfig(hidden_size=self.config.TEXT_BERT.HIDDEN_SIZE,
+        #                                     num_hidden_layers=self.config.TEXT_BERT.NUM_HIDDEN_LAYERS,
+        #                                     num_attention_heads=self.config.MMT.NUM_ATTENTION_HEADS)
+        text_bert_config.hidden_size=self.config.TEXT_BERT.HIDDEN_SIZE
+        text_bert_config.num_hidden_layers=self.config.TEXT_BERT.NUM_HIDDEN_LAYERS
+        text_bert_config.num_attention_heads=self.config.TEXT_BERT.NUM_ATTENTION_HEADS
         self.text_bert = TextBert(text_bert_config)
         self.text_bert_out_linear = nn.Identity()
 

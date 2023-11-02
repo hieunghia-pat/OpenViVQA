@@ -21,7 +21,6 @@ class DictionaryDataset(BaseDataset):
                     answers = [" ".join(answer) for answer in answers]
                     annotation = {
                         "question_id": ann["id"],
-                        "type": ann["QA-type"],
                         "question": question,
                         "answers": answers,
                         "image_id": ann["image_id"],
@@ -44,7 +43,6 @@ class DictionaryDataset(BaseDataset):
 
         return Instance(
             question_id=item["question_id"],
-            type=item["type"],
             image_id=image_id,
             filename=filename,
             question=question,

@@ -20,17 +20,9 @@ class BertOcrVocab(OcrVocab):
         self.tokenizer = tokenizer.tokenize
 
         self.padding_token = tokenizer.pad_token
-        self.bos_token = tokenizer.bos_token
-        self.eos_token = tokenizer.eos_token
+        self.bos_token = tokenizer.sep_token
+        self.eos_token = tokenizer.sep_token
         self.unk_token = tokenizer.unk_token
-        self.img_token = config.IMG_TOKEN
-        self.feat_token = config.FEAT_TOKEN
-        self.box_token = config.BOX_TOKEN
-        self.ocr_token = config.OCR_TOKEN
-        self.ocr_det_token = config.OCR_DET_TOKEN
-        self.ocr_rec_token = config.OCR_REC_TOKEN
-        self.question_token = config.QUESTION_TOKEN
-        self.answer_token = config.ANSWER_TOKEN
 
         self.make_vocab([
             config.JSON_PATH.TRAIN,
@@ -38,25 +30,15 @@ class BertOcrVocab(OcrVocab):
             config.JSON_PATH.TEST
         ])
 
-        itos = tokenizer.ids_to_tokens
+        self.itos = tokenizer.ids_to_tokens
         self.stoi = {token: id for id, token in self.itos.items()}
 
-        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
-                    self.feat_token, self.box_token, self.ocr_token, self.ocr_det_token, self.ocr_rec_token, 
-                    self.question_token, self.answer_token]
+        self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
         self.eos_idx = self.stoi[self.eos_token]
         self.unk_idx = self.stoi[self.unk_token]
-        self.img_idx = self.stoi[self.img_token]
-        self.feat_idx = self.stoi[self.feat_token]
-        self.box_idx = self.stoi[self.box_token]
-        self.ocr_idx = self.stoi[self.ocr_token]
-        self.ocr_det_idx = self.stoi[self.ocr_det_token]
-        self.ocr_rec_idx = self.stoi[self.ocr_rec_token]
-        self.question_idx = self.stoi[self.question_token]
-        self.answer_idx = self.stoi[self.answer_token]
 
     def match_text_to_indices(self, text: List[str], oov2inds: Dict[str, int]):
         '''

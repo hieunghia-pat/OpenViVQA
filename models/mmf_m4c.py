@@ -46,7 +46,8 @@ class MMF_M4C(nn.Module):
     def _build_txt_encoding(self):
         TEXT_BERT_HIDDEN_SIZE = 768
 
-        self.text_bert_config = BertConfig(hidden_size=self.config.TEXT_BERT.HIDDEN_SIZE,
+        self.text_bert_config = BertConfig(vocab_size=len(self.vocab),
+                                            hidden_size=self.config.TEXT_BERT.HIDDEN_SIZE,
                                             num_hidden_layers=self.config.TEXT_BERT.NUM_HIDDEN_LAYERS,
                                             num_attention_heads=self.config.MMT.NUM_ATTENTION_HEADS)
         if self.config.TEXT_BERT.LOAD_PRETRAINED:

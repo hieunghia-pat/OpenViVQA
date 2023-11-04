@@ -18,8 +18,8 @@ class BERTVocab(Vocab):
         self.tokenizer = tokenizer.tokenize
 
         self.padding_token = tokenizer.pad_token
-        self.bos_token = tokenizer.bos_token
-        self.eos_token = tokenizer.eos_token
+        self.bos_token = tokenizer.sep_token
+        self.eos_token = tokenizer.sep_token
         self.unk_token = tokenizer.unk_token
 
         self.make_vocab([

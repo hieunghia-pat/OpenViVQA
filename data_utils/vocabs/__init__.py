@@ -8,3 +8,4 @@ from .ocr_vocab import OcrVocab
 from .ocr_classification_vocab import OcrClassificationVocab
 from .vlsp_evjvqa_vocab import VlspEvjVqaVocab
 from .vlsp_vqa_multimodal_vocab import VlspVqaMultiModalVocab
+from .bert_vocab import BERTVocab

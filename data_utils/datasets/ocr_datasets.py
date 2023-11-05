@@ -40,7 +40,7 @@ class OcrFeatureDataset(FeatureDataset):
         for key, feature in features.items():
             if isinstance(feature, torch.Tensor) or isinstance(feature, np.ndarray):
                 feature = feature[selected_ids]
-            else:
+            elif isinstance(feature, list):
                 feature = [feature[idx] for idx, selected_id in enumerate(selected_ids) if selected_id]
             features[key] = feature
         # get the top confident-score ocr features and tokens
@@ -56,6 +56,7 @@ class OcrFeatureDataset(FeatureDataset):
         return {
             "ocr_det_features": features["det_features"],
             "ocr_rec_features": features["rec_features"],
+            "ocr_fasttext_features": features["fasttext_features"],
             "ocr_texts": features["texts"],
             "ocr_boxes": features["boxes"],
             "ocr_scores": features["scores"]
@@ -130,7 +131,7 @@ class OcrDictionaryDataset(DictionaryDataset):
         for key, feature in features.items():
             if isinstance(feature, torch.Tensor) or isinstance(feature, np.ndarray):
                 feature = feature[selected_ids]
-            else:
+            elif isinstance(feature, list):
                 feature = [feature[idx] for idx, selected_id in enumerate(selected_ids) if selected_id]
             features[key] = feature
         # get the top confident-score ocr features and tokens
@@ -139,13 +140,14 @@ class OcrDictionaryDataset(DictionaryDataset):
             for key, feature in features.items():
                 if isinstance(feature, torch.Tensor):
                     feature = feature[topk_scores.indices]
-                else:
+                elif isinstance(feature, list):
                     feature = [feature[idx] for idx in topk_scores.indices]
                 features[key] = feature
 
         return {
             "ocr_det_features": features["det_features"],
             "ocr_rec_features": features["rec_features"],
+            "ocr_fasttext_features": features["fasttext_features"],
             "ocr_texts": features["texts"],
             "ocr_boxes": features["boxes"],
             "ocr_scores": features["scores"]
@@ -175,7 +177,6 @@ class OcrDictionaryDataset(DictionaryDataset):
         return Instance(
             **features,
             question_id=item["question_id"],
-            type=item["type"],
             image_id=image_id,
             filename=filename,
             ocr_tokens=ocr_tokens,

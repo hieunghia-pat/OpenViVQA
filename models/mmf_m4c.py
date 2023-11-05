@@ -56,6 +56,10 @@ class MMF_M4C(nn.Module):
             )
         else:
             self.text_bert = TextBert(self.text_bert_config)
+        
+        if self.config.TEXT_BERT.FREEZE_WEIGHTS:
+            for param in self.text_bert.parameters():
+                param.requires_grad = False
 
         # if the text bert output dimension doesn't match the
         # multimodal transformer (mmt) hidden dimension,

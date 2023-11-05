@@ -99,7 +99,7 @@ class OcrClassificationDataset(FeatureClassificationDataset):
             for key, feature in features.items():
                 if isinstance(feature, torch.Tensor):
                     feature = feature[topk_scores.indices]
-                else:
+                elif isinstance(feature, list):
                     feature = [feature[idx] for idx in topk_scores.indices]
                 features[key] = feature
         else: # pad to the highest number of ocr tokens

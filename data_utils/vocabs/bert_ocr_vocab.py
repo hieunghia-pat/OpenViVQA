@@ -1,6 +1,5 @@
 from transformers import BertTokenizer
 
-from builders.word_embedding_builder import build_word_embedding
 from builders.vocab_builder import META_VOCAB
 from data_utils.vocabs.ocr_vocab import OcrVocab
 from data_utils.utils import preprocess_sentence

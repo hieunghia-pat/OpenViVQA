@@ -92,7 +92,7 @@ class BertOcrVocab(OcrVocab):
                 if word not in self.specials:
                     answer.append(word)
             answer = " ".join(answer)
-            answer = re.sub(r"\s+#+\s+", "", answer)
+            answer = re.sub(r"\s+#+", "", answer)
 
             if join_words:
                 answers.append(answer)
@@ -125,7 +125,7 @@ class BertOcrVocab(OcrVocab):
                 if word not in self.specials:
                     answer.append(word)
             answer = " ".join(answer)
-            answer = re.sub(r"\s+#+\s+", "", answer)
+            answer = re.sub(r"\s+#+", "", answer)
 
             if join_words:
                 answers.append(answer)

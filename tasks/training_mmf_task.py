@@ -46,7 +46,7 @@ class TrainingMMF(OpenEndedTask):
     def evaluate_loss(self, dataloader):
         self.model.eval()
         running_loss = .0
-        with tqdm(desc='Epoch %d - Validation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Validating' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             with torch.no_grad():
                 for it, items in enumerate(dataloader):
                     items = items.to(self.device)
@@ -72,7 +72,7 @@ class TrainingMMF(OpenEndedTask):
         self.model.eval()
         gens = {}
         gts = {}
-        with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Evaluating' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             for it, items in enumerate(dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
@@ -95,7 +95,7 @@ class TrainingMMF(OpenEndedTask):
     def train(self):
         self.model.train()
         running_loss = .0
-        with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Training' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, items in enumerate(self.train_dataloader):
                 items = items.to(self.device)
                 results = self.model(items)
@@ -177,7 +177,7 @@ class TrainingMMF(OpenEndedTask):
         results = []
         overall_gens = {}
         overall_gts = {}
-        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataloader)) as pbar:
+        with tqdm(desc='Predicting: ', unit='it', total=len(self.test_dict_dataloader)) as pbar:
             for it, items in enumerate(self.test_dict_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():

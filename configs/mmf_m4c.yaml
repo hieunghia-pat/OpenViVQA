@@ -14,7 +14,7 @@ DATASET:
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
-    TYPE: OcrDictionaryDataset
+    TYPE: BertOcrDictionaryDataset
     BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
@@ -27,7 +27,8 @@ DATASET:
     WORD_EMBEDDING_CACHE: null
   MIN_FREQ: 1
   VOCAB:
-    TYPE: OcrVocab
+    TYPE: BertOcrVocab
+    PRETRAINED_NAME: "bert-base-multilingual-cased"
     TOKENIZER: null
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
@@ -108,5 +109,5 @@ MODEL:
     DROPOUT: .1
     LOAD_PRETRAINED: True
     FREEZE_WEIGHTS: False
-    PRETRAINED_NAME: "bert-base-uncased"
+    PRETRAINED_NAME: "bert-base-multilingual-cased"
     DEVICE: cuda

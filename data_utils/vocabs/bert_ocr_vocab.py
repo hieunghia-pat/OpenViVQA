@@ -68,7 +68,7 @@ class BertOcrVocab(OcrVocab):
             for ann in json_data["annotations"]:
                 for answer in ann["answers"]:
                     question = preprocess_sentence(ann["question"], self.tokenizer)
-                    answer = preprocess_sentence(answer, self.tokenizer, self.tokenizer)
+                    answer = preprocess_sentence(answer, self.tokenizer)
                     if len(question) + 2 > self.max_question_length:
                             self.max_question_length = len(question) + 2
                     if len(answer) + 2 > self.max_answer_length:
@@ -92,7 +92,7 @@ class BertOcrVocab(OcrVocab):
                 if word not in self.specials:
                     answer.append(word)
             answer = " ".join(answer)
-            answer = re.sub(r"#+", "", answer)
+            answer = re.sub(r"\s+#+\s+", "", answer)
 
             if join_words:
                 answers.append(answer)
@@ -125,7 +125,7 @@ class BertOcrVocab(OcrVocab):
                 if word not in self.specials:
                     answer.append(word)
             answer = " ".join(answer)
-            answer = re.sub(r"#+", "", answer)
+            answer = re.sub(r"\s+#+\s+", "", answer)
 
             if join_words:
                 answers.append(answer)

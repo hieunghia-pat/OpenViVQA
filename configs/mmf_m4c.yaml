@@ -107,6 +107,6 @@ MODEL:
     D_MODEL: 768
     DROPOUT: .1
     LOAD_PRETRAINED: True
-    FREEZE_WEIGHTS: True
+    FREEZE_WEIGHTS: False
     PRETRAINED_NAME: "bert-base-uncased"
     DEVICE: cuda

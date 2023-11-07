@@ -14,7 +14,7 @@ DATASET:
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
-    TYPE: OcrDictionaryDataset
+    TYPE: BertOcrDictionaryDataset
     BATCH_SIZE: 64
     WORKERS: 0
     FEATURE_PATH:
@@ -27,7 +27,8 @@ DATASET:
     WORD_EMBEDDING_CACHE: null
   MIN_FREQ: 1
   VOCAB:
-    TYPE: OcrVocab
+    TYPE: BertOcrVocab
+    PRETRAINED_NAME: "bert-base-multilingual-cased"
     TOKENIZER: null
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null
@@ -54,11 +55,19 @@ DATASET:
     TEST: data/test.json
 
 TRAINING:
-  CHECKPOINT_PATH: /content/drive/MyDrive
-  LEARNING_RATE: 1.
+  CHECKPOINT_PATH: saved_models
+  LEARNING_RATE: 2.0e-5
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
   SCORE: Accuracy
+  VERBOSE_SCORES:
+    - Accuracy
+    - F1
+    - BLEU
+    - METEOR
+    - ROUGE
+    - CIDEr
+  GET_SCORES: True
   TRAINING_BEAM_SIZE: 1
   EVALUATING_BEAM_SIZE: 3
   PATIENCE: 5
@@ -86,27 +95,21 @@ MODEL:
   OCR_PTR_NET:
     HIDDEN_SIZE: 768
     QUERY_KEY_SIZE: 768
-    OCR_MAX_NUM: 30
+    OCR_MAX_NUM: 100
   CLASSIFIER:
-    OCR_MAX_NUM: 30
+    OCR_MAX_NUM: 100
   MMT:
     HIDDEN_SIZE: 768
     NUM_HIDDEN_LAYERS: 4
-    NUM_ATTENTION_HEADS: 8
+    NUM_ATTENTION_HEADS: 12
   TEXT_BERT:
+    ARCHITECTURE: BertEmbedding
     HIDDEN_SIZE: 768
     NUM_HIDDEN_LAYERS: 12
     NUM_ATTENTION_HEADS: 12
-    D_MODEL: 512
-    DROPOUT: .1
-    LOAD_PRETRAINED: True
-    FREEZE_WEIGHTS: True
-    PRETRAINED_NAME: "bert-base-multilingual-uncased"
-  TEXT_EMBEDDING:
-    ARCHITECTURE: UsualEmbedding
-    DEVICE: cuda
-    D_EMBEDDING: 300
     D_MODEL: 768
     DROPOUT: .1
-    WORD_EMBEDDING: null
-    WORD_EMBEDDING_CACHE: null
+    LOAD_PRETRAINED: True
+    FREEZE_WEIGHTS: False
+    PRETRAINED_NAME: "bert-base-multilingual-cased"
+    DEVICE: cuda

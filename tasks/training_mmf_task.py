@@ -6,6 +6,7 @@ from utils.logging_utils import setup_logger
 from tasks.open_ended_task import OpenEndedTask
 from builders.task_builder import META_TASK
 import evaluation
+from torch.optim import Adam
 
 import os
 from tqdm import tqdm
@@ -15,6 +16,10 @@ import json
 from torch.nn import CrossEntropyLoss
 
 logger = setup_logger()
+
+def countTrainableParameters(model) -> int:
+    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    return num_params
 
 class BCEWithMaskLogitsLoss(nn.Module):
     def __init__(self, ignore_index=0):
@@ -41,13 +46,28 @@ class BCEWithMaskLogitsLoss(nn.Module):
 class TrainingMMF(OpenEndedTask):
     def __init__(self, config):
         super().__init__(config)
+        # self.loss_fn = BCEWithMaskLogitsLoss(ignore_index=self.vocab.padding_idx)
+        optimizer_modules = [
+            {'params': self.model.text_bert.parameters(), 'lr': 0.1*config.TRAINING.LEARNING_RATE},
+            {'params': self.model.mmt.parameters(), 'lr': 1.0*config.TRAINING.LEARNING_RATE},
+            {'params': self.model.ocr_ptr_net.parameters(), 'lr': 1.0*config.TRAINING.LEARNING_RATE}
+        ]
+        finetune_params_set = set()
+        finetune_params_set.update(list(self.model.text_bert.parameters()))
+        finetune_params_set.update(list(self.model.mmt.parameters()))
+        finetune_params_set.update(list(self.model.ocr_ptr_net.parameters()))
 
-        self.loss_fn = CrossEntropyLoss(ignore_index=self.vocab.padding_idx)
+        remaining_params = [
+            p for p in self.model.parameters() if p not in finetune_params_set
+        ]
+        optimizer_modules.insert(0, {"params": remaining_params})
+
+        self.optim = Adam(optimizer_modules, lr=config.TRAINING.LEARNING_RATE, betas=(0.9, 0.98))
 
     def evaluate_loss(self, dataloader):
         self.model.eval()
         running_loss = .0
-        with tqdm(desc='Epoch %d - Validation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Validating' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             with torch.no_grad():
                 for it, items in enumerate(dataloader):
                     items = items.to(self.device)
@@ -73,7 +93,7 @@ class TrainingMMF(OpenEndedTask):
         self.model.eval()
         gens = {}
         gts = {}
-        with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Evaluating' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             for it, items in enumerate(dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
@@ -96,7 +116,7 @@ class TrainingMMF(OpenEndedTask):
     def train(self):
         self.model.train()
         running_loss = .0
-        with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Training' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, items in enumerate(self.train_dataloader):
                 items = items.to(self.device)
                 results = self.model(items)
@@ -134,6 +154,7 @@ class TrainingMMF(OpenEndedTask):
 
             # val scores
             scores = self.evaluate_metrics(self.dev_dict_dataloader)
+            scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
@@ -177,7 +198,7 @@ class TrainingMMF(OpenEndedTask):
         results = []
         overall_gens = {}
         overall_gts = {}
-        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataloader)) as pbar:
+        with tqdm(desc='Predicting: ', unit='it', total=len(self.test_dict_dataloader)) as pbar:
             for it, items in enumerate(self.test_dict_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
@@ -208,6 +229,7 @@ class TrainingMMF(OpenEndedTask):
                 pbar.update()
 
         scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+        scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
         logger.info("Evaluation scores on test: %s", scores)
 
         json.dump({

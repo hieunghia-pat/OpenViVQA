@@ -72,6 +72,8 @@ def preprocess_sentence(sentence: str, tokenizer: str):
     # tokenize the sentence
     tokenizer = get_tokenizer(tokenizer)
     sentence = tokenizer(sentence)
+    if isinstance(sentence, List):
+        sentence = " ".join(sentence)
     sentence = " ".join(sentence.strip().split()) # remove duplicated spaces
     tokens = sentence.strip().split()
     

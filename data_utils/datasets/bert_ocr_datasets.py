@@ -1,13 +1,8 @@
-import torch
-
 from data_utils.datasets.ocr_datasets import OcrDictionaryDataset
 from utils.instance import Instance
 from builders.dataset_builder import META_DATASET
 
-import os
 import re
-import numpy as np
-from typing import Dict, Any
 
 @META_DATASET.register()
 class BertOcrDictionaryDataset(OcrDictionaryDataset):

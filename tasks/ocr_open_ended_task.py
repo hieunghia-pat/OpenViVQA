@@ -1,6 +1,5 @@
 import torch
 
-from utils.logging_utils import setup_logger
 from .open_ended_task import OpenEndedTask
 from builders.task_builder import META_TASK
 import evaluation
@@ -10,8 +9,6 @@ import numpy as np
 from tqdm import tqdm
 import itertools
 import json
-
-logger = setup_logger()
 
 @META_TASK.register()
 class OcrOpenEndedTask(OpenEndedTask):
@@ -83,7 +80,7 @@ class OcrOpenEndedTask(OpenEndedTask):
 
     def get_predictions(self):
         if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
-            logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
+            self.logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
 
         self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
@@ -122,7 +119,7 @@ class OcrOpenEndedTask(OpenEndedTask):
                 pbar.update()
 
         scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
-        logger.info("Evaluation scores on test: %s", scores)
+        self.logger.info("Evaluation scores on test: %s", scores)
 
         json.dump({
             "results": results,

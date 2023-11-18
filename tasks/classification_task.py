@@ -7,15 +7,12 @@ from data_utils.utils import collate_fn
 from .base_task import BaseTask
 from builders.dataset_builder import build_dataset
 from builders.task_builder import META_TASK
-from utils.logging_utils import setup_logger
 import evaluation
 
 import os
 from shutil import copyfile
 from tqdm import tqdm
 import json
-
-logger = setup_logger()
 
 class BCEWithLogitsLoss(nn.Module):
     def __init__(self):
@@ -159,7 +156,7 @@ class ClassificationTask(BaseTask):
             # val scores
             scores = self.evaluate_metrics(self.dev_dataloader)
             scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
-            logger.info("Validation scores %s", scores)
+            self.logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
             # Prepare for next epoch
@@ -173,7 +170,7 @@ class ClassificationTask(BaseTask):
 
             exit_train = False
             if patience == self.patience:
-                logger.info('patience reached.')
+                self.logger.info('patience reached.')
                 exit_train = True
 
             self.save_checkpoint({
@@ -192,7 +189,7 @@ class ClassificationTask(BaseTask):
 
     def get_predictions(self):
         if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
-            logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
+            self.logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
 
         self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
@@ -229,7 +226,7 @@ class ClassificationTask(BaseTask):
 
         scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
         scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
-        logger.info("Evaluation scores on test: %s", scores)
+        self.logger.info("Evaluation scores on test: %s", scores)
 
         json.dump({
             "results": results,

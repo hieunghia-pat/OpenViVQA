@@ -131,7 +131,7 @@ class TrainingMMF(OpenEndedTask):
             # val scores
             scores = self.evaluate_metrics(self.dev_dict_dataloader)
             scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
-            logger.info("Validation scores %s", scores)
+            self.logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
             # Prepare for next epoch

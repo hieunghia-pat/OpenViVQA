@@ -15,11 +15,7 @@ import random
 
 class BaseTask:
     def __init__(self, config):
-
-        self.logger = Logger(os.path.join(
-            config.TRAINING.CHECKPOINT_PATH,
-            config.MODEL.NAME,
-            "task.log"))
+        self.logger = Logger("task.log")
 
         self.checkpoint_path = os.path.join(config.TRAINING.CHECKPOINT_PATH, config.MODEL.NAME)
         if not os.path.isdir(self.checkpoint_path):

@@ -29,7 +29,7 @@ class ColorfulFormatter(logging.Formatter):
         
         return log
 
-class Logger:
+class Logger(logging.Logger):
     def __init__(self, output=None, distributed_rank=0, *, color=True, name="OpenViVQA"):
         """
         Args:
@@ -41,9 +41,10 @@ class Logger:
         Returns:
             logging.Logger: a logger
         """
-        self.__logger = logging.getLogger(name)
-        self.__logger.setLevel(logging.DEBUG)
-        self.__logger.propagate = False
+        super().__init__(name)
+
+        self.setLevel(logging.DEBUG)
+        self.propagate = False
         self.__distributed_rank = distributed_rank
 
         FORMAT = "[%(asctime)s] %(levelname)s: %(message)s"
@@ -57,7 +58,7 @@ class Logger:
             else:
                 formatter = plain_formatter
             ch.setFormatter(formatter)
-            self.__logger.addHandler(ch)
+            self.addHandler(ch)
 
         # file logging: all workers
         if output is not None:
@@ -79,16 +80,13 @@ class Logger:
                 "[%(asctime)s] %(levelname)s: %(message)s", 
                 datefmt="%d/%m/%Y %H:%M:%S")
             )
-            self.__logger.addHandler(fh)
-
-    def __getattribute__(self, __name: str) -> Any:
-        return self.__logger.__getattribute__(__name)
+            self.addHandler(fh)
 
 # cache the opened file object, so that different calls to `setup_logger`
 # with the same file name can safely write to the same file.
 @functools.lru_cache(maxsize=None)
 def _cached_log_stream(filename):
     # use 1K buffer if writing to cloud storage
-    io = open(filename, "a", buffering=1024 if "://" in filename else -1)
+    io = open(filename, "w+", buffering=1024 if "://" in filename else -1)
     atexit.register(io.close)
     return io

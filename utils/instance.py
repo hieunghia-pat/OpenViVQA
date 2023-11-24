@@ -2,10 +2,6 @@ from typing import Any, Dict, List, OrderedDict, Union
 import torch
 import numpy as np
 
-from .logging_utils import setup_logger
-
-logger = setup_logger()
-
 class Instance(OrderedDict):
     def __init__(self, **kwargs):
         super().__init__(kwargs)

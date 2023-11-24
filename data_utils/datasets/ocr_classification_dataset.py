@@ -90,7 +90,7 @@ class OcrClassificationDataset(FeatureClassificationDataset):
         for key, feature in features.items():
             if isinstance(feature, torch.Tensor) or isinstance(feature, np.ndarray):
                 feature = feature[selected_ids]
-            else:
+            elif isinstance(feature, list):
                 feature = [feature[idx] for idx, selected_id in enumerate(selected_ids) if selected_id]
             features[key] = feature
         # get the top confident-score ocr features and tokens
@@ -105,18 +105,19 @@ class OcrClassificationDataset(FeatureClassificationDataset):
         else: # pad to the highest number of ocr tokens
             for key, feature in features.items():
                 if isinstance(feature, torch.Tensor):
-                    features[key] = self.pad_tensor(feature, self.max_scene_text, 1.)
+                    features[key] = self.pad_tensor(feature, self.max_scene_text, 0)
                 elif isinstance(feature, np.ndarray):
-                    features[key] = self.pad_array(feature, self.max_scene_text, 1.)
+                    features[key] = self.pad_array(feature, self.max_scene_text, 0)
                 elif isinstance(feature, list):
                     if isinstance(feature[0], str):
                         features[key] = self.pad_list(feature, self.max_scene_text, self.vocab.padding_token)
                     else:
-                        features[key] = self.pad_list(feature, self.max_scene_text, 1.)
+                        features[key] = self.pad_list(feature, self.max_scene_text, 0)
 
         return {
             "ocr_det_features": features["det_features"],
             "ocr_rec_features": features["rec_features"],
+            "ocr_fasttext_features": features["fasttext_features"],
             "ocr_texts": features["texts"],
             "ocr_boxes": features["boxes"],
             "ocr_scores": features["scores"]

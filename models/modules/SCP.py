@@ -12,7 +12,7 @@ class SpatialCirclePosition(ScaledDotProductAttention):
 
         self.dist_embedding = nn.Embedding(
             num_embeddings=config.NUM_DISTANCE,
-            embedding_dim=config.HEAD
+            embedding_dim=config.D_MODEL
         )
 
         self.init_weights()

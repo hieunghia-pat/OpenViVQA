@@ -7,7 +7,8 @@ from torch import nn
 from transformers.models.t5.modeling_t5 import (
     T5Config,
     T5LayerNorm,
-    T5Model
+    T5Model,
+    T5PreTrainedModel
 )
 
 from utils.logging_utils import Logger
@@ -28,6 +29,26 @@ class MMF_SAL(T5Model):
             num_heads=self.config.MMT.NUM_ATTENTION_HEADS
         )
         super().__init__(config)
+        
+        backbone = T5PreTrainedModel.from_pretrained(
+            self.config.BACKBONE.NAME,
+            config=self.t5_config
+        )
+
+        # freeze the weights of pretrained parameters
+        self.shared = backbone.shared
+        for param in self.shared.parameters():
+            param.requires_grad = False
+        
+        # freeze the weights of pretrained parameters in decoder
+        self.encoder = backbone.encoder
+        for param in self.encoder.embed_tokens.parameters():
+            param.requires_grad = False
+        
+        # freeze the weights of pretrained parameters in decoder
+        self.decoder = backbone.decoder
+        for param in self.decoder.embed_tokens.parameters():
+            param.requires_grad = False
 
         self.vocab = vocab
         self.d_model = self.t5_config.hidden_size
@@ -151,7 +172,7 @@ class MMF_SAL(T5Model):
         )
 
         ocr_scp = self.scp(
-            ocr_features=ocr_emb,
+            ocr_features=ocr_tss,
             ocr_boxes=ocr_bbox, 
             ocr_padding_masks=ocr_mask, 
             image_sizes=items.image_size

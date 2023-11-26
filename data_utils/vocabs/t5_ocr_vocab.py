@@ -13,7 +13,7 @@ import re
 from collections import defaultdict
 
 @META_VOCAB.register()
-class BertOcrVocab(OcrVocab):
+class T5OcrVocab(OcrVocab):
     '''
         This class is designed especially for VQA with reading comprehension
     '''

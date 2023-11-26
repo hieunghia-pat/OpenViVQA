@@ -21,15 +21,15 @@ logger = Logger()
 @META_ARCHITECTURE.register()
 class MMF_SAL(T5Model):
     def __init__(self, config, vocab):
-        self.config = config
         self.t5_config = T5Config(
             vocab_size=len(vocab),
-            d_model=self.config.MMT.HIDDEN_SIZE,
-            num_layers=self.config.MMT.NUM_HIDDEN_LAYERS,
-            num_heads=self.config.MMT.NUM_ATTENTION_HEADS
+            d_model=config.MMT.HIDDEN_SIZE,
+            num_layers=config.MMT.NUM_HIDDEN_LAYERS,
+            num_heads=config.MMT.NUM_ATTENTION_HEADS
         )
-        super().__init__()
+        super().__init__(self.t5_config)
         
+        self.config = config
         backbone = AutoModel.from_pretrained(self.config.BACKBONE.NAME)
 
         # freeze the weights of pretrained parameters

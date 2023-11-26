@@ -12,6 +12,8 @@ from transformers.models.t5.modeling_t5 import (
 
 from utils.logging_utils import Logger
 from builders.model_builder import META_ARCHITECTURE
+from models.modules.TSS import TextSemanticSeparate
+from models.modules.SCP import SpatialCirclePosition
 
 logger = Logger()
 
@@ -64,6 +66,9 @@ class MMF_SAL(T5Model):
         self.ocr_text_layer_norm = T5LayerNorm(self.t5_config.hidden_size)
         self.ocr_drop = nn.Dropout(self.config.OCR_EMBEDDING.DROPOUT)
 
+        self.tss = TextSemanticSeparate(self.config)
+        self.scp = SpatialCirclePosition(self.config)
+
     def forward(self, items):
         if self.training:
             # fwd_results holds intermediate forward pass results
@@ -80,7 +85,7 @@ class MMF_SAL(T5Model):
             fwd_results = {}
             self._foward_embedding(items, fwd_results)
             self._forward_encoder(items, fwd_results)
-            self._forward_step_decoding(items, fwd_results)
+            self._forward_decoding_step(items, fwd_results)
 
             # only keep scores in the forward pass results
             results = {"scores": fwd_results["scores"]}
@@ -123,21 +128,37 @@ class MMF_SAL(T5Model):
         # OCR appearance feature, extracted from swintextspotter
         ocr_feat = items.ocr_det_features + items.ocr_rec_features
         ocr_feat = F.normalize(ocr_feat, dim=-1)
-        ocr_bbox = items.ocr_boxes
-        ocr_text = items.ocr_tokens
-
-        ocr_mmt_in = self.ocr_feat_layer_norm(
+        ocr_emb = self.ocr_feat_layer_norm(
             self.linear_ocr_feat_to_mmt_in(ocr_feat)
-        ) + self.ocr_bbox_layer_norm(
-            self.linear_ocr_bbox_to_mmt_in(ocr_bbox)
-        ) + self.shared(ocr_text)
+        )
 
-        ocr_mmt_in = self.ocr_drop(ocr_mmt_in)
-        fwd_results["ocr_mmt_in"] = ocr_mmt_in
+        ocr_bbox = items.ocr_boxes
+        ocr_box_emb = self.ocr_bbox_layer_norm(
+            self.linear_ocr_bbox_to_mmt_in(ocr_bbox)
+        )
+        
+        ocr_text = items.ocr_tokens
+        ocr_text_emb = self.shared(ocr_text)
 
         # binary mask of valid OCR vs padding
-        ocr_nums = (items.ocr_det_features.sum(dim=-1) != 0).sum(dim=-1)
-        fwd_results["ocr_mask"] = _get_mask(ocr_nums, ocr_mmt_in.size(1))
+        ocr_nums = (ocr_emb.sum(dim=-1) != 0).sum(dim=-1)
+        ocr_mask = _get_mask(ocr_nums, ocr_emb.size(1))
+
+        ocr_tss = self.tss(
+            ocr_emb,
+            ocr_box_emb,
+            ocr_text_emb
+        )
+
+        ocr_scp = self.scp(
+            ocr_features=ocr_emb,
+            ocr_boxes=ocr_bbox, 
+            ocr_padding_masks=ocr_mask, 
+            image_sizes=items.image_size
+        )
+
+        fwd_results["ocr_mmt_in"] = ocr_scp
+        fwd_results["ocr_mask"] = ocr_mask
 
     def _foward_embedding(self, items, fwd_results):
         self._forward_txt_embedding(items, fwd_results)
@@ -164,7 +185,7 @@ class MMF_SAL(T5Model):
 
     def _forward_decoder(self, items, fwd_results):
         fwd_results["prev_inds"] = items.answer_tokens
-        mmt_decoder_mask = _get_causal_mask(items.answer_tokens.shape[1], self.device)
+        mmt_decoder_mask = _get_causal_mask(fwd_results["prev_inds"].shape[1], self.device)
         mmt_decoder_out = self.decoder(
             input_ids=fwd_results["prev_inds"],
             attention_mask=mmt_decoder_mask,
@@ -174,17 +195,28 @@ class MMF_SAL(T5Model):
 
         fwd_results["scores"] = mmt_decoder_out
 
-    def _forward_step_decoding(self, items, fwd_results):
+    def _forward_decoding_step(self, items, fwd_results):
         bs = items.batch_size
-        fwd_results["prev_inds"] = torch.ones((bs, 1)) * self.vocab.padding_idx
-        mmt_decoder_mask = _get_causal_mask(fwd_results["prev_inds"].shape[1], self.device)
-        
-        mmt_decoder_out = self.decoder(
-            input_ids=fwd_results["prev_inds"],
-            attention_mask=mmt_decoder_mask,
-            encoder_hidden_states=fwd_results["mmt_decoder_in"],
-            encoder_attention_mask=fwd_results["mmt_mask"]
-        ).last_hidden_state
+        fwd_results["prev_inds"] = torch.ones((bs, 1)).long().fill_(self.vocab.bos_idx).to(self.device)
+
+        # greedy decoding at test time
+        last_ids = torch.zeros((items.batch_size, )).to(self.device)
+        for ith in range(1, self.vocab.max_answer_length+1):
+            mmt_decoder_mask = _get_causal_mask(fwd_results["prev_inds"].shape[1], self.device)
+            mmt_decoder_out = self.decoder(
+                input_ids=fwd_results["prev_inds"],
+                attention_mask=mmt_decoder_mask,
+                encoder_hidden_states=fwd_results["mmt_decoder_in"],
+                encoder_attention_mask=fwd_results["mmt_mask"]
+            ).last_hidden_state
+            
+            argmax_inds = mmt_decoder_out.argmax(dim=-1)
+            fwd_results["prev_inds"][:, 1:] = argmax_inds[:, :-1]
+            
+            # whether or not to interrupt the decoding process
+            last_ids = torch.where(last_ids == self.vocab.eos_idx, last_ids, argmax_inds[:, ith])
+            if last_ids.mean() == self.vocab.eos_idx:
+                break
 
         fwd_results["scores"] = mmt_decoder_out
 
@@ -195,7 +227,6 @@ def _get_mask(nums, max_num):
     non_pad_mask = arange.to(nums.device).lt(nums.unsqueeze(-1))
     non_pad_mask = non_pad_mask.type(torch.float32)
     return non_pad_mask
-
 
 @functools.lru_cache(maxsize=32)
 def _get_causal_mask(seq_length, device):

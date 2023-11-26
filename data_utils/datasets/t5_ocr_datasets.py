@@ -19,6 +19,9 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
         question = item["question"]
         question_tokens = self.vocab.encode_question(question)
         answer = item["answer"]
+        width = item["weight"]
+        height = item["height"]
+        img_size = (width, height)
 
         ocr_tokens = [text if text.strip() != "" else self.vocab.padding_token for text in features["ocr_texts"]]
 
@@ -32,6 +35,7 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
             **features,
             image_id=item["image_id"],
             filename=item["filename"],
+            image_size=img_size,
             ocr_tokens=ocr_tokens,
             question=" ".join(question),
             question_tokens=question_tokens,
@@ -49,6 +53,10 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         item = self.annotations[idx]
         image_id = item["image_id"]
         filename = item["filename"]
+        width = item["weight"]
+        height = item["height"]
+        img_size = (width, height)
+
         features = self.load_features(image_id)
         question = item["question"]
         question_tokens = self.vocab.encode_question(question)
@@ -81,6 +89,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
             question_id=item["question_id"],
             image_id=image_id,
             filename=filename,
+            image_size=img_size,
             ocr_tokens=ocr_tokens,
             question=" ".join(question),
             question_tokens=question_tokens,

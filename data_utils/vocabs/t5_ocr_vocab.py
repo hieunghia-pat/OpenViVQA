@@ -23,7 +23,7 @@ class T5OcrVocab(OcrVocab):
         self.tokenizer = tokenizer.tokenize
 
         self.padding_token = tokenizer.pad_token
-        self.bos_token = tokenizer._extra_ids[0]
+        self.bos_token = tokenizer._convert_id_to_token(36095) # <extra_id_0>
         self.eos_token = tokenizer.eos_token
         self.unk_token = tokenizer.unk_token
 
@@ -34,7 +34,7 @@ class T5OcrVocab(OcrVocab):
         ])
 
         self.stoi = tokenizer.get_vocab()
-        self.itos = {id: token for token, id in self.itos.items()}
+        self.itos = {id: token for token, id in self.stoi.items()}
 
         self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token]
 

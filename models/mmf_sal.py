@@ -7,9 +7,9 @@ from torch import nn
 from transformers.models.t5.modeling_t5 import (
     T5Config,
     T5LayerNorm,
-    T5Model,
-    T5PreTrainedModel
+    T5Model
 )
+from transformers import AutoModel
 
 from utils.logging_utils import Logger
 from builders.model_builder import META_ARCHITECTURE
@@ -28,12 +28,9 @@ class MMF_SAL(T5Model):
             num_layers=self.config.MMT.NUM_HIDDEN_LAYERS,
             num_heads=self.config.MMT.NUM_ATTENTION_HEADS
         )
-        super().__init__(config)
+        super().__init__()
         
-        backbone = T5PreTrainedModel.from_pretrained(
-            self.config.BACKBONE.NAME,
-            config=self.t5_config
-        )
+        backbone = AutoModel.from_pretrained(self.config.BACKBONE.NAME)
 
         # freeze the weights of pretrained parameters
         self.shared = backbone.shared
@@ -52,7 +49,6 @@ class MMF_SAL(T5Model):
 
         self.vocab = vocab
         self.d_model = self.t5_config.hidden_size
-        self.device = config.DEVICE
         self.max_iter = vocab.max_answer_length
 
         self.build()
@@ -87,8 +83,8 @@ class MMF_SAL(T5Model):
         self.ocr_text_layer_norm = T5LayerNorm(self.t5_config.hidden_size)
         self.ocr_drop = nn.Dropout(self.config.OCR_EMBEDDING.DROPOUT)
 
-        self.tss = TextSemanticSeparate(self.config)
-        self.scp = SpatialCirclePosition(self.config)
+        self.tss = TextSemanticSeparate(self.config.TSS)
+        self.scp = SpatialCirclePosition(self.config.SCP)
 
     def forward(self, items):
         if self.training:

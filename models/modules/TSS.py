@@ -6,7 +6,9 @@ class TextSemanticSeparate(nn.Module):
         super().__init__()
 
         self.device = torch.device(config.DEVICE)
-        self.context_emb = nn.Parameter(nn.init.xavier_uniform_(torch.zeros(config.D_MODEL)))
+        self.context_emb = nn.Parameter(nn.init.xavier_uniform(
+            torch.zeros(1, config.D_MODEL)
+        ))
 
     def forward(self,
                 ocr_emb: torch.Tensor,

@@ -75,6 +75,8 @@ MODEL:
   NAME: mmf_sal_vinvl
   DEVICE: cuda
   D_MODEL: 768
+  BACKBONE:
+    NAME: "VietAI/vit5-base"
   OBJECT_EMBEDDING:
     D_FEATURE: 2048
     DROPOUT: .1
@@ -95,7 +97,8 @@ MODEL:
     D_MODEL: 768
   SCP:
     NUM_DISTANCE: 12
-    D_MODEL: 24
+    D_MODEL: 769
+    HEAD: 24
   MMT:
     HIDDEN_SIZE: 768
     NUM_HIDDEN_LAYERS: 12

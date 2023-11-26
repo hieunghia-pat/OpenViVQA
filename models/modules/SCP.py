@@ -15,12 +15,6 @@ class SpatialCirclePosition(ScaledDotProductAttention):
             embedding_dim=config.D_MODEL
         )
 
-        self.init_weights()
-
-    def init_weights(self):
-        super().init_weights()
-        nn.init.xavier_uniform_(self.dist_embedding.weight)
-
     def patch(ocr_box: tuple,
               image_size: tuple
             ) -> tuple:

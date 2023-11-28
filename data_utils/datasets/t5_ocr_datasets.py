@@ -101,6 +101,7 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
         })
         for key in relevant_ocr_keys:
             features[key] = refined_ocr_features[key]
+        ocr_tokens = self.vocab.encode_token(ocr_tokens)
         features["ocr_texts"] = ocr_tokens
 
         obj_list = [text if text.strip() != "" else 
@@ -117,9 +118,10 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
         })
         for key in relevant_obj_keys:
             features[key] = refined_obj_features[key]
+        obj_list = self.vocab.encode_token(obj_list)
         features["object_list"] = obj_list
 
-        answer_tokens = self.vocab.encode_answer(answer, ocr_tokens)
+        answer_tokens = self.vocab.encode_answer(answer)
 
         shifted_right_answer_tokens = torch.zeros_like(answer_tokens).fill_(self.vocab.padding_idx)
         shifted_right_answer_tokens[:-1] = answer_tokens[1:]
@@ -235,6 +237,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         })
         for key in relevant_ocr_keys:
             features[key] = refined_ocr_features[key]
+        ocr_tokens = self.vocab.encode_token(ocr_tokens)
         features["ocr_texts"] = ocr_tokens
 
         obj_list = [text if text.strip() != "" else 
@@ -251,6 +254,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         })
         for key in relevant_obj_keys:
             features[key] = refined_obj_features[key]
+        obj_list = self.vocab.encode_token(obj_list)
         features["object_list"] = obj_list
 
         return Instance(

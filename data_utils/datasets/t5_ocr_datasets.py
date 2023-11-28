@@ -15,13 +15,15 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
     def refine_ocr_features(self, ocr_tokens, dict_features):
         for key in dict_features:
             features = dict_features[key]
-            if hasattr(features, "tolist"):
-              dict_features[key] = features.tolist()
+            dict_features[key] = features.tolist()
 
-        for idx in range(len(ocr_tokens)):
+        idx = 0
+        while idx < len(ocr_tokens):
             tokens = ocr_tokens[idx]
             len_tokens = len(tokens)
             if len_tokens > 0:
+                # shifting the current sequence to the right
+                ocr_tokens[idx:] = ocr_tokens[idx+1:]
                 left_part = ocr_tokens[:idx]
                 right_part = ocr_tokens[idx:]
                 left_part.extend(tokens)
@@ -32,19 +34,28 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
                     for _ in range(len_tokens):
                         list_features.insert(idx, feature)
                     dict_features[key] = list_features
+                idx += len_tokens
+            else:
+                idx += 1
 
-        return dict_features
+        for key in dict_features:
+            features = dict_features[key]
+            dict_features[key] = torch.Tensor(features)
+
+        return ocr_tokens, dict_features
 
     def refine_obj_features(self, obj_tags, dict_features):
         for key in dict_features:
             features = dict_features[key]
-            if hasattr(features, "tolist"):
-              dict_features[key] = features.tolist()
+            dict_features[key] = features.tolist()
 
-        for idx in range(len(obj_tags)):
+        idx = 0
+        while idx < len(obj_tags):
             tags = obj_tags[idx]
             len_tags = len(tags)
             if len_tags > 0:
+                # shifting the current sequence to the right
+                obj_tags[idx:] = obj_tags[idx+1:]
                 left_part = obj_tags[:idx]
                 right_part = obj_tags[idx:]
                 left_part.extend(tags)
@@ -55,8 +66,15 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
                     for _ in range(len_tags):
                         list_features.insert(idx, feature)
                     dict_features[key] = list_features
+                idx += len_tags
+            else:
+                idx += 1
 
-        return dict_features
+        for key in dict_features:
+            features = dict_features[key]
+            dict_features[key] = torch.Tensor(features)
+
+        return obj_tags, dict_features
 
     def __getitem__(self, idx: int):
         features = self.load_features(self.annotations[idx]["image_id"])
@@ -76,10 +94,9 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
             "ocr_det_features",
             "ocr_rec_features",
             "ocr_fasttext_features",
-            "ocr_boxes",
-            "ocr_scores"
+            "ocr_boxes"
         ]
-        refined_ocr_features = self.refine_ocr_features(ocr_tokens, {
+        ocr_tokens, refined_ocr_features = self.refine_ocr_features(ocr_tokens, {
             key: features[key] for key in relevant_ocr_keys
         })
         for key in relevant_ocr_keys:
@@ -93,10 +110,9 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
             "region_features",
             "region_boxes",
             "grid_features",
-            "grid_boxes",
-            "attr_list"
+            "grid_boxes"
         ]
-        refined_obj_features = self.refine_obj_features(obj_list, {
+        obj_list, refined_obj_features = self.refine_obj_features(obj_list, {
             key: features[key] for key in relevant_obj_keys
         })
         for key in relevant_obj_keys:
@@ -130,13 +146,15 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
     def refine_ocr_features(self, ocr_tokens, dict_features):
         for key in dict_features:
             features = dict_features[key]
-            if hasattr(features, "tolist"):
-                dict_features[key] = features.tolist()
+            dict_features[key] = features.tolist()
 
-        for idx in range(len(ocr_tokens)):
+        idx = 0
+        while idx < len(ocr_tokens):
             tokens = ocr_tokens[idx]
             len_tokens = len(tokens)
             if len_tokens > 0:
+                # shifting the current sequence to the right
+                ocr_tokens[idx:] = ocr_tokens[idx+1:]
                 left_part = ocr_tokens[:idx]
                 right_part = ocr_tokens[idx:]
                 left_part.extend(tokens)
@@ -147,31 +165,47 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
                     for _ in range(len_tokens):
                         list_features.insert(idx, feature)
                     dict_features[key] = list_features
+                idx += len_tokens
+            else:
+                idx += 1
 
-        return dict_features
+        for key in dict_features:
+            features = dict_features[key]
+            dict_features[key] = torch.Tensor(features)
+
+        return ocr_tokens, dict_features
 
     def refine_obj_features(self, obj_tags, dict_features):
         for key in dict_features:
             features = dict_features[key]
-            if hasattr(features, "tolist"):
-                dict_features[key] = features.tolist()
+            dict_features[key] = features.tolist()
 
-        for idx in range(len(obj_tags)):
-            tags = ocr_tokens[idx]
+        idx = 0
+        while idx < len(obj_tags):
+            tags = obj_tags[idx]
             len_tags = len(tags)
             if len_tags > 0:
-                left_part = ocr_tokens[:idx]
-                right_part = ocr_tokens[idx:]
+                # shifting the current sequence to the right
+                obj_tags[idx:] = obj_tags[idx+1:]
+                left_part = obj_tags[:idx]
+                right_part = obj_tags[idx:]
                 left_part.extend(tags)
-                ocr_tokens = left_part + right_part
+                obj_tags = left_part + right_part
                 for key in dict_features:
                     list_features: list = dict_features[key]
                     feature = list_features[idx]
                     for _ in range(len_tags):
                         list_features.insert(idx, feature)
                     dict_features[key] = list_features
+                idx += len_tags
+            else:
+                idx += 1
 
-        return dict_features
+        for key in dict_features:
+            features = dict_features[key]
+            dict_features[key] = torch.Tensor(features)
+
+        return obj_tags, dict_features
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
@@ -194,8 +228,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
             "ocr_det_features",
             "ocr_rec_features",
             "ocr_fasttext_features",
-            "ocr_boxes",
-            "ocr_scores"
+            "ocr_boxes"
         ]
         refined_ocr_features = self.refine_ocr_features(ocr_tokens, {
             key: features[key] for key in relevant_ocr_keys
@@ -211,8 +244,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
             "region_features",
             "region_boxes",
             "grid_features",
-            "grid_boxes",
-            "attr_list"
+            "grid_boxes"
         ]
         refined_obj_features = self.refine_obj_features(obj_list, {
             key: features[key] for key in relevant_obj_keys

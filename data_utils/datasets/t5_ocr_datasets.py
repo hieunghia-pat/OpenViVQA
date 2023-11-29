@@ -21,25 +21,22 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
         while idx < len(ocr_tokens):
             tokens = ocr_tokens[idx]
             len_tokens = len(tokens)
-            if len_tokens > 0:
-                # shifting the current sequence to the right
-                ocr_tokens[idx:] = ocr_tokens[idx+1:]
-                left_part = ocr_tokens[:idx]
-                right_part = ocr_tokens[idx:]
-                left_part.extend(tokens)
-                ocr_tokens = left_part + right_part
-                for key in dict_features:
-                    features: list = dict_features[key]
-                    feature = features[idx]
-                    for _ in range(len_tokens):
-                        features.insert(idx, feature)
-                        idx += 1
-                    dict_features[key] = features
-            else:
-                idx += 1
+            # shifting the current sequence to the right
+            left_part = ocr_tokens[:idx]
+            right_part = ocr_tokens[idx+1:]
+            left_part.extend(tokens)
+            ocr_tokens = left_part + right_part
+            for key in dict_features:
+                features: list = dict_features[key]
+                feature = features[idx]
+                for _ in range(len_tokens-1):
+                    features.insert(idx, feature)
+                dict_features[key] = features
+            idx += len_tokens
 
         for key in dict_features:
             features = dict_features[key]
+            assert len(features) == len(ocr_tokens)
             dict_features[key] = torch.Tensor(features)
 
         return ocr_tokens, dict_features

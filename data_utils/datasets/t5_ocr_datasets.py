@@ -29,12 +29,12 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
                 left_part.extend(tokens)
                 ocr_tokens = left_part + right_part
                 for key in dict_features:
-                    list_features: list = dict_features[key]
-                    feature = list_features[idx]
+                    features: list = dict_features[key]
+                    feature = features[idx]
                     for _ in range(len_tokens):
-                        list_features.insert(idx, feature)
-                    dict_features[key] = list_features
-                idx += len_tokens
+                        features.insert(idx, feature)
+                        idx += 1
+                    dict_features[key] = features
             else:
                 idx += 1
 
@@ -61,12 +61,12 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
                 left_part.extend(tags)
                 obj_tags = left_part + right_part
                 for key in dict_features:
-                    list_features: list = dict_features[key]
-                    feature = list_features[idx]
+                    features: list = dict_features[key]
+                    feature = features[idx]
                     for _ in range(len_tags):
-                        list_features.insert(idx, feature)
-                    dict_features[key] = list_features
-                idx += len_tags
+                        features.insert(idx, feature)
+                        idx += 1
+                    dict_features[key] = features
             else:
                 idx += 1
 
@@ -101,6 +101,7 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
         })
         for key in relevant_ocr_keys:
             features[key] = refined_ocr_features[key]
+        ocr_tokens = [text if text in self.vocab.stoi else self.vocab.padding_token for text in ocr_tokens]
         ocr_tokens = self.vocab.encode_token(ocr_tokens)
         features["ocr_texts"] = ocr_tokens
 
@@ -118,6 +119,7 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
         })
         for key in relevant_obj_keys:
             features[key] = refined_obj_features[key]
+        obj_list = [text if text in self.vocab.stoi else self.vocab.padding_token for text in obj_list]
         obj_list = self.vocab.encode_token(obj_list)
         features["object_list"] = obj_list
 
@@ -162,12 +164,12 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
                 left_part.extend(tokens)
                 ocr_tokens = left_part + right_part
                 for key in dict_features:
-                    list_features: list = dict_features[key]
-                    feature = list_features[idx]
+                    features: list = dict_features[key]
+                    feature = features[idx]
                     for _ in range(len_tokens):
-                        list_features.insert(idx, feature)
-                    dict_features[key] = list_features
-                idx += len_tokens
+                        features.insert(idx, feature)
+                        idx += 1
+                    dict_features[key] = features
             else:
                 idx += 1
 
@@ -194,11 +196,12 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
                 left_part.extend(tags)
                 obj_tags = left_part + right_part
                 for key in dict_features:
-                    list_features: list = dict_features[key]
-                    feature = list_features[idx]
+                    features: list = dict_features[key]
+                    feature = features[idx]
                     for _ in range(len_tags):
-                        list_features.insert(idx, feature)
-                    dict_features[key] = list_features
+                        features.insert(idx, feature)
+                        idx += 1
+                    dict_features[key] = features
                 idx += len_tags
             else:
                 idx += 1
@@ -237,6 +240,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         })
         for key in relevant_ocr_keys:
             features[key] = refined_ocr_features[key]
+        ocr_tokens = [text if text in self.vocab.stoi else self.vocab.padding_token for text in ocr_tokens]
         ocr_tokens = self.vocab.encode_token(ocr_tokens)
         features["ocr_texts"] = ocr_tokens
 
@@ -254,6 +258,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         })
         for key in relevant_obj_keys:
             features[key] = refined_obj_features[key]
+        obj_list = [text if text in self.vocab.stoi else self.vocab.padding_token for text in obj_list]
         obj_list = self.vocab.encode_token(obj_list)
         features["object_list"] = obj_list
 

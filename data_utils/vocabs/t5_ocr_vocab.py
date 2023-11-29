@@ -60,7 +60,7 @@ class T5OcrVocab(Vocab):
         for token in tokens:
             encoded_tokens.append(self.stoi[token])
 
-        return encoded_tokens
+        return torch.Tensor(encoded_tokens).long()
 
     def decode_answer(self, answer_vecs: torch.Tensor, join_words=True) -> List[str]:
         '''

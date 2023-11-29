@@ -60,7 +60,8 @@ class MMF_SAL(T5Model):
 
     def _build_obj_encoding(self):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
-            self.config.OBJECT_EMBEDDING.D_FEATURE, self.t5_config.hidden_size
+            self.config.OBJECT_EMBEDDING.D_FEATURE, 
+            self.t5_config.hidden_size
         )
 
         # object location feature: relative bounding box coordinates (4-dim)
@@ -72,7 +73,8 @@ class MMF_SAL(T5Model):
 
     def _build_ocr_encoding(self):
         self.linear_ocr_feat_to_mmt_in = nn.Linear(
-            self.config.OCR_EMBEDDING.D_FEATURE, self.t5_config.hidden_size
+            self.config.OCR_EMBEDDING.D_FEATURE, 
+            self.t5_config.hidden_size
         )
 
         # OCR location feature: relative bounding box coordinates (4-dim)
@@ -122,7 +124,7 @@ class MMF_SAL(T5Model):
         # object appearance feature
         obj_feat = items.region_features
         obj_bbox = items.region_boxes
-        obj_tag = items.object_list
+        obj_tag = items.object_list.long()
 
         obj_mmt_in = self.obj_feat_layer_norm(
             self.linear_obj_feat_to_mmt_in(obj_feat)
@@ -154,7 +156,7 @@ class MMF_SAL(T5Model):
             self.linear_ocr_bbox_to_mmt_in(ocr_bbox)
         )
         
-        ocr_text = items.ocr_tokens
+        ocr_text = items.ocr_tokens.long()
         ocr_text_emb = self.shared(ocr_text)
 
         # binary mask of valid OCR vs padding

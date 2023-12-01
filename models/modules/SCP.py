@@ -12,22 +12,20 @@ class SpatialCirclePosition(ScaledDotProductAttention):
 
         self.dist_embedding = nn.Embedding(
             num_embeddings=config.NUM_DISTANCE,
-            embedding_dim=config.D_MODEL
+            embedding_dim=config.HEAD
         )
 
-    def patch(ocr_box: tuple,
-              image_size: tuple
-            ) -> tuple:
+    def patch(self, ocr_box: tuple, image_size: tuple) -> tuple:
         """
             ocr_box: (x1, y1, x2, y2)
             image_size: (w, h)
             return: (x_centroid, y_centroid)
         """
+        img_w, img_h = image_size
+        ocr_box = (ocr_box*torch.tensor([img_w, img_h, img_w, img_h]).to(ocr_box.device)).long()
         ocr_x1, ocr_y1, ocr_x2, ocr_y2 = ocr_box
         ocr_centroid_x = (ocr_x2 - ocr_x1) // 2
         ocr_centroid_y = (ocr_y2 - ocr_y1) // 2
-
-        img_w, img_h = image_size
         
         w_per_area = img_w // 11
         h_per_area = img_h // 11
@@ -67,7 +65,7 @@ class SpatialCirclePosition(ScaledDotProductAttention):
             return: (bs, )
         """
         delta = p_i - p_j
-        return torch.sqrt(torch.square(delta[0]) + torch.square(delta[1])).long()
+        return torch.sqrt(torch.square(delta).sum(dim=-1)).long()
 
     def forward(self,
                 ocr_features: torch.Tensor,
@@ -81,24 +79,24 @@ class SpatialCirclePosition(ScaledDotProductAttention):
         """
         bs, nq, _ = ocr_boxes.shape
         patch_boxes = torch.zeros((bs, nq, 2), device=ocr_boxes.device)
-        for batch in bs:
+        for batch in range(bs):
             image_size = image_sizes[batch]
             for ith in range(nq):
-                patch_boxes[batch][ith] = torch.Tensor(self.patch(image_size)).to(ocr_boxes.device)
+                patch_boxes[batch][ith] = torch.Tensor(self.patch(ocr_boxes[batch, ith], image_size)).to(ocr_boxes.device)
 
         dist = torch.zeros((bs, nq, nq)).long().to(ocr_boxes.device)
         for i in range(nq):
             for j in range(i, nq):
                 dist[:, i, j] = self.pytha(patch_boxes[:, i], patch_boxes[:, j]).to(ocr_boxes.device)
                 dist[:, j, i] = self.pytha(patch_boxes[:, j], patch_boxes[:, i]).to(ocr_boxes.device)
-        dist = dist.unsqueeze(-1)# (bs, nq, nq, 1)
-        dist = self.dist_embedding(dist) # (bs, nq, nq, d_k)
+        dist = dist.view(bs, -1) # (bs, nq*nq)
+        dist = self.dist_embedding(dist).view(bs, nq, nq, -1).permute((0, -1, 1, 2)) # (bs, h, nq, nq)
 
         q = self.fc_q(ocr_features).view(bs, nq, self.h, self.d_k).permute(0, 2, 1, 3)  # (bs, h, nq, d_k)
         k = self.fc_k(ocr_features).view(bs, nq, self.h, self.d_k).permute(0, 2, 3, 1)  # (bs, h, d_k, nk)
         v = self.fc_v(ocr_features).view(bs, nq, self.h, self.d_v).permute(0, 2, 1, 3)  # (bs, h, nk, d_v)
         att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (bs, h, nq, nq)
-        att += ocr_padding_masks
+        att += ocr_padding_masks.unsqueeze(1).unsqueeze(1)
         att = torch.softmax(att + dist, dim=-1)
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(bs, nq, self.h * self.d_v)  # (bs, nq, h*d_v)
         out = self.fc_o(out)  # (bs, nq, d_model)

@@ -90,7 +90,7 @@ MODEL:
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   OCR_EMBEDDING:
-    D_FEATURE: 812 # 256 (det features) + 256 (rec features) + 300 (fasttext)
+    D_FEATURE: 256
     DROPOUT: .1
   TSS:
     DEVICE: cuda

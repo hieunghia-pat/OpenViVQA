@@ -29,18 +29,16 @@ class SpatialCirclePosition(ScaledDotProductAttention):
         
         w_per_area = img_w // 11
         h_per_area = img_h // 11
-        x_unit_centroid = w_per_area // 2
-        y_unit_centroid = h_per_area // 2
         
         # list of indices
         iths = [i for i in range(11)]
         # list of x boundaries
         x_lower_bounds = np.array([ith*w_per_area for ith in iths])
-        x_centroids = np.array([ith*w_per_area+x_unit_centroid for ith in iths])
+        x_centroids = np.array(iths)
         x_higher_bounds = np.array([(ith+1)*w_per_area for ith in iths])
         # list of y boundaries
         y_lower_bounds = np.array([ith*h_per_area for ith in iths])
-        y_centroids = np.array([ith*h_per_area+y_unit_centroid for ith in iths])
+        y_centroids = np.array(iths)
         y_higher_bounds = np.array([(ith+1)*h_per_area for ith in iths])
 
         selected_x_centroid = None

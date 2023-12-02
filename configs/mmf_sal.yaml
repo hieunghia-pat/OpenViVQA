@@ -3,11 +3,11 @@ TASK: TrainingMMF
 DATASET:
   FEATURE_DATASET:
     TYPE: T5OcrFeatureDataset
-    BATCH_SIZE: 64
-    WORKERS: 2
+    BATCH_SIZE: 2
+    WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features/OpenViVQA/vinvl_vinvl
-      SCENE_TEXT: features/OpenViVQA/swintextspotter
+      FEATURES: annotations/vinvl_vinvl
+      SCENE_TEXT: annotations/swintext_spotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -15,11 +15,11 @@ DATASET:
     WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
     TYPE: T5OcrDictionaryDataset
-    BATCH_SIZE: 64
-    WORKERS: 2
+    BATCH_SIZE: 2
+    WORKERS: 0
     FEATURE_PATH:
-      FEATURES: features/OpenViVQA/vinvl_vinvl
-      SCENE_TEXT: features/OpenViVQA/swintextspotter
+      FEATURES: annotations/vinvl_vinvl
+      SCENE_TEXT: annotations/swintext_spotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -46,13 +46,13 @@ DATASET:
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
     JSON_PATH:
-      TRAIN: openvivqa_train_v2.json
-      DEV: openvivqa_dev_v2.json
-      TEST: openvivqa_test_v2.json
+      TRAIN: annotations/ViTextVQA_train.json
+      DEV: annotations/ViTextVQA_dev.json
+      TEST: annotations/ViTextVQA_test.json
   JSON_PATH:
-    TRAIN: openvivqa_train_v2.json
-    DEV: openvivqa_dev_v2.json
-    TEST: openvivqa_test_v2.json
+    TRAIN: annotations/ViTextVQA_train.json
+    DEV: annotations/ViTextVQA_dev.json
+    TEST: annotations/ViTextVQA_test.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -73,7 +73,7 @@ TRAINING:
 MODEL:
   ARCHITECTURE: MMF_SAL
   NAME: mmf_sal_vinvl
-  DEVICE: cuda
+  DEVICE: mps
   D_MODEL: 768
   BACKBONE:
     NAME: "VietAI/vit5-base"
@@ -82,7 +82,7 @@ MODEL:
     DROPOUT: .1
   BOX_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
-    DEVICE: cuda
+    DEVICE: mps
     D_FEATURE: 4
     D_MODEL: 768
     DROPOUT: .1
@@ -93,7 +93,7 @@ MODEL:
     D_FEATURE: 256
     DROPOUT: .1
   TSS:
-    DEVICE: cuda
+    DEVICE: mps
     D_MODEL: 768
   SCP:
     NUM_DISTANCE: 12

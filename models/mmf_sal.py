@@ -169,7 +169,7 @@ class MMF_SAL(T5Model):
             ocr_text_emb
         )
 
-        ocr_scp = self.scp(
+        ocr_scp, _ = self.scp(
             ocr_features=ocr_tss,
             ocr_boxes=ocr_bbox, 
             ocr_padding_masks=ocr_mask, 
@@ -186,7 +186,7 @@ class MMF_SAL(T5Model):
         fwd_results["mmt_in"] = torch.cat([
             fwd_results["txt_emb"], 
             fwd_results["obj_mmt_in"], 
-            fwd_results["ocr_mmt_in"]], dim=-1)
+            fwd_results["ocr_mmt_in"]], dim=1)
         fwd_results["mmt_mask"] = torch.cat([
             fwd_results["txt_mask"],
             fwd_results["obj_mask"],
@@ -204,7 +204,8 @@ class MMF_SAL(T5Model):
 
     def _forward_decoder(self, items, fwd_results):
         fwd_results["prev_inds"] = items.answer_tokens
-        mmt_decoder_mask = _get_causal_mask(fwd_results["prev_inds"].shape[1], self.device)
+        bs, seq_len = fwd_results["prev_inds"].shape
+        mmt_decoder_mask = _get_causal_mask(bs, seq_len, self.device)
         mmt_decoder_out = self.decoder(
             input_ids=fwd_results["prev_inds"],
             attention_mask=mmt_decoder_mask,
@@ -248,10 +249,10 @@ def _get_mask(nums, max_num):
     return non_pad_mask
 
 @functools.lru_cache(maxsize=32)
-def _get_causal_mask(seq_length, device):
+def _get_causal_mask(bs, seq_length, device):
     # generate a lower triangular mask
-    mask = torch.zeros(seq_length, seq_length, device=device)
+    mask = torch.zeros(bs, seq_length, seq_length, device=device)
     for i in range(seq_length):
         for j in range(i + 1):
-            mask[i, j] = 1.0
+            mask[:, i, j] = 1.0
     return mask

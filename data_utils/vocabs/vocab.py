@@ -133,6 +133,9 @@ class Vocab(object):
 
     def __len__(self):
         return len(self.itos)
+    
+    def size(self):
+        return len(self.itos)
 
     def extend(self, v, sort=False):
         words = sorted(v.itos.values()) if sort else v.itos.values()

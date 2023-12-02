@@ -73,7 +73,7 @@ TRAINING:
 MODEL:
   ARCHITECTURE: MMF_SAL
   NAME: mmf_sal_vinvl
-  DEVICE: mps
+  DEVICE: cpu
   D_MODEL: 768
   BACKBONE:
     NAME: "VietAI/vit5-base"
@@ -82,7 +82,7 @@ MODEL:
     DROPOUT: .1
   BOX_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
-    DEVICE: mps
+    DEVICE: cpu
     D_FEATURE: 4
     D_MODEL: 768
     DROPOUT: .1
@@ -93,7 +93,7 @@ MODEL:
     D_FEATURE: 256
     DROPOUT: .1
   TSS:
-    DEVICE: mps
+    DEVICE: cpu
     D_MODEL: 768
   SCP:
     NUM_DISTANCE: 12

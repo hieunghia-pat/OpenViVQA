@@ -30,6 +30,20 @@ class MMF_SAL(T5Model):
         super().__init__(self.t5_config)
         
         self.config = config
+
+        self.vocab = vocab
+        self.d_model = self.t5_config.hidden_size
+        self.max_iter = vocab.max_answer_length
+
+        self.build()
+
+    def build(self):
+        # split model building into several components
+        self._build_obj_encoding()
+        self._build_ocr_encoding()
+        self._build_backbone()
+
+    def _build_backbone(self):
         backbone = AutoModel.from_pretrained(self.config.BACKBONE.NAME)
 
         # freeze the weights of pretrained parameters
@@ -47,16 +61,10 @@ class MMF_SAL(T5Model):
         for param in self.decoder.embed_tokens.parameters():
             param.requires_grad = False
 
-        self.vocab = vocab
-        self.d_model = self.t5_config.hidden_size
-        self.max_iter = vocab.max_answer_length
-
-        self.build()
-
-    def build(self):
-        # split model building into several components
-        self._build_obj_encoding()
-        self._build_ocr_encoding()
+        self.vocab_proj = nn.Sequential(
+            nn.Linear(self.config.D_MODEL, self.vocab.size()),
+            nn.Dropout()
+        )
 
     def _build_obj_encoding(self):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
@@ -212,6 +220,7 @@ class MMF_SAL(T5Model):
             encoder_hidden_states=fwd_results["mmt_decoder_in"],
             encoder_attention_mask=fwd_results["mmt_mask"]
         ).last_hidden_state
+        mmt_decoder_out = self.vocab_proj(mmt_decoder_out)
 
         fwd_results["scores"] = mmt_decoder_out
 
@@ -229,6 +238,7 @@ class MMF_SAL(T5Model):
                 encoder_hidden_states=fwd_results["mmt_decoder_in"],
                 encoder_attention_mask=fwd_results["mmt_mask"]
             ).last_hidden_state
+            mmt_decoder_out = self.vocab_proj(mmt_decoder_out)
             
             argmax_inds = mmt_decoder_out.argmax(dim=-1)
             fwd_results["prev_inds"][:, 1:] = argmax_inds[:, :-1]

@@ -11,5 +11,7 @@ args = parser.parse_args()
 config = get_config(args.config_file)
 
 task = build_task(config)
-task.start()
-task.get_predictions()
+for item in task.train_dataloader:
+    continue
+# task.start()
+# task.get_predictions()

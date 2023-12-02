@@ -48,7 +48,6 @@ class InstanceList(OrderedDict):
             else:
                 values
             self.set(key, values)
-            print("+"*10)
 
     def __setattr__(self, name: str, val: Any) -> None:
         if name.startswith("_"):

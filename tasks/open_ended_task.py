@@ -1,4 +1,5 @@
 import torch
+from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 from data_utils.utils import collate_fn
@@ -9,7 +10,6 @@ import evaluation
 from evaluation import Cider
 
 import os
-import numpy as np
 from tqdm import tqdm
 import itertools
 from shutil import copyfile
@@ -98,40 +98,20 @@ class OpenEndedTask(BaseTask):
         self.patience = config.TRAINING.PATIENCE
         self.train_cider = Cider({f"{idx}": answer for idx, answer in enumerate(self.train_dataset.answers)})
 
-    def evaluate_loss(self, dataloader):
-        self.model.eval()
-        running_loss = .0
-        with tqdm(desc='Epoch %d - Validation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
-            with torch.no_grad():
-                for it, items in enumerate(dataloader):
-                    items = items.to(self.device)
-                    with torch.no_grad():
-                        out = self.model(items).contiguous()
-                    
-                    shifted_right_answer_tokens = items.shifted_right_answer_tokens
-                    loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
-                    this_loss = loss.item()
-                    running_loss += this_loss
-
-                    pbar.set_postfix(loss=running_loss / (it + 1))
-                    pbar.update()
-
-        val_loss = running_loss / len(dataloader)
-
-        return val_loss
-
     def evaluate_metrics(self, dataloader):
         self.model.eval()
         gens = {}
         gts = {}
-        with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Evaluating' % self.epoch, unit='it', total=len(dataloader)) as pbar:
             for it, items in enumerate(dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
+                    results = self.model(items)
+                outs = results["scores"].argmax(dim=-1)
 
                 answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
+                answers_gen = self.vocab.decode_answer(outs.contiguous(), 
+                                                        join_words=False)
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
@@ -144,12 +124,14 @@ class OpenEndedTask(BaseTask):
 
     def train(self):
         self.model.train()
-
         running_loss = .0
-        with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
+        with tqdm(desc='Epoch %d - Training' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, items in enumerate(self.train_dataloader):
                 items = items.to(self.device)
-                out = self.model(items).contiguous()
+                results = self.model(items)
+                out = results["scores"].contiguous()
+                out = F.log_softmax(out, dim=-1)
+
                 shifted_right_answer_tokens = items.shifted_right_answer_tokens
                 self.optim.zero_grad()
                 loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
@@ -162,45 +144,6 @@ class OpenEndedTask(BaseTask):
                 pbar.set_postfix(loss=running_loss / (it + 1))
                 pbar.update()
                 self.scheduler.step()
-
-    def train_scst(self):
-        # design especially for self-critical sequential learning
-        running_reward = .0
-        running_reward_baseline = .0
-
-        self.model.train()
-
-        running_loss = .0
-        with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dict_dataloader)) as pbar:
-            for it, items in enumerate(self.train_dict_dataloader):
-                items = items.to(self.device)
-                outs, log_probs = self.model.beam_search(items, batch_size=items.batch_size, 
-                                                            beam_size=self.training_beam_size, out_size=self.training_beam_size)
-                
-                self.optim.zero_grad()
-
-                # Rewards
-                bs = items.question_tokens.shape[0]
-                answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
-                answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
-                gens = {f"{idx}": [answer_gen, ] for idx, answer_gen in enumerate(answers_gen)}
-                gts = {f"{idx}": answer_gt for idx, answer_gt in enumerate(answers_gt)}
-                reward = self.train_cider.compute_score(gts, gens)[1].astype(np.float32)
-                reward = torch.from_numpy(reward).to(self.device).view(bs, self.training_beam_size)
-                reward_baseline = torch.mean(reward, dim=-1, keepdim=True)
-                loss = -torch.mean(log_probs, -1) * (reward - reward_baseline)
-
-                loss = loss.mean()
-                loss.backward()
-                self.optim.step()
-
-                running_loss += loss.item()
-                running_reward += reward.mean().item()
-                running_reward_baseline += reward_baseline.mean().item()
-                pbar.set_postfix(loss=running_loss / (it + 1), reward=running_reward / (it + 1),
-                                reward_baseline=running_reward_baseline / (it + 1))
-                pbar.update()
 
     def start(self):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
@@ -219,6 +162,7 @@ class OpenEndedTask(BaseTask):
 
             # val scores
             scores = self.evaluate_metrics(self.dev_dict_dataloader)
+            scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
             self.logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
@@ -239,7 +183,7 @@ class OpenEndedTask(BaseTask):
 
             self.save_checkpoint({
                 'best_val_score': best_val_score,
-                'patience': patience,
+                'patience': patience
             })
 
             if best:
@@ -262,14 +206,17 @@ class OpenEndedTask(BaseTask):
         results = []
         overall_gens = {}
         overall_gts = {}
-        with tqdm(desc='Getting predictions: ', unit='it', total=len(self.test_dict_dataloader)) as pbar:
+        with tqdm(desc='Predicting: ', unit='it', total=len(self.test_dict_dataloader)) as pbar:
             for it, items in enumerate(self.test_dict_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs, _ = self.model.beam_search(items, batch_size=items.batch_size, beam_size=self.evaluating_beam_size, out_size=1)
+                    result = self.model(items)
+                outs = result["scores"].argmax(dim=-1)
 
                 answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=False)
+                answers_gen = self.vocab.decode_answer_with_determination(
+                  outs.contiguous().view(-1, self.vocab.max_answer_length),
+                  join_words=False)
                 gts = {}
                 gens = {}
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
@@ -291,6 +238,7 @@ class OpenEndedTask(BaseTask):
                 pbar.update()
 
         scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
+        scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
         self.logger.info("Evaluation scores on test: %s", scores)
 
         json.dump({

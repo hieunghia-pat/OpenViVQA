@@ -214,7 +214,7 @@ class OpenEndedTask(BaseTask):
                 outs = result["scores"].argmax(dim=-1)
 
                 answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer_with_determination(
+                answers_gen = self.vocab.decode_answer(
                   outs.contiguous().view(-1, self.vocab.max_answer_length),
                   join_words=False)
                 gts = {}

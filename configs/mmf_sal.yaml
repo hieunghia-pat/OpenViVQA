@@ -3,8 +3,8 @@ TASK: TrainingMMF
 DATASET:
   FEATURE_DATASET:
     TYPE: T5OcrFeatureDataset
-    BATCH_SIZE: 2
-    WORKERS: 0
+    BATCH_SIZE: 16
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: annotations/vinvl_vinvl
       SCENE_TEXT: annotations/swintext_spotter
@@ -15,8 +15,8 @@ DATASET:
     WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
     TYPE: T5OcrDictionaryDataset
-    BATCH_SIZE: 2
-    WORKERS: 0
+    BATCH_SIZE: 16
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: annotations/vinvl_vinvl
       SCENE_TEXT: annotations/swintext_spotter
@@ -73,7 +73,7 @@ TRAINING:
 MODEL:
   ARCHITECTURE: MMF_SAL
   NAME: mmf_sal_vinvl
-  DEVICE: cpu
+  DEVICE: cuda
   D_MODEL: 768
   BACKBONE:
     NAME: "VietAI/vit5-base"
@@ -82,7 +82,7 @@ MODEL:
     DROPOUT: .1
   BOX_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
-    DEVICE: cpu
+    DEVICE: cuda
     D_FEATURE: 4
     D_MODEL: 768
     DROPOUT: .1
@@ -93,7 +93,7 @@ MODEL:
     D_FEATURE: 256
     DROPOUT: .1
   TSS:
-    DEVICE: cpu
+    DEVICE: cuda
     D_MODEL: 768
   SCP:
     NUM_DISTANCE: 12

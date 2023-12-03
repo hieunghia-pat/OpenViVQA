@@ -76,3 +76,4 @@ class T5OcrVocab(Vocab):
                 answers.append(answer.strip().split())
 
         return answers
+

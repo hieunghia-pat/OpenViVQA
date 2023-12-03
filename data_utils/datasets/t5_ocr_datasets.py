@@ -199,13 +199,15 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
+
         image_id = item["image_id"]
         filename = item["filename"]
-        width = item["width"]
-        height = item["height"]
-        img_size = (width, height)
 
         features = self.load_features(image_id)
+        width = features["width"]
+        height = features["height"]
+        img_size = (width, height)
+        
         question = item["question"]
         question_tokens = self.vocab.encode_question(question)
         answers = item["answers"]
@@ -220,7 +222,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
             "ocr_fasttext_features",
             "ocr_boxes"
         ]
-        refined_ocr_features = self.refine_ocr_features(ocr_tokens, {
+        ocr_tokens, refined_ocr_features = self.refine_ocr_features(ocr_tokens, {
             key: features[key] for key in relevant_ocr_keys
         })
         for key in relevant_ocr_keys:
@@ -236,7 +238,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
             "region_features",
             "region_boxes"
         ]
-        refined_obj_features = self.refine_obj_features(obj_list, {
+        obj_list, refined_obj_features = self.refine_obj_features(obj_list, {
             key: features[key] for key in relevant_obj_keys
         })
         for key in relevant_obj_keys:

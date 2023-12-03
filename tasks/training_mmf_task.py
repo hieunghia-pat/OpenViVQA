@@ -182,8 +182,10 @@ class TrainingMMF(OpenEndedTask):
                 outs = result["scores"].argmax(dim=-1)
 
                 answers_gt = items.answers
-                answers_gen, in_fixed_vocab = self.vocab.decode_answer_with_determination(outs.contiguous().view(-1, self.vocab.max_answer_length),
-                                                        items.ocr_tokens, join_words=False)
+                answers_gen, in_fixed_vocab = self.vocab.decode_answer_with_determination(
+                  outs.contiguous().view(-1, self.vocab.max_answer_length),
+                  items.ocr_tokens,
+                  join_words=False)
                 gts = {}
                 gens = {}
                 for i, (gts_i, gen_i, in_fixed_vocab_i) in enumerate(zip(answers_gt, answers_gen, in_fixed_vocab)):

@@ -226,12 +226,13 @@ class MMF_SAL(T5Model):
 
     def _forward_decoding_step(self, items, fwd_results):
         bs = items.batch_size
-        fwd_results["prev_inds"] = torch.ones((bs, 1)).long().fill_(self.vocab.bos_idx).to(self.device)
+        fwd_results["prev_inds"] = torch.ones((bs, self.vocab.max_answer_length)).long().fill_(self.vocab.padding_idx).to(self.device)
+        fwd_results["prev_inds"][:, 0] = self.vocab.bos_idx
 
         # greedy decoding at test time
         last_ids = torch.zeros((items.batch_size, )).to(self.device)
-        for ith in range(1, self.vocab.max_answer_length+1):
-            mmt_decoder_mask = _get_causal_mask(fwd_results["prev_inds"].shape[1], self.device)
+        for ith in range(1, self.vocab.max_answer_length):
+            mmt_decoder_mask = _get_causal_mask(bs, fwd_results["prev_inds"].shape[1], self.device)
             mmt_decoder_out = self.decoder(
                 input_ids=fwd_results["prev_inds"],
                 attention_mask=mmt_decoder_mask,

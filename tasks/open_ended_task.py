@@ -66,13 +66,13 @@ class OpenEndedTask(BaseTask):
         # creating dictionary iterable-dataset data loader
         self.train_dict_dataloader = DataLoader(
             dataset=self.train_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.TRAINING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         )
         self.dev_dict_dataloader = DataLoader(
             dataset=self.dev_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
+            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE,
             shuffle=True,
             collate_fn=collate_fn
         )

@@ -33,7 +33,6 @@ class MMF_SAL(T5ForConditionalGeneration):
         self.vocab = vocab
         self.d_model = self.t5_config.hidden_size
         self.max_iter = vocab.max_answer_length
-        self.device = config.DEVICE
 
         self.build()
 
@@ -104,7 +103,7 @@ class MMF_SAL(T5ForConditionalGeneration):
         )
         txt_mask = (1.0 - txt_mask) * -1e5
         fwd_results["txt_mask"] = txt_mask
-        fwd_results["txt_emb"] = self.backbone.shared(fwd_results["txt_inds"])
+        fwd_results["txt_emb"] = self.shared(fwd_results["txt_inds"])
 
     def _forward_obj_embedding(self, items, fwd_results):
         # object appearance feature
@@ -116,7 +115,7 @@ class MMF_SAL(T5ForConditionalGeneration):
             self.linear_obj_feat_to_mmt_in(obj_feat)
         ) + self.obj_bbox_layer_norm(
             self.linear_obj_bbox_to_mmt_in(obj_bbox)
-        ) + self.backbone.shared(obj_tag)
+        ) + self.shared(obj_tag)
         obj_mmt_in = self.obj_drop(obj_mmt_in)
         fwd_results["obj_mmt_in"] = obj_mmt_in
 
@@ -145,7 +144,7 @@ class MMF_SAL(T5ForConditionalGeneration):
         )
         
         ocr_text = items.ocr_tokens.long()
-        ocr_text_emb = self.backbone.shared(ocr_text)
+        ocr_text_emb = self.shared(ocr_text)
 
         # binary mask of valid OCR vs padding
         ocr_nums = (ocr_emb.sum(dim=-1) != 0).sum(dim=-1)
@@ -185,7 +184,7 @@ class MMF_SAL(T5ForConditionalGeneration):
     def _forward_encoder(self, items, fwd_results):
         mmt_in = fwd_results["mmt_in"]
         mmt_mask = fwd_results["mmt_mask"]
-        encoder_output = self.backbone.encoder(
+        encoder_output = self.encoder(
             inputs_embeds = mmt_in,
             encoder_attention_mask=mmt_mask
         )
@@ -196,7 +195,7 @@ class MMF_SAL(T5ForConditionalGeneration):
         bs, seq_len = fwd_results["prev_inds"].shape
         mmt_decoder_mask = _get_causal_mask(bs, seq_len, self.device)
         mmt_decoder_mask = (1 - mmt_decoder_mask) * -1e5
-        mmt_decoder_out = self.backbone.decoder(
+        mmt_decoder_out = self.decoder(
             input_ids=fwd_results["prev_inds"],
             attention_mask=mmt_decoder_mask,
             encoder_hidden_states=fwd_results["mmt_decoder_in"],
@@ -216,13 +215,13 @@ class MMF_SAL(T5ForConditionalGeneration):
         for ith in range(1, self.vocab.max_answer_length):
             mmt_decoder_mask = _get_causal_mask(bs, fwd_results["prev_inds"].shape[1], self.device)
             mmt_decoder_mask = (1 - mmt_decoder_mask) * -1e5
-            mmt_decoder_out = self.backbone.decoder(
+            mmt_decoder_out = self.decoder(
                 input_ids=fwd_results["prev_inds"],
                 attention_mask=mmt_decoder_mask,
                 encoder_hidden_states=fwd_results["mmt_decoder_in"],
                 encoder_attention_mask=fwd_results["mmt_mask"]
             ).last_hidden_state
-            mmt_decoder_out = self.vocab_proj(mmt_decoder_out)
+            mmt_decoder_out = self.lm_head(mmt_decoder_out)
             
             argmax_inds = mmt_decoder_out.argmax(dim=-1)
             fwd_results["prev_inds"][:, 1:] = argmax_inds[:, :-1]

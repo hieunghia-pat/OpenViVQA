@@ -7,7 +7,7 @@ from torch import nn
 from transformers.models.t5.modeling_t5 import (
     T5Config,
     T5LayerNorm,
-    T5ForConditionalGeneration
+    T5Model
 )
 
 from utils.logging_utils import Logger
@@ -18,13 +18,18 @@ from models.modules.SCP import SpatialCirclePosition
 logger = Logger()
 
 @META_ARCHITECTURE.register()
-class MMF_SAL(T5ForConditionalGeneration):
+class MMF_SAL(T5Model):
     def __init__(self, config, vocab):
         self.t5_config = T5Config(
             vocab_size=len(vocab),
             d_model=config.MMT.HIDDEN_SIZE,
             num_layers=config.MMT.NUM_HIDDEN_LAYERS,
-            num_heads=config.MMT.NUM_ATTENTION_HEADS
+            num_heads=config.MMT.NUM_ATTENTION_HEADS,
+            num_decoder_layers=config.MMT.NUM_HIDDEN_LAYERS,
+            d_ff=config.MMT.D_FF,
+            d_kv=config.MMT.D_KV,
+            pad_token_id=vocab.padding_idx,
+            eos_token_id=vocab.eos_idx
         )
         super().__init__(self.t5_config)
         
@@ -40,6 +45,11 @@ class MMF_SAL(T5ForConditionalGeneration):
         # split model building into several components
         self._build_obj_encoding()
         self._build_ocr_encoding()
+
+        self.vocab_proj = nn.Sequential(
+            nn.Linear(self.config.D_MODEL, self.vocab.size()),
+            nn.Dropout()
+        )
 
     def _build_obj_encoding(self):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
@@ -98,11 +108,9 @@ class MMF_SAL(T5ForConditionalGeneration):
 
         # binary mask of valid text (question words) vs padding
         text_len = (items.question_tokens != self.vocab.padding_idx).sum(dim=-1)
-        txt_mask = _get_mask(
+        fwd_results["txt_mask"] = _get_mask(
             text_len, items.question_tokens.size(1)
         )
-        txt_mask = (1.0 - txt_mask) * -1e5
-        fwd_results["txt_mask"] = txt_mask
         fwd_results["txt_emb"] = self.shared(fwd_results["txt_inds"])
 
     def _forward_obj_embedding(self, items, fwd_results):
@@ -121,9 +129,7 @@ class MMF_SAL(T5ForConditionalGeneration):
 
         # binary mask of valid object vs padding
         obj_nums = (items.region_features.sum(dim=-1) != 0).sum(dim=-1)
-        obj_mask = _get_mask(obj_nums, obj_mmt_in.size(1))
-        obj_mask = (1 - obj_mask) * -1e5
-        fwd_results["obj_mask"] = obj_mask
+        fwd_results["obj_mask"] = _get_mask(obj_nums, obj_mmt_in.size(1))
 
     def _forward_ocr_embedding(self, items, fwd_results):
         # OCR rec feature (256-dim) extracted from swintextspotter
@@ -149,7 +155,6 @@ class MMF_SAL(T5ForConditionalGeneration):
         # binary mask of valid OCR vs padding
         ocr_nums = (ocr_emb.sum(dim=-1) != 0).sum(dim=-1)
         ocr_mask = _get_mask(ocr_nums, ocr_emb.size(1))
-        ocr_mask = (1 - ocr_mask) * -1e5
 
         ocr_tss = self.tss(
             ocr_emb,
@@ -194,14 +199,13 @@ class MMF_SAL(T5ForConditionalGeneration):
         fwd_results["prev_inds"] = items.answer_tokens
         bs, seq_len = fwd_results["prev_inds"].shape
         mmt_decoder_mask = _get_causal_mask(bs, seq_len, self.device)
-        mmt_decoder_mask = (1 - mmt_decoder_mask) * -1e5
         mmt_decoder_out = self.decoder(
             input_ids=fwd_results["prev_inds"],
             attention_mask=mmt_decoder_mask,
             encoder_hidden_states=fwd_results["mmt_decoder_in"],
             encoder_attention_mask=fwd_results["mmt_mask"]
         ).last_hidden_state
-        mmt_decoder_out = self.lm_head(mmt_decoder_out)
+        mmt_decoder_out = self.vocab_proj(mmt_decoder_out)
 
         fwd_results["scores"] = mmt_decoder_out
 
@@ -214,14 +218,13 @@ class MMF_SAL(T5ForConditionalGeneration):
         last_ids = torch.zeros((items.batch_size, )).to(self.device)
         for ith in range(1, self.vocab.max_answer_length):
             mmt_decoder_mask = _get_causal_mask(bs, fwd_results["prev_inds"].shape[1], self.device)
-            mmt_decoder_mask = (1 - mmt_decoder_mask) * -1e5
             mmt_decoder_out = self.decoder(
                 input_ids=fwd_results["prev_inds"],
                 attention_mask=mmt_decoder_mask,
                 encoder_hidden_states=fwd_results["mmt_decoder_in"],
                 encoder_attention_mask=fwd_results["mmt_mask"]
             ).last_hidden_state
-            mmt_decoder_out = self.lm_head(mmt_decoder_out)
+            mmt_decoder_out = self.vocab_proj(mmt_decoder_out)
             
             argmax_inds = mmt_decoder_out.argmax(dim=-1)
             fwd_results["prev_inds"][:, 1:] = argmax_inds[:, :-1]

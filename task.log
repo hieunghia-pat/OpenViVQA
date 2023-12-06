@@ -1,4 +1,0 @@
-[02/12/2023 22:20:13] INFO: Loading vocab from saved_models/mmf_sal_vinvl/vocab.bin
-[02/12/2023 22:20:13] INFO: Loading data
-[02/12/2023 22:20:30] INFO: Building model
-[02/12/2023 22:20:37] INFO: Defining optimizer and objective function

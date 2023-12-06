@@ -74,7 +74,7 @@ MODEL:
   ARCHITECTURE: MMF_SAL
   NAME: mmf_sal_vinvl
   DEVICE: cuda
-  D_MODEL: 768
+  D_MODEL: 512
   BACKBONE:
     NAME: "VietAI/vit5-base"
   OBJECT_EMBEDDING:
@@ -84,7 +84,7 @@ MODEL:
     ARCHITECTURE: FeatureEmbedding
     DEVICE: cuda
     D_FEATURE: 4
-    D_MODEL: 768
+    D_MODEL: 512
     DROPOUT: .1
   OCR_TEXT_EMBEDDING:
     WORD_EMBEDDING: ViFastText
@@ -94,14 +94,16 @@ MODEL:
     DROPOUT: .1
   TSS:
     DEVICE: cuda
-    D_MODEL: 768
+    D_MODEL: 512
   SCP:
     NUM_DISTANCE: 12
-    D_MODEL: 768
-    HEAD: 24
-    D_KEY: 32
-    D_VALUE: 32
+    D_MODEL: 512
+    HEAD: 8
+    D_KEY: 64
+    D_VALUE: 64
   MMT:
-    HIDDEN_SIZE: 768
-    NUM_HIDDEN_LAYERS: 12
-    NUM_ATTENTION_HEADS: 24
+    HIDDEN_SIZE: 512
+    NUM_HIDDEN_LAYERS: 6
+    NUM_ATTENTION_HEADS: 8
+    D_FF: 2048
+    D_KV: 64

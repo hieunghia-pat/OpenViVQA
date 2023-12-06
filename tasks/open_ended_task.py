@@ -145,6 +145,10 @@ class OpenEndedTask(BaseTask):
                 pbar.update()
                 self.scheduler.step()
 
+                if it % self.config.ITER_TO_VERBOSE == 0:
+                    self.logger.info(f"Loss: {loss.item()}")
+
+
     def start(self):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
             checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))

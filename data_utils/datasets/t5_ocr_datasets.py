@@ -236,7 +236,6 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         question = item["question"]
         question_tokens = self.vocab.encode_question(question)
         answers = item["answers"]
-        answers = [re.sub("_", " ", answer) for answer in answers]
 
         ocr_tokens = [text if text.strip() != "" else 
                       self.vocab.padding_token for text in features["ocr_texts"]]

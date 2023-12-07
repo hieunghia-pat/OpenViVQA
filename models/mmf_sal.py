@@ -1,14 +1,11 @@
 import functools
+from copy import deepcopy
 
 import torch
 from torch import nn
 import torch.nn.functional as F
 from torch import nn
-from transformers.models.t5.modeling_t5 import (
-    T5Config,
-    T5LayerNorm,
-    T5Model
-)
+from transformers.models.t5.modeling_t5 import *
 
 from utils.logging_utils import Logger
 from builders.model_builder import META_ARCHITECTURE
@@ -18,11 +15,13 @@ from models.modules.SCP import SpatialCirclePosition
 logger = Logger()
 
 @META_ARCHITECTURE.register()
-class MMF_SAL(T5Model):
+class MMF_SAL(nn.Module):
     def __init__(self, config, vocab):
+        super().__init__()
+
         self.t5_config = T5Config(
             vocab_size=len(vocab),
-            d_model=config.MMT.HIDDEN_SIZE,
+            d_model=config.MMT.d_model,
             num_layers=config.MMT.NUM_HIDDEN_LAYERS,
             num_heads=config.MMT.NUM_ATTENTION_HEADS,
             num_decoder_layers=config.MMT.NUM_HIDDEN_LAYERS,
@@ -31,7 +30,6 @@ class MMF_SAL(T5Model):
             pad_token_id=vocab.padding_idx,
             eos_token_id=vocab.eos_idx
         )
-        super().__init__(self.t5_config)
         
         self.config = config
 
@@ -41,10 +39,61 @@ class MMF_SAL(T5Model):
 
         self.build()
 
+    def init_weights(self):
+        self.apply(self._initialize_weights)
+
+    def _initialize_weights(self, module):
+        """Initialize the weights"""
+        factor = self.config.initializer_factor  # Used for testing weights initialization
+        if isinstance(module, T5LayerNorm):
+            module.weight.data.fill_(factor * 1.0)
+        elif isinstance(module, T5ClassificationHead):
+            module.dense.weight.data.normal_(mean=0.0, std=factor * ((self.config.d_model) ** -0.5))
+            if hasattr(module.dense, "bias") and module.dense.bias is not None:
+                module.dense.bias.data.zero_()
+            module.out_proj.weight.data.normal_(mean=0.0, std=factor * ((self.config.d_model) ** -0.5))
+            if hasattr(module.out_proj, "bias") and module.out_proj.bias is not None:
+                module.out_proj.bias.data.zero_()
+        elif isinstance(module, T5DenseActDense):
+            # Mesh TensorFlow FF initialization
+            # See https://github.com/tensorflow/mesh/blob/master/mesh_tensorflow/transformer/transformer_layers.py#L56
+            # and https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/layers.py#L89
+            module.wi.weight.data.normal_(mean=0.0, std=factor * ((self.config.d_model) ** -0.5))
+            if hasattr(module.wi, "bias") and module.wi.bias is not None:
+                module.wi.bias.data.zero_()
+            module.wo.weight.data.normal_(mean=0.0, std=factor * ((self.config.d_ff) ** -0.5))
+            if hasattr(module.wo, "bias") and module.wo.bias is not None:
+                module.wo.bias.data.zero_()
+        elif isinstance(module, T5DenseGatedActDense):
+            module.wi_0.weight.data.normal_(mean=0.0, std=factor * ((self.config.d_model) ** -0.5))
+            if hasattr(module.wi_0, "bias") and module.wi_0.bias is not None:
+                module.wi_0.bias.data.zero_()
+            module.wi_1.weight.data.normal_(mean=0.0, std=factor * ((self.config.d_model) ** -0.5))
+            if hasattr(module.wi_1, "bias") and module.wi_1.bias is not None:
+                module.wi_1.bias.data.zero_()
+            module.wo.weight.data.normal_(mean=0.0, std=factor * ((self.config.d_ff) ** -0.5))
+            if hasattr(module.wo, "bias") and module.wo.bias is not None:
+                module.wo.bias.data.zero_()
+        elif isinstance(module, T5Attention):
+            # Mesh TensorFlow attention initialization to avoid scaling before softmax
+            # See https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/transformer/attention.py#L136
+            d_model = self.config.d_model
+            key_value_proj_dim = self.config.d_kv
+            n_heads = self.config.num_heads
+            module.q.weight.data.normal_(mean=0.0, std=factor * ((d_model * key_value_proj_dim) ** -0.5))
+            module.k.weight.data.normal_(mean=0.0, std=factor * (d_model**-0.5))
+            module.v.weight.data.normal_(mean=0.0, std=factor * (d_model**-0.5))
+            module.o.weight.data.normal_(mean=0.0, std=factor * ((n_heads * key_value_proj_dim) ** -0.5))
+            if module.has_relative_attention_bias:
+                module.relative_attention_bias.weight.data.normal_(mean=0.0, std=factor * ((d_model) ** -0.5))
+
     def build(self):
-        # split model building into several components
+        self.shared = nn.Embedding(self.t5_config.vocab_size, self.t5_config.d_model)
+        
         self._build_obj_encoding()
         self._build_ocr_encoding()
+        self._build_encoder()
+        self._build_decoder()
 
         self.vocab_proj = nn.Sequential(
             nn.Linear(self.config.D_MODEL, self.vocab.size()),
@@ -80,6 +129,20 @@ class MMF_SAL(T5Model):
 
         self.tss = TextSemanticSeparate(self.config.TSS)
         self.scp = SpatialCirclePosition(self.config.SCP)
+
+    def _build_encoder(self):
+        encoder_config = deepcopy(self.t5_config)
+        encoder_config.is_decoder = False
+        encoder_config.use_cache = False
+        encoder_config.is_encoder_decoder = False
+        self.encoder = T5Stack(encoder_config, self.shared)
+
+    def _build_decoder(self):
+        decoder_config = deepcopy(self.t5_config)
+        decoder_config.is_decoder = True
+        decoder_config.is_encoder_decoder = False
+        decoder_config.num_layers = self.t5_config.num_decoder_layers
+        self.decoder = T5Stack(decoder_config, self.shared)
 
     def forward(self, items):
         if self.training:
@@ -198,7 +261,10 @@ class MMF_SAL(T5Model):
     def _forward_decoder(self, items, fwd_results):
         fwd_results["prev_inds"] = items.answer_tokens
         bs, seq_len = fwd_results["prev_inds"].shape
-        mmt_decoder_mask = _get_causal_mask(bs, seq_len, self.device)
+        answer_casual_mask = _get_causal_mask(bs, seq_len, self.device)
+        answer_lens = (fwd_results["prev_inds"] != self.vocab.padding_idx).sum(dim=-1)
+        answer_padding_mask = _get_mask(answer_lens, self.vocab.max_answer_length)[:, None, :]
+        mmt_decoder_mask = answer_casual_mask * answer_padding_mask
         mmt_decoder_out = self.decoder(
             input_ids=fwd_results["prev_inds"],
             attention_mask=mmt_decoder_mask,
@@ -217,7 +283,11 @@ class MMF_SAL(T5Model):
         # greedy decoding at test time
         last_ids = torch.zeros((items.batch_size, )).to(self.device)
         for ith in range(1, self.vocab.max_answer_length):
-            mmt_decoder_mask = _get_causal_mask(bs, fwd_results["prev_inds"].shape[1], self.device)
+            bs, seq_len = fwd_results["prev_inds"].shape
+            answer_casual_mask = _get_causal_mask(bs, seq_len, self.device)
+            answer_lens = (fwd_results["prev_inds"] != self.vocab.padding_idx).sum(dim=-1)
+            answer_padding_mask = _get_mask(answer_lens, self.vocab.max_answer_length)[:, None, :]
+            mmt_decoder_mask = answer_casual_mask * answer_padding_mask
             mmt_decoder_out = self.decoder(
                 input_ids=fwd_results["prev_inds"],
                 attention_mask=mmt_decoder_mask,

@@ -102,21 +102,19 @@ class OpenEndedTask(BaseTask):
         self.model.eval()
         gens = {}
         gts = {}
-        with tqdm(desc='Epoch %d - Evaluating' % self.epoch, unit='it', total=len(dataloader)) as pbar:
-            for it, items in enumerate(dataloader):
-                items = items.to(self.device)
-                with torch.no_grad():
-                    results = self.model(items)
-                outs = results["scores"].argmax(dim=-1)
+        for it, items in enumerate(dataloader):
+            items = items.to(self.device)
+            with torch.no_grad():
+                results = self.model(items)
+            outs = results["scores"].argmax(dim=-1)
 
-                answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous(), 
-                                                        join_words=False)
-                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
-                    gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
-                    gens['%d_%d' % (it, i)] = [gen_i, ]
-                    gts['%d_%d' % (it, i)] = gts_i
-                pbar.update()
+            answers_gt = items.answers
+            answers_gen = self.vocab.decode_answer(outs.contiguous(), 
+                                                    join_words=False)
+            for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
+                gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
+                gens['%d_%d' % (it, i)] = [gen_i, ]
+                gts['%d_%d' % (it, i)] = gts_i
 
         scores, _ = evaluation.compute_scores(gts, gens)
 
@@ -125,29 +123,25 @@ class OpenEndedTask(BaseTask):
     def train(self):
         self.model.train()
         running_loss = .0
-        with tqdm(desc='Epoch %d - Training' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
-            for it, items in enumerate(self.train_dataloader):
-                items = items.to(self.device)
-                results = self.model(items)
-                out = results["scores"].contiguous()
-                out = F.log_softmax(out, dim=-1)
+        for it, items in enumerate(self.train_dataloader):
+            items = items.to(self.device)
+            results = self.model(items)
+            out = results["scores"].contiguous()
+            out = F.log_softmax(out, dim=-1)
 
-                shifted_right_answer_tokens = items.shifted_right_answer_tokens
-                self.optim.zero_grad()
-                loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
-                loss.backward()
+            shifted_right_answer_tokens = items.shifted_right_answer_tokens
+            self.optim.zero_grad()
+            loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
+            loss.backward()
 
-                self.optim.step()
-                this_loss = loss.item()
-                running_loss += this_loss
+            self.optim.step()
+            this_loss = loss.item()
+            running_loss += this_loss
 
-                pbar.set_postfix(loss=running_loss / (it + 1))
-                pbar.update()
-                self.scheduler.step()
+            self.scheduler.step()
 
-                if it % self.config.ITER_TO_VERBOSE == 0:
-                    self.logger.info(f"Loss: {loss.item()}")
-
+            if it > 0 and it % self.config.TRAINING.ITER_TO_VERBOSE == 0:
+                self.logger.info(f"Epoch {self.epoch+1} - Training - Iter {it}/{len(self.train_dataloader)} - Loss: {running_loss / (it + 1)}")
 
     def start(self):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
@@ -165,6 +159,7 @@ class OpenEndedTask(BaseTask):
             self.train()
 
             # val scores
+            self.logger.info(f"Epoch {self.epoch+1} - Validating")
             scores = self.evaluate_metrics(self.dev_dict_dataloader)
             scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
             self.logger.info("Validation scores %s", scores)
@@ -210,36 +205,33 @@ class OpenEndedTask(BaseTask):
         results = []
         overall_gens = {}
         overall_gts = {}
-        with tqdm(desc='Predicting: ', unit='it', total=len(self.test_dict_dataloader)) as pbar:
-            for it, items in enumerate(self.test_dict_dataloader):
-                items = items.to(self.device)
-                with torch.no_grad():
-                    result = self.model(items)
-                outs = result["scores"].argmax(dim=-1)
+        self.logger.info(f"Epoch {self.epoch+1} - Evaluating")
+        for it, items in enumerate(self.test_dict_dataloader):
+            items = items.to(self.device)
+            with torch.no_grad():
+                result = self.model(items)
+            outs = result["scores"].argmax(dim=-1)
 
-                answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(
-                  outs.contiguous().view(-1, self.vocab.max_answer_length),
-                  join_words=False)
-                gts = {}
-                gens = {}
-                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
-                    gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
-                    gens['%d_%d' % (it, i)] = gen_i
-                    gts['%d_%d' % (it, i)] = gts_i
-                    overall_gens['%d_%d' % (it, i)] = [gen_i, ]
-                    overall_gts['%d_%d' % (it, i)] = gts_i
-                pbar.update()
+            answers_gt = items.answers
+            answers_gen = self.vocab.decode_answer(
+                outs.contiguous().view(-1, self.vocab.max_answer_length),
+                join_words=False)
+            gts = {}
+            gens = {}
+            for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
+                gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
+                gens['%d_%d' % (it, i)] = gen_i
+                gts['%d_%d' % (it, i)] = gts_i
+                overall_gens['%d_%d' % (it, i)] = [gen_i, ]
+                overall_gts['%d_%d' % (it, i)] = gts_i
 
-                results.append({
-                    "id": items.question_id,
-                    "image_id": items.image_id,
-                    "filename": items.filename,
-                    "gens": gens,
-                    "gts": gts
-                })
-
-                pbar.update()
+            results.append({
+                "id": items.question_id,
+                "image_id": items.image_id,
+                "filename": items.filename,
+                "gens": gens,
+                "gts": gts
+            })
 
         scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
         scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}

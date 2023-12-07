@@ -2,10 +2,12 @@ import torch
 
 from data_utils.datasets.ocr_datasets import OcrFeatureDataset
 from data_utils.datasets.ocr_datasets import OcrDictionaryDataset
+from data_utils.utils import preprocess_sentence
 from utils.instance import Instance
 from builders.dataset_builder import META_DATASET
 
 import re
+from typing import Dict, List
 
 @META_DATASET.register()
 class T5OcrFeatureDataset(OcrFeatureDataset):
@@ -139,6 +141,29 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
     def __init__(self, json_path: str, vocab, config) -> None:
         super().__init__(json_path, vocab, config)
 
+    def load_annotations(self, json_data: Dict) -> List[Dict]:
+        annotations = []
+        for ann in json_data["annotations"]:
+            # find the appropriate image
+            for image in json_data["images"]:
+                if image["id"] == ann["image_id"]:
+                    question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
+                    answers = [preprocess_sentence(answer, self.vocab.tokenizer) for answer in ann["answers"]]
+                    answers = ["".join(answer) for answer in answers]
+                    answers = [re.sub("▁", " ", answer).strip() for answer in answers]
+                    annotation = {
+                        "question_id": ann["id"],
+                        "question": question,
+                        "answers": answers,
+                        "image_id": ann["image_id"],
+                        "filename": image["filename"]
+                    }
+                    break
+
+            annotations.append(annotation)
+
+        return annotations
+
     def refine_ocr_features(self, ocr_tokens, dict_features):
         for key in dict_features:
             features = dict_features[key]
@@ -211,7 +236,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         question = item["question"]
         question_tokens = self.vocab.encode_question(question)
         answers = item["answers"]
-        answers = [re.sub(r"_", "", answer) for answer in answers]
+        answers = [re.sub("_", " ", answer) for answer in answers]
 
         ocr_tokens = [text if text.strip() != "" else 
                       self.vocab.padding_token for text in features["ocr_texts"]]

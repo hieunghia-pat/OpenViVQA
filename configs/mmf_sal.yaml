@@ -3,8 +3,8 @@ TASK: OpenEndedTask
 DATASET:
   FEATURE_DATASET:
     TYPE: T5OcrFeatureDataset
-    BATCH_SIZE: 16
-    WORKERS: 2
+    BATCH_SIZE: 32
+    WORKERS: 10
     FEATURE_PATH:
       FEATURES: annotations/vinvl_vinvl
       SCENE_TEXT: annotations/swintext_spotter
@@ -15,8 +15,8 @@ DATASET:
     WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
     TYPE: T5OcrDictionaryDataset
-    BATCH_SIZE: 16
-    WORKERS: 2
+    BATCH_SIZE: 32
+    WORKERS: 10
     FEATURE_PATH:
       FEATURES: annotations/vinvl_vinvl
       SCENE_TEXT: annotations/swintext_spotter

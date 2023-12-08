@@ -21,7 +21,7 @@ class MMF_SAL(nn.Module):
 
         self.t5_config = T5Config(
             vocab_size=len(vocab),
-            d_model=config.MMT.d_model,
+            d_model=config.D_MODEL,
             num_layers=config.MMT.NUM_HIDDEN_LAYERS,
             num_heads=config.MMT.NUM_ATTENTION_HEADS,
             num_decoder_layers=config.MMT.NUM_HIDDEN_LAYERS,
@@ -36,8 +36,10 @@ class MMF_SAL(nn.Module):
         self.vocab = vocab
         self.d_model = self.t5_config.hidden_size
         self.max_iter = vocab.max_answer_length
+        self.device = config.DEVICE
 
         self.build()
+        self.init_weights()
 
     def init_weights(self):
         self.apply(self._initialize_weights)
@@ -261,15 +263,20 @@ class MMF_SAL(nn.Module):
     def _forward_decoder(self, items, fwd_results):
         fwd_results["prev_inds"] = items.answer_tokens
         bs, seq_len = fwd_results["prev_inds"].shape
+
         answer_casual_mask = _get_causal_mask(bs, seq_len, self.device)
+        head_mask = [None] * self.config.num_hidden_layers
+        
         answer_lens = (fwd_results["prev_inds"] != self.vocab.padding_idx).sum(dim=-1)
         answer_padding_mask = _get_mask(answer_lens, self.vocab.max_answer_length)[:, None, :]
         mmt_decoder_mask = answer_casual_mask * answer_padding_mask
+
         mmt_decoder_out = self.decoder(
             input_ids=fwd_results["prev_inds"],
             attention_mask=mmt_decoder_mask,
             encoder_hidden_states=fwd_results["mmt_decoder_in"],
-            encoder_attention_mask=fwd_results["mmt_mask"]
+            encoder_attention_mask=fwd_results["mmt_mask"],
+            head_mask=head_mask
         ).last_hidden_state
         mmt_decoder_out = self.vocab_proj(mmt_decoder_out)
 
@@ -280,19 +287,24 @@ class MMF_SAL(nn.Module):
         fwd_results["prev_inds"] = torch.ones((bs, self.vocab.max_answer_length)).long().fill_(self.vocab.padding_idx).to(self.device)
         fwd_results["prev_inds"][:, 0] = self.vocab.bos_idx
 
+        answer_casual_mask = _get_causal_mask(bs, seq_len, self.device)
+        head_mask = [None] * self.config.num_hidden_layers
+
         # greedy decoding at test time
         last_ids = torch.zeros((items.batch_size, )).to(self.device)
         for ith in range(1, self.vocab.max_answer_length):
             bs, seq_len = fwd_results["prev_inds"].shape
-            answer_casual_mask = _get_causal_mask(bs, seq_len, self.device)
+
             answer_lens = (fwd_results["prev_inds"] != self.vocab.padding_idx).sum(dim=-1)
             answer_padding_mask = _get_mask(answer_lens, self.vocab.max_answer_length)[:, None, :]
             mmt_decoder_mask = answer_casual_mask * answer_padding_mask
+
             mmt_decoder_out = self.decoder(
                 input_ids=fwd_results["prev_inds"],
                 attention_mask=mmt_decoder_mask,
                 encoder_hidden_states=fwd_results["mmt_decoder_in"],
-                encoder_attention_mask=fwd_results["mmt_mask"]
+                encoder_attention_mask=fwd_results["mmt_mask"],
+                head_mask=head_mask
             ).last_hidden_state
             mmt_decoder_out = self.vocab_proj(mmt_decoder_out)
             

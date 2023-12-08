@@ -71,9 +71,8 @@ class T5OcrVocab(Vocab):
             answer = "".join([self.itos[idx] for idx in vec.tolist() if self.itos[idx] not in self.specials])
             answer = re.sub("▁", " ", answer)
             if join_words:
-                answers.append(answer)
+                answers.append(answer.strip())
             else:
                 answers.append(answer.strip().split())
 
         return answers
-

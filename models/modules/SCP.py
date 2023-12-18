@@ -15,52 +15,46 @@ class SpatialCirclePosition(ScaledDotProductAttention):
             embedding_dim=config.HEAD
         )
 
-    def patch(self, ocr_box: tuple, image_size: tuple) -> tuple:
+    def patch(self, ocr_boxes: torch.Tensor, image_sizes: torch.Tensor) -> tuple:
         """
-            ocr_box: (x1, y1, x2, y2)
-            image_size: (w, h)
-            return: (x_centroid, y_centroid)
+            ocr_boxes: (bs, n_ocr, 4)
+            image_sizes: (bs, 4)
+            return: (bs, x_centroid, y_centroid)
         """
-        img_w, img_h = image_size
-        ocr_box = (ocr_box*torch.tensor([img_w, img_h, img_w, img_h]).to(ocr_box.device)).long()
-        ocr_x1, ocr_y1, ocr_x2, ocr_y2 = ocr_box
-        ocr_centroid_x = (ocr_x2 - ocr_x1) // 2
-        ocr_centroid_y = (ocr_y2 - ocr_y1) // 2
         
-        w_per_area = img_w // 11
-        h_per_area = img_h // 11
-        
-        # list of indices
-        iths = [i for i in range(11)]
-        # list of x boundaries
-        x_lower_bounds = np.array([ith*w_per_area for ith in iths])
-        x_centroids = np.array(iths)
-        x_higher_bounds = np.array([(ith+1)*w_per_area for ith in iths])
-        # list of y boundaries
-        y_lower_bounds = np.array([ith*h_per_area for ith in iths])
-        y_centroids = np.array(iths)
-        y_higher_bounds = np.array([(ith+1)*h_per_area for ith in iths])
+        # boundaries
+        size_per_area = (image_sizes[:, :2] // 11).unsqueeze(1) # (bs, 1, 2)
+        lower_bounds = torch.arange(
+            start=0, 
+            end=11, 
+            step=1
+        ).unsqueeze(0).repeat(ocr_boxes.shape[0], -1).to(ocr_boxes.device) # (bs, 11)
+        higher_bounds = lower_bounds + 1
+        # width boundaries
+        width_lower_bounds = lower_bounds * size_per_area[:, 0]
+        width_higher_bounds = higher_bounds * size_per_area[:, 0]
+        # height boundaries
+        height_lower_bounds = lower_bounds * size_per_area[:, 1]
+        height_higher_bounds = higher_bounds * size_per_area[:, 1]
 
-        selected_x_centroid = None
-        selected_y_centroid = None
-        for ith in iths:
-            x_lower_bound = x_lower_bounds[ith]
-            x_higher_bound = x_higher_bounds[ith]
-            if x_lower_bound <= ocr_centroid_x <= x_higher_bound:
-                selected_x_centroid = x_centroids[ith]
+        # reshape the bounds so that we can broadcast the dimension
+        bounds = bounds.unsqueeze(1) # (bs, 1, 11, 2)
+        ocr_boxes = ocr_boxes.unsqueeze(-2) # (bs, n_ocr, 1, 4)
+        ocr_x_centroid = (ocr_boxes[:, :, :, 0] - ocr_boxes[:, :, :, 2]) // 2
+        ocr_y_centroid = (ocr_boxes[:, :, :, 1] - ocr_boxes[:, :, :, 3]) // 2
+        selected_x_centroid = width_lower_bounds <= ocr_x_centroid <= width_higher_bounds # (bs, n_ocr, 11)
+        selected_y_centroid = height_lower_bounds <= ocr_y_centroid <= height_higher_bounds # (bs, n_ocr, 11)
+        # determine the appropriate patch
+        selected_x_centroid = selected_x_centroid.argmax(dim=-1) # (bs, n_ocr)
+        selected_y_centroid = selected_y_centroid.argmax(dim=-1) # (bs, n_orc)
 
-            y_lower_bound = y_lower_bounds[ith]
-            y_higher_bound = y_higher_bounds[ith]
-            if y_lower_bound <= ocr_centroid_y <= y_higher_bound:
-                selected_y_centroid = y_centroids[ith]
-
-        return (selected_x_centroid, selected_y_centroid)
+        return selected_x_centroid, selected_y_centroid
     
     def pytha(self, p_i: torch.Tensor, p_j: torch.Tensor) -> torch.Tensor:
         """
-            p_i: (bs, 2)
-            p_j: (bs, 2)
-            return: (bs, )
+            p_i: (bs, *, 2)
+            p_j: (bs, *, 2)
+            return: (bs, *)
         """
         delta = p_i - p_j
         return torch.sqrt(torch.square(delta).sum(dim=-1)).long()
@@ -69,25 +63,26 @@ class SpatialCirclePosition(ScaledDotProductAttention):
                 ocr_features: torch.Tensor,
                 ocr_boxes: torch.Tensor, 
                 ocr_padding_masks: torch.Tensor, 
-                image_sizes: List[tuple]
+                image_sizes: torch.Tensor
         ) -> torch.Tensor:
         """
+            ocr_features: (bs, n_ocr, d_model)
             ocr_boxes: (bs, n_ocr, 4)
             ocr_padding_masks: (bs, 1, 1, n_ocr)
+            image_sizes: (bs, 4)
         """
         bs, nq, _ = ocr_boxes.shape
-        patch_boxes = torch.zeros((bs, nq, 2), device=ocr_boxes.device)
-        for batch in range(bs):
-            image_size = image_sizes[batch]
-            for ith in range(nq):
-                patch_boxes[batch][ith] = torch.Tensor(self.patch(ocr_boxes[batch, ith], image_size)).to(ocr_boxes.device)
+        image_sizes = image_sizes
+        ocr_boxes = (ocr_boxes * image_sizes.unsqueeze(1)).long()
 
-        dist = torch.zeros((bs, nq, nq)).long().to(ocr_boxes.device)
-        for i in range(nq):
-            for j in range(i, nq):
-                dist[:, i, j] = self.pytha(patch_boxes[:, i], patch_boxes[:, j]).to(ocr_boxes.device)
-                dist[:, j, i] = self.pytha(patch_boxes[:, j], patch_boxes[:, i]).to(ocr_boxes.device)
-        dist = dist.view(bs, -1) # (bs, nq*nq)
+        patch_x, patch_y = self.patch(ocr_boxes, image_sizes)
+        patch_i_x = patch_x.unsqueeze(-1).repeat(-1, -1, nq).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
+        patch_i_y = patch_y.unsqueeze(-1).repeat(-1, -1, nq).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
+        patch_i = torch.cat([patch_i_x, patch_i_y], dim=-1) # (bs, n_ocr, n_ocr, 2)
+        patch_j_x = patch_x.unsqueeze(-2).repeat(-1, nq, -1).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
+        patch_j_y = patch_y.unsqueeze(-2).repeat(-1, nq, -1).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
+        patch_j = torch.cat([patch_j_x, patch_j_y], dim=-1) # (bs, n_ocr, n_ocr, 2)
+        dist = self.pytha(patch_i, patch_j) # (bs, n_ocr, n_ocr)
         dist = self.dist_embedding(dist).view(bs, nq, nq, -1).permute((0, -1, 1, 2)) # (bs, h, nq, nq)
 
         q = self.fc_q(ocr_features).view(bs, nq, self.h, self.d_k).permute(0, 2, 1, 3)  # (bs, h, nq, d_k)

@@ -81,7 +81,7 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
         answer = item["answer"]
         width = features["width"]
         height = features["height"]
-        img_size = (width, height)
+        img_size = torch.Tensor((width, height, width, height))
 
         ocr_tokens = [text if text.strip() != "" else 
                       self.vocab.padding_token for text in features["ocr_texts"]]
@@ -231,7 +231,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         features = self.load_features(image_id)
         width = features["width"]
         height = features["height"]
-        img_size = (width, height)
+        img_size = torch.Tensor((width, height, width, height))
         
         question = item["question"]
         question_tokens = self.vocab.encode_question(question)

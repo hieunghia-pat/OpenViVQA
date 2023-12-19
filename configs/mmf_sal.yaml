@@ -97,7 +97,7 @@ MODEL:
     DEVICE: cuda
     D_MODEL: 512
   SCP:
-    NUM_DISTANCE: 12
+    NUM_DISTANCE: 16
     D_MODEL: 512
     HEAD: 8
     D_KEY: 64

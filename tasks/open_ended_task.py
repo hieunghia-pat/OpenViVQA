@@ -10,10 +10,11 @@ import evaluation
 from evaluation import Cider
 
 import os
-from tqdm import tqdm
+import numpy as np
 import itertools
 from shutil import copyfile
 import json
+import datetime
 
 @META_TASK.register()
 class OpenEndedTask(BaseTask):
@@ -102,7 +103,10 @@ class OpenEndedTask(BaseTask):
         self.model.eval()
         gens = {}
         gts = {}
+        # for estimating the eslapsed time
+        durations = []
         for it, items in enumerate(dataloader):
+            start_moment = datetime.datetime.now()
             items = items.to(self.device)
             with torch.no_grad():
                 results = self.model(items)
@@ -116,6 +120,17 @@ class OpenEndedTask(BaseTask):
                 gens['%d_%d' % (it, i)] = [gen_i, ]
                 gts['%d_%d' % (it, i)] = gts_i
 
+            # get the time of the ending moment
+            end_moment = datetime.datetime.now()
+            # estimating esplapsed time
+            durations.append((end_moment - start_moment).total_seconds())
+            avg_duration = np.array(durations).mean()
+            remain_its = len(dataloader) - it
+            total_time = str(datetime.timedelta(seconds=int(avg_duration * remain_its)))
+
+            if it > 0 and it % self.config.TRAINING.ITER_TO_VERBOSE == 0:
+                self.logger.info(f"Epoch {self.epoch+1} - Evaluating - Iter {it}/{len(self.train_dataloader)} - Estimating remaining: {total_time}")
+
         scores, _ = evaluation.compute_scores(gts, gens)
 
         return scores
@@ -123,12 +138,18 @@ class OpenEndedTask(BaseTask):
     def train(self):
         self.model.train()
         running_loss = .0
+        # for estimating the eslapsed time
+        durations = []
         for it, items in enumerate(self.train_dataloader):
+            # get the time of the starting moment
+            start_moment = datetime.datetime.now()
+            # forward pass
             items = items.to(self.device)
             results = self.model(items)
             out = results["scores"].contiguous()
             out = F.log_softmax(out, dim=-1)
 
+            # backward pass
             shifted_right_answer_tokens = items.shifted_right_answer_tokens
             self.optim.zero_grad()
             loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
@@ -140,8 +161,16 @@ class OpenEndedTask(BaseTask):
 
             self.scheduler.step()
 
+            # get the time of the ending moment
+            end_moment = datetime.datetime.now()
+            # estimating esplapsed time
+            durations.append((end_moment - start_moment).total_seconds())
+            avg_duration = np.array(durations).mean()
+            remain_its = len(self.train_dataloader) - it
+            total_time = str(datetime.timedelta(seconds=int(avg_duration * remain_its)))
+
             if it > 0 and it % self.config.TRAINING.ITER_TO_VERBOSE == 0:
-                self.logger.info(f"Epoch {self.epoch+1} - Training - Iter {it}/{len(self.train_dataloader)} - Loss: {running_loss / (it + 1)}")
+                self.logger.info(f"Epoch {self.epoch+1} - Training - Iter {it}/{len(self.train_dataloader)} - Loss: {running_loss / (it + 1)} - Estimating remaining: {total_time}")
 
     def start(self):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):

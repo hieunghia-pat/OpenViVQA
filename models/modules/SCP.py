@@ -22,31 +22,33 @@ class SpatialCirclePosition(ScaledDotProductAttention):
             return: (bs, x_centroid, y_centroid)
         """
         
-        # boundaries
         size_per_area = (image_sizes[:, :2] // 11).unsqueeze(1) # (bs, 1, 2)
         lower_bounds = torch.arange(
             start=0, 
             end=11, 
             step=1
-        ).unsqueeze(0).repeat(ocr_boxes.shape[0], -1).to(ocr_boxes.device) # (bs, 11)
+        ).unsqueeze(0).repeat(ocr_boxes.shape[0], 1).to(ocr_boxes.device) # (bs, 11)
         higher_bounds = lower_bounds + 1
         # width boundaries
-        width_lower_bounds = lower_bounds * size_per_area[:, 0]
-        width_higher_bounds = higher_bounds * size_per_area[:, 0]
+        width_lower_bounds = lower_bounds * size_per_area[:, :, 0]
+        width_higher_bounds = higher_bounds * size_per_area[:, :, 0]
         # height boundaries
-        height_lower_bounds = lower_bounds * size_per_area[:, 1]
-        height_higher_bounds = higher_bounds * size_per_area[:, 1]
+        height_lower_bounds = lower_bounds * size_per_area[:, :, 1]
+        height_higher_bounds = higher_bounds * size_per_area[:, :, 1]
 
         # reshape the bounds so that we can broadcast the dimension
-        bounds = bounds.unsqueeze(1) # (bs, 1, 11, 2)
+        width_lower_bounds = width_lower_bounds.unsqueeze(1) # (bs, 1, 11, 2)
+        width_higher_bounds = width_higher_bounds.unsqueeze(1) # (bs, 1, 11, 2)
+        height_lower_bounds = height_lower_bounds.unsqueeze(1) # (bs, 1, 11, 2)
+        height_higher_bounds = height_higher_bounds.unsqueeze(1) # (bs, 1, 11, 2)
         ocr_boxes = ocr_boxes.unsqueeze(-2) # (bs, n_ocr, 1, 4)
-        ocr_x_centroid = (ocr_boxes[:, :, :, 0] - ocr_boxes[:, :, :, 2]) // 2
-        ocr_y_centroid = (ocr_boxes[:, :, :, 1] - ocr_boxes[:, :, :, 3]) // 2
-        selected_x_centroid = width_lower_bounds <= ocr_x_centroid <= width_higher_bounds # (bs, n_ocr, 11)
-        selected_y_centroid = height_lower_bounds <= ocr_y_centroid <= height_higher_bounds # (bs, n_ocr, 11)
+        ocr_x_centroid = (ocr_boxes[:, :, :, 0] + ocr_boxes[:, :, :, 2]) // 2
+        ocr_y_centroid = (ocr_boxes[:, :, :, 1] + ocr_boxes[:, :, :, 3]) // 2
+        selected_x_centroid = torch.logical_and(torch.le(width_lower_bounds, ocr_x_centroid), torch.le(ocr_x_centroid, width_higher_bounds)) # (bs, n_ocr, 11)
+        selected_y_centroid = torch.logical_and(torch.le(height_lower_bounds, ocr_y_centroid), torch.le(ocr_y_centroid, height_higher_bounds)) # (bs, n_ocr, 11)
         # determine the appropriate patch
-        selected_x_centroid = selected_x_centroid.argmax(dim=-1) # (bs, n_ocr)
-        selected_y_centroid = selected_y_centroid.argmax(dim=-1) # (bs, n_orc)
+        selected_x_centroid = selected_x_centroid.long().argmax(dim=-1) # (bs, n_ocr)
+        selected_y_centroid = selected_y_centroid.long().argmax(dim=-1) # (bs, n_orc)
 
         return selected_x_centroid, selected_y_centroid
     
@@ -57,7 +59,7 @@ class SpatialCirclePosition(ScaledDotProductAttention):
             return: (bs, *)
         """
         delta = p_i - p_j
-        return torch.sqrt(torch.square(delta).sum(dim=-1)).long()
+        return torch.round(torch.sqrt(torch.square(delta).sum(dim=-1))).long()
 
     def forward(self,
                 ocr_features: torch.Tensor,
@@ -76,11 +78,11 @@ class SpatialCirclePosition(ScaledDotProductAttention):
         ocr_boxes = (ocr_boxes * image_sizes.unsqueeze(1)).long()
 
         patch_x, patch_y = self.patch(ocr_boxes, image_sizes)
-        patch_i_x = patch_x.unsqueeze(-1).repeat(-1, -1, nq).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
-        patch_i_y = patch_y.unsqueeze(-1).repeat(-1, -1, nq).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
+        patch_i_x = patch_x.unsqueeze(-1).repeat(1, 1, nq).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
+        patch_i_y = patch_y.unsqueeze(-1).repeat(1, 1, nq).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
         patch_i = torch.cat([patch_i_x, patch_i_y], dim=-1) # (bs, n_ocr, n_ocr, 2)
-        patch_j_x = patch_x.unsqueeze(-2).repeat(-1, nq, -1).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
-        patch_j_y = patch_y.unsqueeze(-2).repeat(-1, nq, -1).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
+        patch_j_x = patch_x.unsqueeze(-2).repeat(1, nq, 1).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
+        patch_j_y = patch_y.unsqueeze(-2).repeat(1, nq, 1).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
         patch_j = torch.cat([patch_j_x, patch_j_y], dim=-1) # (bs, n_ocr, n_ocr, 2)
         dist = self.pytha(patch_i, patch_j) # (bs, n_ocr, n_ocr)
         dist = self.dist_embedding(dist).view(bs, nq, nq, -1).permute((0, -1, 1, 2)) # (bs, h, nq, nq)

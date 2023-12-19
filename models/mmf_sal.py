@@ -267,15 +267,13 @@ class MMF_SAL(nn.Module):
         answer_lens = (fwd_results["prev_inds"] != self.vocab.padding_idx).sum(dim=-1)
         answer_padding_mask = _get_mask(answer_lens, self.vocab.max_answer_length)[:, None, :]
         answer_casual_mask = _get_causal_mask(bs, seq_len, self.device)
-        head_mask = torch.Tensor([1] * self.t5_config.num_hidden_layers)
         mmt_decoder_mask = answer_casual_mask * answer_padding_mask
 
         mmt_decoder_out = self.decoder(
             input_ids=fwd_results["prev_inds"],
             attention_mask=mmt_decoder_mask,
             encoder_hidden_states=fwd_results["mmt_decoder_in"],
-            encoder_attention_mask=fwd_results["mmt_mask"],
-            head_mask=head_mask
+            encoder_attention_mask=fwd_results["mmt_mask"]
         ).last_hidden_state
         mmt_decoder_out = self.vocab_proj(mmt_decoder_out)
 
@@ -294,14 +292,12 @@ class MMF_SAL(nn.Module):
             answer_lens = (fwd_results["prev_inds"] != self.vocab.padding_idx).sum(dim=-1)
             answer_padding_mask = _get_mask(answer_lens, self.vocab.max_answer_length)[:, None, :]
             answer_casual_mask = _get_causal_mask(bs, seq_len, self.device)
-            head_mask = torch.Tensor([1] * self.t5_config.num_hidden_layers)
             mmt_decoder_mask = answer_casual_mask * answer_padding_mask
             mmt_decoder_out = self.decoder(
                 input_ids=fwd_results["prev_inds"],
                 attention_mask=mmt_decoder_mask,
                 encoder_hidden_states=fwd_results["mmt_decoder_in"],
-                encoder_attention_mask=fwd_results["mmt_mask"],
-                head_mask=head_mask
+                encoder_attention_mask=fwd_results["mmt_mask"]
             ).last_hidden_state
             mmt_decoder_out = self.vocab_proj(mmt_decoder_out)
             

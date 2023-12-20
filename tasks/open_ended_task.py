@@ -129,7 +129,7 @@ class OpenEndedTask(BaseTask):
             total_time = str(datetime.timedelta(seconds=int(avg_duration * remain_its)))
 
             if it > 0 and it % self.config.TRAINING.ITER_TO_VERBOSE == 0:
-                self.logger.info(f"Epoch {self.epoch+1} - Evaluating - Iter {it}/{len(self.dataloader)} - Estimating remaining: {total_time}")
+                self.logger.info(f"Epoch {self.epoch+1} - Evaluating - Iter {it}/{len(dataloader)} - Estimating remaining: {total_time}")
 
         scores, _ = evaluation.compute_scores(gts, gens)
 

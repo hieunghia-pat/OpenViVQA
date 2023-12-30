@@ -21,7 +21,7 @@ class T5OcrVocab(Vocab):
         self.tokenizer = tokenizer.tokenize
 
         self.padding_token = tokenizer.pad_token
-        self.bos_token = "<extra_id_0>"
+        self.bos_token = tokenizer.unk_token
         self.eos_token = tokenizer.eos_token
         self.unk_token = tokenizer.unk_token
 

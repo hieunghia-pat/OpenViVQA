@@ -96,4 +96,4 @@ class SpatialCirclePosition(ScaledDotProductAttention):
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(bs, nq, self.h * self.d_v)  # (bs, nq, h*d_v)
         out = self.fc_o(out)  # (bs, nq, d_model)
 
-        return out, att
+        return out

@@ -89,7 +89,7 @@ class SAL(T5ForConditionalGeneration):
             answer_tokens = items.answer_tokens
             shifted_right_answer_tokens = items.shifted_right_answer_tokens
             bs, seq_len = answer_tokens.shape
-            decoder_attention_mask = _get_causal_mask(bs, seq_len, answer_tokens.device)
+            decoder_attention_mask = _get_causal_mask(bs, seq_len, self.device)
         
             return super().forward(
                 inputs_embeds=fwd_results["mmt_in"],
@@ -99,7 +99,9 @@ class SAL(T5ForConditionalGeneration):
                 labels=shifted_right_answer_tokens
             )
 
+        bs = fwd_results["mmt_in"].shape[0]
         kwargs["attention_mask"] = fwd_results["mmt_mask"]
+        kwargs["decoder_attention_mask"] = _get_causal_mask(bs, 1, self.device)
         return super().forward(
                 inputs_embeds=fwd_results["mmt_in"],
                 **kwargs
@@ -205,6 +207,7 @@ class SAL(T5ForConditionalGeneration):
         encoder_outputs=None,
         **kwargs,
     ):
+        input_ids = input_ids.repeat(items.batch_size, 1)
         # cut decoder_input_ids if past is used
         if past_key_values is not None:
             input_ids = input_ids[:, -1:]

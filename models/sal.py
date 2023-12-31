@@ -8,6 +8,7 @@ from transformers.models.t5.modeling_t5 import *
 from transformers.generation.utils import *
 
 from utils.logging_utils import Logger
+from utils.instance import InstanceList
 from builders.model_builder import META_ARCHITECTURE
 from models.modules.TSS import TextSemanticSeparate
 from models.modules.SCP import SpatialCirclePosition
@@ -25,7 +26,9 @@ class SAL(T5ForConditionalGeneration):
             num_decoder_layers=config.MMT.NUM_HIDDEN_LAYERS,
             d_ff=config.MMT.D_FF,
             d_kv=config.MMT.D_KV,
+            bos_token_id=vocab.bos_idx,
             pad_token_id=vocab.padding_idx,
+            unk_token_id=vocab.unk_idx,
             eos_token_id=vocab.eos_idx
         )
 
@@ -35,7 +38,8 @@ class SAL(T5ForConditionalGeneration):
         self.max_iter = vocab.max_answer_length
         self.object_dim = config.OBJECT_EMBEDDING.D_FEATURE
         self.ocr_dim = config.OCR_EMBEDDING.D_FEATURE
-        self.tts_config = config.TTS
+        self.d_model = self.config.hidden_size
+        self.tss_config = config.TSS
         self.scp_config = config.SCP
 
         self.build()
@@ -71,26 +75,35 @@ class SAL(T5ForConditionalGeneration):
         self.ocr_text_layer_norm = T5LayerNorm(self.config.hidden_size)
         self.ocr_drop = nn.Dropout(self.config.dropout_rate)
 
-        self.tss = TextSemanticSeparate(self.tts_config)
+        self.tss = TextSemanticSeparate(self.tss_config)
         self.tss_layer_norm = T5LayerNorm(self.config.hidden_size)
 
         self.scp = SpatialCirclePosition(self.scp_config)
         self.scp_layer_norm = T5LayerNorm(self.config.hidden_size)
 
-    def forward(self, items):
+    def forward(self, items, **kwargs):
         fwd_results = {}
         self._foward_embedding(items, fwd_results)
 
-        answer_tokens = items.shifted_right_answer_tokens
-        bs, seq_len = answer_tokens.shape
-        decoder_attention_mask = _get_causal_mask(bs, seq_len, answer_tokens.device)
+        if self.training:
+            answer_tokens = items.answer_tokens
+            shifted_right_answer_tokens = items.shifted_right_answer_tokens
+            bs, seq_len = answer_tokens.shape
+            decoder_attention_mask = _get_causal_mask(bs, seq_len, answer_tokens.device)
         
+            return super().forward(
+                inputs_embeds=fwd_results["mmt_in"],
+                attention_mask=fwd_results["mmt_mask"],
+                decoder_input_ids=answer_tokens,
+                decoder_attention_mask=decoder_attention_mask,
+                labels=shifted_right_answer_tokens
+            )
+
+        kwargs["attention_mask"] = fwd_results["mmt_mask"]
         return super().forward(
-            inputs_embeds=fwd_results["mmt_in"],
-            attention_mask=fwd_results["mmt_mast"],
-            decoder_input_ids=answer_tokens,
-            decoder_attention_mask=decoder_attention_mask
-        )
+                inputs_embeds=fwd_results["mmt_in"],
+                **kwargs
+            )
         
     def _forward_txt_embedding(self, items, fwd_results):
         fwd_results["txt_inds"] = items.question_tokens
@@ -214,14 +227,15 @@ class SAL(T5ForConditionalGeneration):
         fwd_results = {}
         self._foward_embedding(items, fwd_results)
 
-        inputs = fwd_results["mmt_in"],
-        generation_config = None,
-        logits_processor = None,
-        stopping_criteria = None,
-        prefix_allowed_tokens_fn = None,
-        synced_gpus: Optional[bool] = None,
-        negative_prompt_ids: Optional[torch.Tensor] = None,
-        negative_prompt_attention_mask: Optional[torch.Tensor] = None,
+        inputs = None
+        inputs_embeds = fwd_results["mmt_in"]
+        generation_config = None
+        logits_processor = None
+        stopping_criteria = None
+        prefix_allowed_tokens_fn = None
+        synced_gpus: Optional[bool] = None
+        negative_prompt_ids: Optional[torch.Tensor] = None
+        negative_prompt_attention_mask: Optional[torch.Tensor] = None
 
         if synced_gpus is None:
             if is_deepspeed_zero3_enabled() and dist.get_world_size() > 1:
@@ -379,6 +393,7 @@ class SAL(T5ForConditionalGeneration):
 
         return self.greedy_search(
                 input_ids,
+                items,
                 logits_processor=logits_processor,
                 stopping_criteria=stopping_criteria,
                 pad_token_id=generation_config.pad_token_id,
@@ -386,12 +401,14 @@ class SAL(T5ForConditionalGeneration):
                 output_scores=generation_config.output_scores,
                 return_dict_in_generate=generation_config.return_dict_in_generate,
                 synced_gpus=synced_gpus,
+                inputs_embeds=inputs_embeds,
                 **model_kwargs,
             )
     
     def greedy_search(
         self,
         input_ids: torch.LongTensor,
+        items: InstanceList,
         logits_processor: Optional[LogitsProcessorList] = None,
         stopping_criteria: Optional[StoppingCriteriaList] = None,
         max_length: Optional[int] = None,
@@ -462,7 +479,7 @@ class SAL(T5ForConditionalGeneration):
                     break
 
             # prepare model inputs
-            model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
+            model_inputs = self.prepare_inputs_for_generation(input_ids, items, **model_kwargs)
 
             # forward pass to get next token
             outputs = self(

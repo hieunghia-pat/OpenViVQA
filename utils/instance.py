@@ -14,7 +14,7 @@ class Instance(OrderedDict):
         try:
             return self[key]
         except KeyError:
-            raise AttributeError(f"{key} not found")
+            return None
 
     def get_fields(self):
         """Get current attributes/fields registered under the sample.
@@ -58,7 +58,7 @@ class InstanceList(OrderedDict):
 
     def __getattr__(self, name: str) -> Any:
         if name == "_fields" or name not in self:
-            raise AttributeError(f"{name} not found")
+            return None
         return self[name]
 
     def set(self, name: str, value: Any) -> None:

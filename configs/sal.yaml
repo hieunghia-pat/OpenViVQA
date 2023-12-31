@@ -4,7 +4,7 @@ DATASET:
   FEATURE_DATASET:
     TYPE: T5OcrFeatureDataset
     BATCH_SIZE: 32
-    WORKERS: 10
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: annotations/vinvl_vinvl
       SCENE_TEXT: annotations/swintext_spotter
@@ -16,7 +16,7 @@ DATASET:
   DICT_DATASET:
     TYPE: T5OcrDictionaryDataset
     BATCH_SIZE: 32
-    WORKERS: 10
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: annotations/vinvl_vinvl
       SCENE_TEXT: annotations/swintext_spotter

@@ -6,4 +6,4 @@ from .training_saaa_task import TrainingSAAATask
 from .training_m4c_task import TrainingM4C
 from .training_mmf_task import TrainingMMF
 from .vlsp_evjvqa_task import VlspEvjVqaTask
-from .training_hugginface_models import TrainingHuggingFaceModels
+from .training_huggingface_models import TrainingHuggingFaceModels

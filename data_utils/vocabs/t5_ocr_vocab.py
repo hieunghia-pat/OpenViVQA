@@ -18,12 +18,17 @@ class T5OcrVocab(Vocab):
     def __init__(self, config):
 
         tokenizer: T5Tokenizer = T5Tokenizer.from_pretrained(config.PRETRAINED_NAME)
+        tokenizer.add_special_tokens({
+            "bos_token": "<s>",
+            "sep_token": "<sep>"
+        })
+        
         self.tokenizer = tokenizer.tokenize
-
         self.padding_token = tokenizer.pad_token
-        self.bos_token = tokenizer.unk_token
+        self.bos_token = tokenizer.bos_token
         self.eos_token = tokenizer.eos_token
         self.unk_token = tokenizer.unk_token
+        self.sep_token = tokenizer.sep_token
 
         self.make_vocab([
             config.JSON_PATH.TRAIN,

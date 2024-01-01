@@ -71,14 +71,19 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
             dict_features[key] = torch.Tensor(features)
 
         return obj_tags, dict_features
+    
+    def append_question(self, question: List[str], obj_list: List[str], ocr_tokens: List[str]) -> List[str]:
+        for obj in obj_list:
+            question.extend([obj, self.vocab.sep_token])
+        for ocr_token in ocr_tokens:
+            question.extend([ocr_token, self.vocab.sep_token])
+
+        return question
 
     def __getitem__(self, idx: int):
         features = self.load_features(self.annotations[idx]["image_id"])
 
         item = self.annotations[idx]
-        question = item["question"]
-        question_tokens = self.vocab.encode_question(question)
-        answer = item["answer"]
         width = features["width"]
         height = features["height"]
         img_size = torch.Tensor((width, height, width, height))
@@ -117,6 +122,12 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
         obj_list = self.vocab.encode_token(obj_list)
         features["object_list"] = obj_list
 
+
+        question = item["question"]
+        question = self.append_question(question, obj_list, ocr_tokens)
+        question_tokens = self.vocab.encode_question(question)
+        
+        answer = item["answer"]
         answer_tokens = self.vocab.encode_answer(answer)
 
         shifted_right_answer_tokens = torch.zeros_like(answer_tokens).fill_(self.vocab.padding_idx)
@@ -221,6 +232,14 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
             dict_features[key] = torch.Tensor(features)
 
         return obj_tags, dict_features
+    
+    def append_question(self, question: List[str], obj_list: List[str], ocr_tokens: List[str]) -> List[str]:
+        for obj in obj_list:
+            question.extend([obj, self.vocab.sep_token])
+        for ocr_token in ocr_tokens:
+            question.extend([ocr_token, self.vocab.sep_token])
+
+        return question
 
     def __getitem__(self, idx: int):
         item = self.annotations[idx]
@@ -232,10 +251,6 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         width = features["width"]
         height = features["height"]
         img_size = torch.Tensor((width, height, width, height))
-        
-        question = item["question"]
-        question_tokens = self.vocab.encode_question(question)
-        answers = item["answers"]
 
         ocr_tokens = [text if text.strip() != "" else 
                       self.vocab.padding_token for text in features["ocr_texts"]]
@@ -270,6 +285,12 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         obj_list = [text if text in self.vocab.stoi else self.vocab.padding_token for text in obj_list]
         obj_list = self.vocab.encode_token(obj_list)
         features["object_list"] = obj_list
+
+        question = item["question"]
+        question = self.append_question(question, obj_list, ocr_tokens)
+        question_tokens = self.vocab.encode_question(question)
+        
+        answers = item["answers"]
 
         return Instance(
             **features,

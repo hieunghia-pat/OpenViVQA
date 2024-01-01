@@ -73,10 +73,13 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
         return obj_tags, dict_features
     
     def append_question(self, question: List[str], obj_list: List[str], ocr_tokens: List[str]) -> List[str]:
-        for obj in obj_list:
-            question.extend([obj, self.vocab.sep_token])
-        for ocr_token in ocr_tokens:
-            question.extend([ocr_token, self.vocab.sep_token])
+        for obj in obj_list[:-1]:
+            question.extend([obj, self.vocab.sep_token] if "▁" not in obj else [obj])
+        question.extend([obj_list[-1]])
+
+        for ocr_token in ocr_tokens[:-1]:
+            question.extend([ocr_token, self.vocab.sep_token] if "▁" not in ocr_token else [ocr_token])
+        question.extend([ocr_tokens[-1]])
 
         return question
 
@@ -103,8 +106,7 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
         for key in relevant_ocr_keys:
             features[key] = refined_ocr_features[key]
         ocr_tokens = [text if text in self.vocab.stoi else self.vocab.padding_token for text in ocr_tokens]
-        ocr_tokens = self.vocab.encode_token(ocr_tokens)
-        features["ocr_texts"] = ocr_tokens
+        features["ocr_texts"] = self.vocab.encode_token(ocr_tokens)
 
         obj_list = [text if text.strip() != "" else 
                       self.vocab.padding_token for text in features["object_list"]]
@@ -119,9 +121,7 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
         for key in relevant_obj_keys:
             features[key] = refined_obj_features[key]
         obj_list = [text if text in self.vocab.stoi else self.vocab.padding_token for text in obj_list]
-        obj_list = self.vocab.encode_token(obj_list)
-        features["object_list"] = obj_list
-
+        features["object_list"] = self.vocab.encode_token(obj_list)
 
         question = item["question"]
         question = self.append_question(question, obj_list, ocr_tokens)
@@ -267,8 +267,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         for key in relevant_ocr_keys:
             features[key] = refined_ocr_features[key]
         ocr_tokens = [text if text in self.vocab.stoi else self.vocab.padding_token for text in ocr_tokens]
-        ocr_tokens = self.vocab.encode_token(ocr_tokens)
-        features["ocr_texts"] = ocr_tokens
+        features["ocr_texts"] = self.vocab.encode_token(ocr_tokens)
 
         obj_list = [text if text.strip() != "" else 
                       self.vocab.padding_token for text in features["object_list"]]
@@ -283,8 +282,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         for key in relevant_obj_keys:
             features[key] = refined_obj_features[key]
         obj_list = [text if text in self.vocab.stoi else self.vocab.padding_token for text in obj_list]
-        obj_list = self.vocab.encode_token(obj_list)
-        features["object_list"] = obj_list
+        features["object_list"] = self.vocab.encode_token(obj_list)
 
         question = item["question"]
         question = self.append_question(question, obj_list, ocr_tokens)

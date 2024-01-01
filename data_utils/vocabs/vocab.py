@@ -63,8 +63,6 @@ class Vocab(object):
 
     def make_vocab(self, json_dirs):
         self.freqs = Counter()
-        self.max_question_length = 0
-        self.max_answer_length = 0
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
@@ -73,24 +71,20 @@ class Vocab(object):
                     answer = preprocess_sentence(answer, self.tokenizer)
                     self.freqs.update(question)
                     self.freqs.update(answer)
-                    if len(question) + 2 > self.max_question_length:
-                            self.max_question_length = len(question) + 2
-                    if len(answer) + 2 > self.max_answer_length:
-                        self.max_answer_length = len(answer) + 2
 
     def encode_question(self, question: List[str]) -> torch.Tensor:
         """ Turn a question into a vector of indices and a question length """
-        vec = torch.ones(self.max_question_length).long() * self.padding_idx
+        vec = torch.ones(len(question) + 2)
         for i, token in enumerate([self.bos_token] + question + [self.eos_token]):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
-        return vec
+        return vec.long()
 
     def encode_answer(self, answer: List[str]) -> torch.Tensor:
         """ Turn a answer into a vector of indices and a question length """
-        vec = torch.ones(self.max_answer_length).long() * self.padding_idx
+        vec = torch.ones(len(answer) + 2)
         for i, token in enumerate([self.bos_token] + answer + [self.eos_token]):
             vec[i] = self.stoi[token] if token in self.stoi else self.unk_idx
-        return vec
+        return vec.long()
 
     def decode_question(self, question_vecs: torch.Tensor, join_words=True) -> List[str]:
         '''

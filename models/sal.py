@@ -100,6 +100,7 @@ class SAL(T5ForConditionalGeneration):
             )
 
         bs = fwd_results["mmt_in"].shape[0]
+        kwargs["encoder_outputs"] = None
         kwargs["attention_mask"] = fwd_results["mmt_mask"]
         kwargs["decoder_attention_mask"] = _get_causal_mask(bs, 1, self.device)
         return super().forward(
@@ -207,7 +208,6 @@ class SAL(T5ForConditionalGeneration):
         encoder_outputs=None,
         **kwargs,
     ):
-        input_ids = input_ids.repeat(items.batch_size, 1)
         # cut decoder_input_ids if past is used
         if past_key_values is not None:
             input_ids = input_ids[:, -1:]
@@ -298,6 +298,7 @@ class SAL(T5ForConditionalGeneration):
         inputs_tensor, model_input_name, model_kwargs = self._prepare_model_inputs(
             inputs, generation_config.bos_token_id, model_kwargs
         )
+        inputs_tensor = inputs_tensor.repeat(items.batch_size, 1)
         batch_size = inputs_tensor.shape[0]
 
         # 4. Define other model kwargs
@@ -355,15 +356,7 @@ class SAL(T5ForConditionalGeneration):
         # 6. Prepare `max_length` depending on other stopping criteria.
         input_ids_length = input_ids.shape[-1]
         has_default_max_length = kwargs.get("max_length") is None and generation_config.max_length is not None
-        if generation_config.max_new_tokens is not None:
-            if not has_default_max_length and generation_config.max_length is not None:
-                logger.warning(
-                    f"Both `max_new_tokens` (={generation_config.max_new_tokens}) and `max_length`(="
-                    f"{generation_config.max_length}) seem to have been set. `max_new_tokens` will take precedence. "
-                    "Please refer to the documentation for more information. "
-                    "(https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)"
-                )
-            generation_config.max_length = generation_config.max_new_tokens + input_ids_length
+        generation_config.max_length = self.vocab.max_answer_length
         self._validate_generated_length(generation_config, input_ids_length, has_default_max_length)
 
         if self.device.type != input_ids.device.type:

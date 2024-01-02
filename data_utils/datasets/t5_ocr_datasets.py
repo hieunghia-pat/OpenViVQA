@@ -73,13 +73,15 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
         return obj_tags, dict_features
     
     def append_question(self, question: List[str], obj_list: List[str], ocr_tokens: List[str]) -> List[str]:
-        for obj in obj_list[:-1]:
-            question.extend([obj, self.vocab.sep_token] if "▁" not in obj else [obj])
-        question.extend([obj_list[-1]])
+        if len(obj_list) > 0:
+            for obj in obj_list[:-1]:
+                question.extend([obj, self.vocab.sep_token] if "▁" not in obj else [obj])
+            question.extend([obj_list[-1]])
 
-        for ocr_token in ocr_tokens[:-1]:
-            question.extend([ocr_token, self.vocab.sep_token] if "▁" not in ocr_token else [ocr_token])
-        question.extend([ocr_tokens[-1]])
+        if len(ocr_tokens) > 0:
+            for ocr_token in ocr_tokens[:-1]:
+                question.extend([ocr_token, self.vocab.sep_token] if "▁" not in ocr_token else [ocr_token])
+            question.extend([ocr_tokens[-1]])
 
         return question
 
@@ -139,7 +141,7 @@ class T5OcrFeatureDataset(OcrFeatureDataset):
             image_id=item["image_id"],
             filename=item["filename"],
             image_size=img_size,
-            ocr_tokens=ocr_tokens,
+            ocr_tokens=features["ocr_texts"],
             question=" ".join(question),
             question_tokens=question_tokens,
             answer=answer,
@@ -234,10 +236,15 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
         return obj_tags, dict_features
     
     def append_question(self, question: List[str], obj_list: List[str], ocr_tokens: List[str]) -> List[str]:
-        for obj in obj_list:
-            question.extend([obj, self.vocab.sep_token])
-        for ocr_token in ocr_tokens:
-            question.extend([ocr_token, self.vocab.sep_token])
+        if len(obj_list) > 0:
+            for obj in obj_list[:-1]:
+                question.extend([obj, self.vocab.sep_token] if "▁" not in obj else [obj])
+            question.extend([obj_list[-1]])
+
+        if len(ocr_tokens) > 0:
+            for ocr_token in ocr_tokens[:-1]:
+                question.extend([ocr_token, self.vocab.sep_token] if "▁" not in ocr_token else [ocr_token])
+            question.extend([ocr_tokens[-1]])
 
         return question
 
@@ -296,7 +303,7 @@ class T5OcrDictionaryDataset(OcrDictionaryDataset):
             image_id=image_id,
             filename=filename,
             image_size=img_size,
-            ocr_tokens=ocr_tokens,
+            ocr_tokens=features["ocr_texts"],
             question=" ".join(question),
             question_tokens=question_tokens,
             answers=answers

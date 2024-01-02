@@ -16,7 +16,6 @@ class T5OcrVocab(Vocab):
         This class is designed especially for VQA with reading comprehension
     '''
     def __init__(self, config):
-
         tokenizer: T5Tokenizer = T5Tokenizer.from_pretrained(config.PRETRAINED_NAME)
         tokenizer.add_special_tokens({
             "bos_token": "<s>",
@@ -39,6 +38,22 @@ class T5OcrVocab(Vocab):
         self.bos_idx = self.stoi[self.bos_token]
         self.eos_idx = self.stoi[self.eos_token]
         self.unk_idx = self.stoi[self.unk_token]
+
+        self.make_vocab([
+            config.JSON_PATH.TRAIN,
+            config.JSON_PATH.DEV,
+            config.JSON_PATH.TEST
+        ])
+
+    def make_vocab(self, json_dirs):
+        self.max_answer_length = 0
+        for json_dir in json_dirs:
+            json_data = json.load(open(json_dir))
+            for ann in json_data["annotations"]:
+                for answer in ann["answers"]:
+                    answer = preprocess_sentence(answer, self.tokenizer)
+                    if len(answer) + 2 > self.max_answer_length:
+                        self.max_answer_length = len(answer) + 2
     
     def encode_token(self, tokens: List[str]) -> torch.Tensor:
         encoded_tokens = []

@@ -88,8 +88,11 @@ class SAL(T5ForConditionalGeneration):
         if self.training:
             answer_tokens = items.answer_tokens
             shifted_right_answer_tokens = items.shifted_right_answer_tokens
-            bs, seq_len = answer_tokens.shape
-            decoder_attention_mask = _get_causal_mask(bs, seq_len, self.device)
+            shifted_right_answer_tokens[shifted_right_answer_tokens == self.vocab.padding_idx] = -100
+            answer_len = (items.answer_tokens != self.vocab.padding_idx).sum(dim=-1)
+            decoder_attention_mask = _get_mask(
+                answer_len, items.answer_tokens.shape[1]
+            )
         
             return super().forward(
                 inputs_embeds=fwd_results["mmt_in"],
@@ -99,10 +102,9 @@ class SAL(T5ForConditionalGeneration):
                 labels=shifted_right_answer_tokens
             )
 
-        bs = fwd_results["mmt_in"].shape[0]
         kwargs["encoder_outputs"] = None
         kwargs["attention_mask"] = fwd_results["mmt_mask"]
-        kwargs["decoder_attention_mask"] = _get_causal_mask(bs, 1, self.device)
+        kwargs["decoder_attention_mask"] = None
         return super().forward(
                 inputs_embeds=fwd_results["mmt_in"],
                 **kwargs

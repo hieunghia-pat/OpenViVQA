@@ -168,9 +168,9 @@ class InstanceList(OrderedDict):
                 continue
 
             if n_dims == 1:
-                padding_tensor = torch.zeros((additional_len, )).fill_(padding_value)
+                padding_tensor = torch.zeros((additional_len, )).fill_(padding_value).long()
             else:
-                padding_tensor = torch.zeros((additional_len, dim)).fill_(padding_value)
+                padding_tensor = torch.zeros((additional_len, dim)).fill_(padding_value).long()
             
             value = torch.cat([value, padding_tensor], dim=0)
             padded_values.append(value.unsqueeze(0))

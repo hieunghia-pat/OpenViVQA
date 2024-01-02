@@ -62,6 +62,7 @@ class Vocab(object):
             self.load_word_embeddings(build_word_embedding(config))
 
     def make_vocab(self, json_dirs):
+        self.max_answer_length = 0
         self.freqs = Counter()
         for json_dir in json_dirs:
             json_data = json.load(open(json_dir))
@@ -69,6 +70,8 @@ class Vocab(object):
                 for answer in ann["answers"]:
                     question = preprocess_sentence(ann["question"], self.tokenizer)
                     answer = preprocess_sentence(answer, self.tokenizer)
+                    if len(answer) + 2 > self.max_answer_length:
+                        self.max_answer_length = len(answer) + 2
                     self.freqs.update(question)
                     self.freqs.update(answer)
 

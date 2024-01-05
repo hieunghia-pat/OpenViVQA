@@ -52,7 +52,7 @@ class ScaledDotProductAttention(nn.Module):
 
         att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
         if attention_mask is not None:
-            att += attention_mask
+            att.mask_fill_(attention_mask, -torch.inf)
         att = torch.softmax(att, dim=-1)
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)

@@ -1,4 +1,5 @@
 .vector_cache
+*.log
 features
 annotations
 saved_models

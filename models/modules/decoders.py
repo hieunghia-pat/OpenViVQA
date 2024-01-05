@@ -16,7 +16,7 @@ class DecoderLayer(Module):
 
         self.self_attn = MultiHeadAttention(config.SELF_ATTENTION)
         self.enc_attn = MultiHeadAttention(config.ENC_ATTENTION)
-        self.pwff = PositionWiseFeedForward(config.ENC_ATTENTION)
+        self.pwff = PositionWiseFeedForward(config)
 
     def forward(self, queries, keys, values, self_attention_mask, enc_attention_mask, **kwargs):
         self_att = self.self_attn(queries, queries, queries, attention_mask=self_attention_mask, **kwargs)
@@ -37,14 +37,17 @@ class Decoder(Module):
         self.padding_idx = vocab.padding_idx
         self.N = config.LAYERS
 
-        self.word_emb = build_text_embedding(config.TEXT_EMBEDDING, vocab)
+        self.word_emb = build_text_embedding(config.TEXT_EMBEDDING, vocab) if config.TEXT_EMBEDDING is not None else None
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len=self.max_len+1,
                                                                             d_model=config.D_MODEL, padding_idx=0), freeze=True)
-        self.layers = ModuleList([DecoderLayer(config.ATTENTION) for _ in range(config.LAYERS)])
+        self.layers = ModuleList([DecoderLayer(config) for _ in range(config.LAYERS)])
         self.fc = nn.Linear(config.D_MODEL, len(vocab), bias=False)
 
         self.register_state('running_mask_self_attention', torch.zeros((1, 1, 0)).bool())
         self.register_state('running_seq', torch.zeros((1,)).long())
+
+    def set_word_emb(self, word_emb):
+        self.word_emb = word_emb
 
     def forward(self, answer_tokens: torch.Tensor, encoder_features: torch.Tensor, encoder_attention_mask: torch.Tensor):
         b_s, seq_len = answer_tokens.shape
@@ -88,7 +91,7 @@ class AdaptiveDecoder(Module):
         self.word_emb = build_text_embedding(config.TEXT_EMBEDDING)
         self.pos_emb = nn.Embedding.from_pretrained(sinusoid_encoding_table(max_len=self.max_len+1,
                                                                             d_model=config.D_MODEL, padding_idx=0), freeze=True)
-        self.layers = ModuleList([DecoderLayer(config.ATTENTION) if i < config.LAYERS else DecoderLayer(config.ADAPTIVE_ATTENTION) 
+        self.layers = ModuleList([DecoderLayer(config) if i < config.LAYERS else DecoderLayer(config.ADAPTIVE_ATTENTION) 
                                                 for i in range(config.LAYERS + 1)])
         self.fc = nn.Linear(config.D_MODEL, len(vocab), bias=False)
 

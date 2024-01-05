@@ -108,9 +108,7 @@ class OpenEndedTask(BaseTask):
         for it, items in enumerate(dataloader):
             start_moment = datetime.datetime.now()
             items = items.to(self.device)
-            with torch.no_grad():
-                results = self.model(items)
-            outs = results["scores"].argmax(dim=-1)
+            outs = self.model.generate(items)
 
             answers_gt = items.answers
             answers_gen = self.vocab.decode_answer(outs.contiguous(), 
@@ -237,9 +235,7 @@ class OpenEndedTask(BaseTask):
         self.logger.info(f"Epoch {self.epoch+1} - Evaluating")
         for it, items in enumerate(self.test_dict_dataloader):
             items = items.to(self.device)
-            with torch.no_grad():
-                result = self.model(items)
-            outs = result["scores"].argmax(dim=-1)
+            outs = self.model.generate(outs)
 
             answers_gt = items.answers
             answers_gen = self.vocab.decode_answer(

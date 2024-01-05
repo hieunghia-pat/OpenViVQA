@@ -3,48 +3,32 @@ TASK: TrainingHuggingFaceModels
 DATASET:
   FEATURE_DATASET:
     TYPE: T5OcrFeatureDataset
-    BATCH_SIZE: 32
+    BATCH_SIZE: 16
     WORKERS: 2
     FEATURE_PATH:
       FEATURES: annotations/vinvl_vinvl
       SCENE_TEXT: annotations/swintext_spotter
       IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.0
-    MAX_SCENE_TEXT: 100
+    SCENE_TEXT_THRESHOLD: 0.5
+    MAX_SCENE_TEXT: 32
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
     TYPE: T5OcrDictionaryDataset
-    BATCH_SIZE: 32
+    BATCH_SIZE: 16
     WORKERS: 2
     FEATURE_PATH:
       FEATURES: annotations/vinvl_vinvl
       SCENE_TEXT: annotations/swintext_spotter
       IMAGE: null
-    SCENE_TEXT_THRESHOLD: 0.0
-    MAX_SCENE_TEXT: 100
+    SCENE_TEXT_THRESHOLD: 0.5
+    MAX_SCENE_TEXT: 32
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   MIN_FREQ: 1
   VOCAB:
     TYPE: T5OcrVocab
     PRETRAINED_NAME: "VietAI/vit5-base"
-    TOKENIZER: null
-    WORD_EMBEDDING: null
-    WORD_EMBEDDING_CACHE: null
-    MIN_FREQ: 1
-    BOS_TOKEN: <bos>
-    EOS_TOKEN: <eos>
-    PAD_TOKEN: <pad>
-    UNK_TOKEN: <unk>
-    IMG_TOKEN: <img>
-    FEAT_TOKEN: <feat>
-    BOX_TOKEN: <box>
-    OCR_TOKEN: <ocr>
-    OCR_DET_TOKEN: <ocr_det>
-    OCR_REC_TOKEN: <ocr_rec>
-    QUESTION_TOKEN: <question>
-    ANSWER_TOKEN: <answer>
     JSON_PATH:
       TRAIN: annotations/ViTextVQA_train.json
       DEV: annotations/ViTextVQA_dev.json
@@ -78,6 +62,8 @@ MODEL:
   D_MODEL: 512
   BACKBONE:
     NAME: "VietAI/vit5-base"
+  EMBEDDING:
+
   OBJECT_EMBEDDING:
     D_FEATURE: 2048
     DROPOUT: .1
@@ -87,9 +73,6 @@ MODEL:
     D_FEATURE: 4
     D_MODEL: 512
     DROPOUT: .1
-  OCR_TEXT_EMBEDDING:
-    WORD_EMBEDDING: ViFastText
-    WORD_EMBEDDING_CACHE: null
   OCR_EMBEDDING:
     D_FEATURE: 512 # 256 (rec_features) + 256 (det_features)
     DROPOUT: .1
@@ -102,9 +85,26 @@ MODEL:
     HEAD: 8
     D_KEY: 64
     D_VALUE: 64
-  MMT:
-    HIDDEN_SIZE: 512
-    NUM_HIDDEN_LAYERS: 6
-    NUM_ATTENTION_HEADS: 8
-    D_FF: 2048
-    D_KV: 64
+  ENCODER:
+    D_MODEL: 512
+    LAYERS: 6
+    SELF_ATTENTION:
+      HEAD: 8
+      D_KEY: 64
+      D_VALUE: 64
+      D_MODEL: 512
+      USE_AOA: False
+      DROPOUT: 0.1
+      CAN_BE_STATEFUL: False
+  DECODER:
+    TEXT_EMBEDDING: null
+    SELF_ATTENTION:
+      D_MODEL: 512
+      USE_AOA: False
+      DROPOUT: 0.1
+      CAN_BE_STATEFUL: True
+    ENC_ATTENTION:
+      D_MODEL: 512
+      USE_AOA: False
+      DROPOUT: 0.1
+      CAN_BE_STATEFUL: False

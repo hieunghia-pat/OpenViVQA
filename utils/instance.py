@@ -54,6 +54,16 @@ class InstanceList(OrderedDict):
         if name.startswith("_"):
             super().__setattr__(name, val)
         else:
+            if isinstance(val, torch.Tensor) or isinstance(val, np.ndarray):
+                batch_size = val.shape[0]
+            elif isinstance(val, list) or isinstance(val, tuple):
+                batch_size = len(val)
+            else:
+                raise f"Value must be one of these types: torch.Tensor, np.ndarray, list, tuple, but got {type(val)}"
+            
+            if batch_size != self.batch_size:
+                raise "Batch size does not match"
+
             self.set(name, val)
 
     def __getattr__(self, name: str) -> Any:

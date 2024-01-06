@@ -143,9 +143,7 @@ class OpenEndedTask(BaseTask):
             start_moment = datetime.datetime.now()
             # forward pass
             items = items.to(self.device)
-            results = self.model(items)
-            out = results["scores"].contiguous()
-            out = F.log_softmax(out, dim=-1)
+            out = self.model(items).continuous
 
             # backward pass
             shifted_right_answer_tokens = items.shifted_right_answer_tokens

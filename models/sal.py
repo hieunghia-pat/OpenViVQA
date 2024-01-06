@@ -192,7 +192,7 @@ class SAL(Module):
             is_all_eos_tokens = torch.zeros(items.batch_size).long().to(self.device)
             for _ in range(self.max_iter):
                 logits = self.decoder(
-                    answer_tokens=tokens[:, -1],
+                    answer_tokens=tokens[:, -1].unsqueeze(-1),
                     encoder_features=encoder_features,
                     encoder_attention_mask=padding_mask
                 )

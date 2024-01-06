@@ -58,6 +58,7 @@ def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
     return subsequent_mask.unsqueeze(0).unsqueeze(0) # (1, 1, seq_len, seq_len)
 
 def generate_self_attention_masks(padding_masks: torch.Tensor, sequential_masks: torch.Tensor):
+    padding_masks = padding_masks.repeat(1, 1, sequential_masks.shape[-2], 1)
     self_attention_masks = torch.logical_or(padding_masks, sequential_masks)
     
     return self_attention_masks

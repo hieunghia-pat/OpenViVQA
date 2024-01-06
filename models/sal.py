@@ -23,6 +23,7 @@ class SAL(Module):
 
         self.config = config
         self.vocab = vocab
+        self.d_model = config.D_MODEL
         self.max_iter = self.vocab.max_answer_length
         self.device = config.DEVICE
 
@@ -30,7 +31,7 @@ class SAL(Module):
 
     def build(self):
         self._build_embedding(self.config.EMBEDDING)
-        self._build_obj_encoding(self.config.OBJ_EMBEDDING)
+        self._build_obj_encoding(self.config.OBJECT_EMBEDDING)
         self._build_ocr_encoding(self.config.OCR_EMBEDDING)
         self._build_encoder(self.config.ENCODER)
         self._build_decoder(self.config.DECODER)
@@ -44,7 +45,7 @@ class SAL(Module):
 
     def _build_obj_encoding(self, config):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
-            config.OBJ_DIM, 
+            config.D_FEATURE, 
             config.D_MODEL
         )
 
@@ -57,36 +58,36 @@ class SAL(Module):
 
     def _build_ocr_encoding(self, config):
         self.linear_ocr_feat_to_mmt_in = nn.Linear(
-            self.ocr_dim, 
-            self.config.hidden_size
+            config.D_FEATURE, 
+            config.D_MODEL
         )
 
         # OCR location feature: relative bounding box coordinates (4-dim)
-        self.linear_ocr_bbox_to_mmt_in = nn.Linear(4, self.config.hidden_size)
+        self.linear_ocr_bbox_to_mmt_in = nn.Linear(4, config.D_MODEL)
 
-        self.ocr_feat_layer_norm = T5LayerNorm(self.config.hidden_size)
-        self.ocr_bbox_layer_norm = T5LayerNorm(self.config.hidden_size)
-        self.ocr_text_layer_norm = T5LayerNorm(self.config.hidden_size)
-        self.ocr_drop = nn.Dropout(self.config.dropout_rate)
+        self.ocr_feat_layer_norm = T5LayerNorm(config.D_MODEL)
+        self.ocr_bbox_layer_norm = T5LayerNorm(config.D_MODEL)
+        self.ocr_text_layer_norm = T5LayerNorm(config.D_MODEL)
+        self.ocr_drop = nn.Dropout(config.DROPOUT)
 
-        # self.tss = TextSemanticSeparate(self.tss_config)
-        # self.tss_layer_norm = T5LayerNorm(self.config.hidden_size)
+        # self.tss = TextSemanticSeparate(config.TSS)
+        # self.tss_layer_norm = T5LayerNorm(config.D_MODEL)
 
-        # self.scp = SpatialCirclePosition(self.scp_config)
-        # self.scp_layer_norm = T5LayerNorm(self.config.hidden_size)
+        # self.scp = SpatialCirclePosition(config.SCP)
+        # self.scp_layer_norm = T5LayerNorm(config.D_MODEL)
 
     def _build_encoder(self, config):
         self.encoder = Encoder(config)
 
     def _build_decoder(self, config):
-        self.decoder = Decoder(config)
+        self.decoder = Decoder(config, self.vocab)
         self.decoder.set_word_emb(self.embedding)
         
     def _forward_question_embedding(self, items):
         # binary mask of valid text (question words) vs padding
         question_tokens = items.question_tokens
-        question_padding_mask = generate_padding_mask(question_tokens).to(self.device)
-        question_emb = self.shared(question_tokens)
+        question_padding_mask = generate_padding_mask(question_tokens, padding_idx=self.vocab.padding_idx).to(self.device)
+        question_emb = self.embedding(question_tokens)
 
         return question_emb, question_padding_mask
 
@@ -100,7 +101,7 @@ class SAL(Module):
             self.linear_obj_feat_to_mmt_in(obj_feat)
         ) + self.obj_bbox_layer_norm(
             self.linear_obj_bbox_to_mmt_in(obj_bbox)
-        ) + self.shared(obj_tag)
+        ) + self.embedding(obj_tag)
         obj_emb = self.obj_drop(obj_emb)
 
         obj_mask = generate_padding_mask(obj_emb, padding_idx=0).to(self.device)
@@ -111,6 +112,7 @@ class SAL(Module):
         ocr_rec = items.ocr_rec_features
         ocr_rec = F.normalize(ocr_rec, dim=-1)
 
+        ocr_det = items.ocr_det_features
         ocr_det = F.normalize(ocr_det, dim=-1)
 
         ocr_emb = torch.cat(
@@ -126,24 +128,24 @@ class SAL(Module):
         )
         
         ocr_text = items.ocr_tokens
-        ocr_text_emb = F.normalize(self.shared(ocr_text), dim=-1)
+        ocr_text_emb = F.normalize(self.embedding(ocr_text), dim=-1)
 
-        ocr_mask = generate_padding_mask(ocr_rec).to(self.device)
+        ocr_mask = generate_padding_mask(ocr_rec, padding_idx=0).to(self.device)
 
-        ocr_emb = self.tss_layer_norm(self.tss(
-                ocr_emb,
-                ocr_box_emb,
-                ocr_text_emb
-            )
-        )
+        # ocr_emb = self.tss_layer_norm(self.tss(
+        #         ocr_emb,
+        #         ocr_box_emb,
+        #         ocr_text_emb
+        #     )
+        # )
 
-        ocr_emb = self.scp_layer_norm(self.scp(
-                ocr_features=ocr_emb,
-                ocr_boxes=ocr_bbox, 
-                ocr_padding_masks=ocr_mask, 
-                image_sizes=items.image_size
-            )
-        )
+        # ocr_emb = self.scp_layer_norm(self.scp(
+        #         ocr_features=ocr_emb,
+        #         ocr_boxes=ocr_bbox, 
+        #         ocr_padding_masks=ocr_mask, 
+        #         image_sizes=items.image_size
+        #     )
+        # )
 
         return ocr_emb, ocr_mask
 
@@ -154,7 +156,7 @@ class SAL(Module):
         emb = torch.cat([
             question_emb, 
             obj_emb, 
-            ocr_emb], dim=-1)
+            ocr_emb], dim=1)
         mask = torch.cat([
             question_mask,
             obj_mask,

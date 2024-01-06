@@ -52,7 +52,7 @@ class ScaledDotProductAttention(nn.Module):
 
         att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
         if attention_mask is not None:
-            att.mask_fill_(attention_mask, -torch.inf)
+            att.masked_fill_(attention_mask, -torch.inf)
         att = torch.softmax(att, dim=-1)
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)
@@ -124,9 +124,9 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
         k = self.fc_k(keys).view(b_s, nk, self.h, self.d_k).permute(0, 2, 3, 1)  # (b_s, h, d_k, nk)
         v = self.fc_v(values).view(b_s, nk, self.h, self.d_v).permute(0, 2, 1, 3)  # (b_s, h, nk, d_v)
 
-        a = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
+        score = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
         if attention_mask is not None:
-            att += attention_mask
+           score.masked_fill_(attention_mask)
 
         g = relative_geometry_weights
         mn = torch.log(torch.clamp(g, min = 1e-6)) + a
@@ -200,7 +200,7 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
 
         att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (b_s, h, nq, nk)
         if attention_mask is not None:
-            att[:, :, :, :nk] = att[:, :, :, :nk] + attention_mask
+            att[:, :, :, :nk].masked_fill_(attention_mask)
         att = torch.softmax(att, -1)
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.h * self.d_v)  # (b_s, nq, h*d_v)
         out = self.fc_o(out)  # (b_s, nq, d_model)

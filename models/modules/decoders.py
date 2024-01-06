@@ -16,7 +16,7 @@ class DecoderLayer(Module):
 
         self.self_attn = MultiHeadAttention(config.SELF_ATTENTION)
         self.enc_attn = MultiHeadAttention(config.ENC_ATTENTION)
-        self.pwff = PositionWiseFeedForward(config)
+        self.pwff = PositionWiseFeedForward(config.PFF)
 
     def forward(self, queries, keys, values, self_attention_mask, enc_attention_mask, **kwargs):
         self_att = self.self_attn(queries, queries, queries, attention_mask=self_attention_mask, **kwargs)
@@ -65,7 +65,7 @@ class Decoder(Module):
             self.running_seq.add_(1)
             seq = self.running_seq
 
-        embedded_answers, _ = self.word_emb(answer_tokens)
+        embedded_answers = self.word_emb(answer_tokens)
         out = embedded_answers + self.pos_emb(seq)
         for layer in self.layers:
             out = layer(queries=out, 

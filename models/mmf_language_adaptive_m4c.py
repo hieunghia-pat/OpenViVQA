@@ -8,12 +8,12 @@ from transformers.models.bert.modeling_bert import (
     BertPreTrainedModel
 )
 from transformers import AutoModel, AutoTokenizer
-
-from utils.logging_utils import setup_logger
-from builders.model_builder import META_ARCHITECTURE
 from .mmf_m4c import OcrPtrNet, MMT
 
-logger = setup_logger()
+from utils.logging_utils import Logger
+from builders.model_builder import META_ARCHITECTURE
+
+logger = Logger("mmf_adaptive_m4c.log")
 def _get_mask(nums, max_num):
     # non_pad_mask: b x lq, torch.float32, 0. on PAD
     batch_size = nums.size(0)

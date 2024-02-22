@@ -14,7 +14,7 @@ def normalize_text(text):
     return text
 
 def compute_scores(gts, gen):
-    metrics = (Bleu(), Meteor(), Rouge(), Cider(), Accuracy(), Precision(), Recall(), F1())
+    metrics = (Bleu(), Rouge(), Cider(), Accuracy(), Precision(), Recall(), F1())
     all_score = {}
     all_scores = {}
     normalized_gts = {key: [normalize_text(value[0])] for key, value in gts.items()}

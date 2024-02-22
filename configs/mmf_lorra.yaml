@@ -10,12 +10,13 @@ DATASET:
       SCENE_TEXT: data/swintext_spotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.3
-    MAX_SCENE_TEXT: 50
+    MAX_SCENE_TEXT: 32
+    SORT_TYPE: top-left bottom-right #score or top-left bottom-right
   VOCAB:
     TYPE: OcrClassificationVocab
     TOKENIZER: null
     SCENE_TEXT_THRESHOLD: 0.3
-    MAX_SCENE_TEXT: 50
+    MAX_SCENE_TEXT: 32
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
     MIN_FREQ: 1
@@ -42,11 +43,18 @@ DATASET:
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
-  LEARNING_RATE: 0.01
+  LEARNING_RATE: 0.0001
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
-  SCORE: Accuracy
+  SCORE: F1
+  ITER_TO_VERBOSE: 30
+  VERBOSE_SCORES:
+    - Accuracy
+    - F1
+    - CIDEr
   GET_SCORES: True
+  TRAINING_BEAM_SIZE: 1
+  EVALUATING_BEAM_SIZE: 3
   PATIENCE: 5
 
 MODEL:
@@ -55,7 +63,7 @@ MODEL:
   DEVICE: cuda
   D_MODEL: 512
   SCENE_TEXT_THRESHOLD: 0.3
-  MAX_SCENE_TEXT: 50
+  MAX_SCENE_TEXT: 32
   OBJECT_EMBEDDING:
     D_FEATURE: 2048
     DROPOUT: .1
@@ -69,7 +77,7 @@ MODEL:
     D_FEATURE: 300 # (fasttext)
     DROPOUT: .1
   TEXT_EMBEDDING:
-    ARCHITECTURE: UsualEmbedding
+    ARCHITECTURE: LSTMTextEmbedding
     DEVICE: cuda
     D_EMBEDDING: 300
     D_MODEL: 512

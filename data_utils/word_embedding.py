@@ -8,9 +8,9 @@ from data_utils.utils import reporthook, unk_init
 import zipfile
 
 from builders.word_embedding_builder import META_WORD_EMBEDDING
-from utils.logging_utils import setup_logger
+from utils.logging_utils import Logger
 
-logger = setup_logger()
+logger = Logger("word_embedding.log")
 
 def _infer_shape(f):
     num_lines, vector_dim = 0, None

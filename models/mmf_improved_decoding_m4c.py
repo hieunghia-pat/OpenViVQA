@@ -12,10 +12,10 @@ from transformers.models.bert.modeling_bert import (
     BertPreTrainedModel,
 )
 
-from utils.logging_utils import setup_logger
+from utils.logging_utils import Logger
 from builders.model_builder import META_ARCHITECTURE
 
-logger = setup_logger()
+logger = Logger("mmf_improved_decoding_m4c.log")
 
 @META_ARCHITECTURE.register()
 class MMF_ImprovedDecodingM4C(nn.Module):

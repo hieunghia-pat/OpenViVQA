@@ -12,12 +12,14 @@ from pytorch_transformers.modeling_bert import (
     BertPreTrainedModel,
 )
 
-from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
 from builders.text_embedding_builder import build_text_embedding
 from builders.encoder_builder import build_encoder
+from utils.logging_utils import Logger
+from builders.model_builder import META_ARCHITECTURE
 
-logger = setup_logger()
+logger = Logger("experimental_mmf_m4c_multilevel.log")
+
 
 @META_ARCHITECTURE.register()
 class experimental_MMF_M4C(nn.Module):

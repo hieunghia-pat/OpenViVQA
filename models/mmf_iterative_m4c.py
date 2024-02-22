@@ -9,14 +9,16 @@ from torch.nn import functional as F
 from .mmf_regional_m4c import PrevPredEmbeddings
 from .mmf_m4c import OcrPtrNet
 from builders.model_builder import META_ARCHITECTURE
-from utils.logging_utils import setup_logger
 from models.modules.text_embeddings import TextRoberta,TextBert
 from transformers.models.bert.modeling_bert import (
     BertConfig, 
     BertEncoder,
     BertPreTrainedModel
 )
-logger = setup_logger()
+from utils.logging_utils import Logger
+from builders.model_builder import META_ARCHITECTURE
+
+logger = Logger("mmf_iterative_m4c.log")
 
 def _get_mask(nums, max_num):
     # non_pad_mask: b x lq, torch.float32, 0. on PAD

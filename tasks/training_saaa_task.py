@@ -1,9 +1,6 @@
-from utils.logging_utils import setup_logger
 from .open_ended_task import OpenEndedTask
 from builders.task_builder import META_TASK
 from evaluation import Cider
-
-logger = setup_logger()
 
 @META_TASK.register()
 class TrainingSAAATask(OpenEndedTask):

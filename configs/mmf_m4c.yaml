@@ -6,11 +6,12 @@ DATASET:
     BATCH_SIZE: 64
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: data/vinvl_vinvl
-      SCENE_TEXT: data/swintext_spotter
+      FEATURES: data/obj_feature_bf
+      SCENE_TEXT: data/ocr_feature_bf
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
+    SORT_TYPE: score #score or top-left bottom right
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
@@ -18,11 +19,12 @@ DATASET:
     BATCH_SIZE: 64
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: data/vinvl_vinvl
-      SCENE_TEXT: data/swintext_spotter
+      FEATURES: data/obj_feature_bf
+      SCENE_TEXT: data/ocr_feature_bf
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
+    SORT_TYPE: score #score or top-left bottom right
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   MIN_FREQ: 1
@@ -56,10 +58,11 @@ DATASET:
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
-  LEARNING_RATE: 2.0e-5
+  LEARNING_RATE: 1
   RL_LEARNING_RATE: 0.000005
   WARMUP: 10000
   SCORE: Accuracy
+  ITER_TO_VERBOSE: 30
   VERBOSE_SCORES:
     - Accuracy
     - F1
@@ -110,6 +113,6 @@ MODEL:
     D_MODEL: 768
     DROPOUT: .1
     LOAD_PRETRAINED: True
-    FREEZE_WEIGHTS: False
+    FREEZE_WEIGHTS: True
     PRETRAINED_NAME: "bert-base-multilingual-cased"
     DEVICE: cuda

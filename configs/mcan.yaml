@@ -6,7 +6,7 @@ DATASET:
     BATCH_SIZE: 64
     WORKERS: 2
     FEATURE_PATH:
-      FEATURES: features/OpenViVQA/features/x152++_faster_rcnn
+      FEATURES: data/vinvl_vinvl
       SCENE_TEXT: null
       IMAGE: null
   VOCAB:
@@ -25,19 +25,27 @@ DATASET:
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
     JSON_PATH:
-      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
-      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
-      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+      TRAIN: data/train.json
+      DEV: data/dev.json
+      TEST: data/test.json
   JSON_PATH:
-    TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
-    DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
-    TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+    TRAIN: data/train.json
+    DEV: data/dev.json
+    TEST: data/test.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
   LEARNING_RATE: 1.
   WARMUP: 10000
-  SCORE: CIDEr
+  SCORE: Accuracy
+  ITER_TO_VERBOSE: 30
+  VERBOSE_SCORES:
+    - Accuracy
+    - F1
+    - BLEU
+    - METEOR
+    - ROUGE
+    - CIDEr
   GET_SCORES: True
   TRAINING_BEAM_SIZE: 5
   EVALUATING_BEAM_SIZE: 3
@@ -50,7 +58,7 @@ MODEL:
   D_MODEL: 512
   VISION_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
-    D_FEATURE: 1024
+    D_FEATURE: 2048
     D_MODEL: 512
     DROPOUT: 0.1
   TEXT_EMBEDDING:

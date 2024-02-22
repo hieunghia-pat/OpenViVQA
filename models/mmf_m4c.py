@@ -12,10 +12,10 @@ from transformers.models.bert.modeling_bert import (
     BertPreTrainedModel,
 )
 
-from utils.logging_utils import setup_logger
+from utils.logging_utils import Logger
 from builders.model_builder import META_ARCHITECTURE
 
-logger = setup_logger()
+logger = Logger("mmf_m4c.log")
 
 @META_ARCHITECTURE.register()
 class MMF_M4C(nn.Module):
@@ -54,11 +54,12 @@ class MMF_M4C(nn.Module):
             self.text_bert = TextBert.from_pretrained(
                 self.config.TEXT_BERT.PRETRAINED_NAME, config=self.text_bert_config
             )
-            if self.config.TEXT_BERT.FREEZE_WEIGHTS:
-                for param in self.text_bert.parameters():
-                    param.requires_grad = False
         else:
             self.text_bert = TextBert(self.text_bert_config)
+        
+        if self.config.TEXT_BERT.FREEZE_WEIGHTS:
+            for param in self.text_bert.parameters():
+                param.requires_grad = False
 
         # if the text bert output dimension doesn't match the
         # multimodal transformer (mmt) hidden dimension,

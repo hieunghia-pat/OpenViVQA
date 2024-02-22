@@ -5,7 +5,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import LambdaLR
 from builders.vocab_builder import build_vocab
 
-from utils.logging_utils import setup_logger
+from utils.logging_utils import Logger
 from builders.model_builder import build_model
 
 import os
@@ -13,35 +13,34 @@ import numpy as np
 import pickle
 import random
 
-logger = setup_logger()
-
 class BaseTask:
     def __init__(self, config):
+        self.logger = Logger("task.log")
 
         self.checkpoint_path = os.path.join(config.TRAINING.CHECKPOINT_PATH, config.MODEL.NAME)
         if not os.path.isdir(self.checkpoint_path):
-            logger.info("Creating checkpoint path")
+            self.logger.info("Creating checkpoint path")
             os.makedirs(self.checkpoint_path)
 
         if not os.path.isfile(os.path.join(self.checkpoint_path, "vocab.bin")):
-            logger.info("Creating vocab")
+            self.logger.info("Creating vocab")
             self.vocab = self.load_vocab(config.DATASET.VOCAB)
-            logger.info("Saving vocab to %s" % os.path.join(self.checkpoint_path, "vocab.bin"))
+            self.logger.info("Saving vocab to %s" % os.path.join(self.checkpoint_path, "vocab.bin"))
             pickle.dump(self.vocab, open(os.path.join(self.checkpoint_path, "vocab.bin"), "wb"))
         else:
-            logger.info("Loading vocab from %s" % os.path.join(self.checkpoint_path, "vocab.bin"))
+            self.logger.info("Loading vocab from %s" % os.path.join(self.checkpoint_path, "vocab.bin"))
             self.vocab = pickle.load(open(os.path.join(self.checkpoint_path, "vocab.bin"), "rb"))
 
-        logger.info("Loading data")
+        self.logger.info("Loading data")
         self.load_datasets(config.DATASET)
         self.create_dataloaders(config)
 
-        logger.info("Building model")
+        self.logger.info("Building model")
         self.model = build_model(config.MODEL, self.vocab)
         self.config = config
         self.device = torch.device(config.MODEL.DEVICE)
 
-        logger.info("Defining optimizer and objective function")
+        self.logger.info("Defining optimizer and objective function")
         self.configuring_hyperparameters(config)
         self.optim = Adam(self.model.parameters(), lr=config.TRAINING.LEARNING_RATE, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)
@@ -79,7 +78,7 @@ class BaseTask:
         if not os.path.exists(fname):
             return None
 
-        logger.info("Loading checkpoint from %s", fname)
+        self.logger.info("Loading checkpoint from %s", fname)
 
         checkpoint = torch.load(fname)
 
@@ -90,7 +89,7 @@ class BaseTask:
 
         self.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
-        logger.info("Resuming from epoch %s", checkpoint['epoch'])
+        self.logger.info("Resuming from epoch %s", checkpoint['epoch'])
 
         return checkpoint
 

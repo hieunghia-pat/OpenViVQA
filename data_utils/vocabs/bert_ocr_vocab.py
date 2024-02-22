@@ -10,6 +10,7 @@ from typing import List, Dict
 import numpy as np
 import json
 import re
+from collections import defaultdict
 
 @META_VOCAB.register()
 class BertOcrVocab(OcrVocab):
@@ -23,7 +24,7 @@ class BertOcrVocab(OcrVocab):
 
         self.padding_token = tokenizer.pad_token
         self.bos_token = tokenizer.sep_token
-        self.eos_token = tokenizer.sep_token
+        self.eos_token = tokenizer.cls_token
         self.unk_token = tokenizer.unk_token
 
         self.make_vocab([
@@ -73,6 +74,25 @@ class BertOcrVocab(OcrVocab):
                             self.max_question_length = len(question) + 2
                     if len(answer) + 2 > self.max_answer_length:
                         self.max_answer_length = len(answer) + 2
+
+    def encode_answer(self, answer: List[str], ocr_tokens: List[str]) -> torch.Tensor:
+        '''
+            Turn a answer into a vector of indices and a question length
+        '''
+        assert isinstance(answer, list), f"answer must be a list of strings, get answer is of type {type(answer)}"
+
+        # match answers to fixed vocabulary and OCR tokens
+        ocr_tokens = {len(self.stoi)+idx: token for idx, token in enumerate(ocr_tokens)}
+        ocr2inds = defaultdict(list)
+        for idx, token in ocr_tokens.items():
+            ocr2inds[token].append(idx)
+        answer = self.match_text_to_indices(answer, ocr2inds)
+
+        vec = torch.ones(self.max_answer_length).long() * self.padding_idx
+        for ith, idx in enumerate([self.bos_idx] + answer + [self.eos_idx]):
+            vec[ith] = idx
+
+        return vec
 
     def decode_answer(self, answer_vecs: torch.Tensor, list_ocr_tokens: List[List[str]], join_words=True) -> List[str]:
         '''

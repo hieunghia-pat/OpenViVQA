@@ -15,11 +15,9 @@ from models.modules.SCP import SpatialCirclePosition
 logger = Logger()
 
 @META_ARCHITECTURE.register()
-class MMF_SAL(nn.Module):
+class MMF_SAL(T5ForConditionalGeneration):
     def __init__(self, config, vocab):
-        super().__init__()
-
-        self.t5_config = T5Config(
+        t5_config = T5Config(
             vocab_size=len(vocab),
             d_model=config.D_MODEL,
             num_layers=config.MMT.NUM_HIDDEN_LAYERS,
@@ -30,121 +28,54 @@ class MMF_SAL(nn.Module):
             pad_token_id=vocab.padding_idx,
             eos_token_id=vocab.eos_idx
         )
-        
-        self.config = config
+
+        super().__init__(t5_config)
 
         self.vocab = vocab
-        self.d_model = self.t5_config.hidden_size
         self.max_iter = vocab.max_answer_length
-        self.device = config.DEVICE
+        self.object_dim = config.OBJECT_EMBEDDING.D_FEATURE
+        self.ocr_dim = config.OCR_EMBEDDING.D_FEATURE
+        self.tts_config = config.TTS
+        self.scp_config = config.SCP
 
         self.build()
-        self.init_weights()
-
-    def init_weights(self):
-        self.apply(self._initialize_weights)
-
-    def _initialize_weights(self, module):
-        """Initialize the weights"""
-        factor = self.t5_config.initializer_factor  # Used for testing weights initialization
-        if isinstance(module, T5LayerNorm):
-            module.weight.data.fill_(factor * 1.0)
-        elif isinstance(module, T5ClassificationHead):
-            module.dense.weight.data.normal_(mean=0.0, std=factor * ((self.t5_config.d_model) ** -0.5))
-            if hasattr(module.dense, "bias") and module.dense.bias is not None:
-                module.dense.bias.data.zero_()
-            module.out_proj.weight.data.normal_(mean=0.0, std=factor * ((self.t5_config.d_model) ** -0.5))
-            if hasattr(module.out_proj, "bias") and module.out_proj.bias is not None:
-                module.out_proj.bias.data.zero_()
-        elif isinstance(module, T5DenseActDense):
-            # Mesh TensorFlow FF initialization
-            # See https://github.com/tensorflow/mesh/blob/master/mesh_tensorflow/transformer/transformer_layers.py#L56
-            # and https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/layers.py#L89
-            module.wi.weight.data.normal_(mean=0.0, std=factor * ((self.t5_config.d_model) ** -0.5))
-            if hasattr(module.wi, "bias") and module.wi.bias is not None:
-                module.wi.bias.data.zero_()
-            module.wo.weight.data.normal_(mean=0.0, std=factor * ((self.t5_config.d_ff) ** -0.5))
-            if hasattr(module.wo, "bias") and module.wo.bias is not None:
-                module.wo.bias.data.zero_()
-        elif isinstance(module, T5DenseGatedActDense):
-            module.wi_0.weight.data.normal_(mean=0.0, std=factor * ((self.t5_config.d_model) ** -0.5))
-            if hasattr(module.wi_0, "bias") and module.wi_0.bias is not None:
-                module.wi_0.bias.data.zero_()
-            module.wi_1.weight.data.normal_(mean=0.0, std=factor * ((self.t5_config.d_model) ** -0.5))
-            if hasattr(module.wi_1, "bias") and module.wi_1.bias is not None:
-                module.wi_1.bias.data.zero_()
-            module.wo.weight.data.normal_(mean=0.0, std=factor * ((self.t5_config.d_ff) ** -0.5))
-            if hasattr(module.wo, "bias") and module.wo.bias is not None:
-                module.wo.bias.data.zero_()
-        elif isinstance(module, T5Attention):
-            # Mesh TensorFlow attention initialization to avoid scaling before softmax
-            # See https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/transformer/attention.py#L136
-            d_model = self.t5_config.d_model
-            key_value_proj_dim = self.t5_config.d_kv
-            n_heads = self.t5_config.num_heads
-            module.q.weight.data.normal_(mean=0.0, std=factor * ((d_model * key_value_proj_dim) ** -0.5))
-            module.k.weight.data.normal_(mean=0.0, std=factor * (d_model**-0.5))
-            module.v.weight.data.normal_(mean=0.0, std=factor * (d_model**-0.5))
-            module.o.weight.data.normal_(mean=0.0, std=factor * ((n_heads * key_value_proj_dim) ** -0.5))
-            if module.has_relative_attention_bias:
-                module.relative_attention_bias.weight.data.normal_(mean=0.0, std=factor * ((d_model) ** -0.5))
 
     def build(self):
-        self.shared = nn.Embedding(self.t5_config.vocab_size, self.t5_config.d_model)
-        
         self._build_obj_encoding()
         self._build_ocr_encoding()
-        self._build_encoder()
-        self._build_decoder()
-
-        self.vocab_proj = nn.Sequential(
-            nn.Linear(self.config.D_MODEL, self.vocab.size()),
-            nn.Dropout()
-        )
 
     def _build_obj_encoding(self):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
-            self.config.OBJECT_EMBEDDING.D_FEATURE, 
-            self.t5_config.hidden_size
+            self.object_dim, 
+            self.config.hidden_size
         )
 
         # object location feature: relative bounding box coordinates (4-dim)
-        self.linear_obj_bbox_to_mmt_in = nn.Linear(4, self.t5_config.hidden_size)
+        self.linear_obj_bbox_to_mmt_in = nn.Linear(4, self.config.hidden_size)
 
-        self.obj_feat_layer_norm = T5LayerNorm(self.t5_config.hidden_size)
-        self.obj_bbox_layer_norm = T5LayerNorm(self.t5_config.hidden_size)
-        self.obj_drop = nn.Dropout(self.config.OBJECT_EMBEDDING.DROPOUT)
+        self.obj_feat_layer_norm = T5LayerNorm(self.config.hidden_size)
+        self.obj_bbox_layer_norm = T5LayerNorm(self.config.hidden_size)
+        self.obj_drop = nn.Dropout(self.config.dropout_rate)
 
     def _build_ocr_encoding(self):
         self.linear_ocr_feat_to_mmt_in = nn.Linear(
-            self.config.OCR_EMBEDDING.D_FEATURE, 
-            self.t5_config.hidden_size
+            self.ocr_dim, 
+            self.config.hidden_size
         )
 
         # OCR location feature: relative bounding box coordinates (4-dim)
-        self.linear_ocr_bbox_to_mmt_in = nn.Linear(4, self.t5_config.hidden_size)
+        self.linear_ocr_bbox_to_mmt_in = nn.Linear(4, self.config.hidden_size)
 
-        self.ocr_feat_layer_norm = T5LayerNorm(self.t5_config.hidden_size)
-        self.ocr_bbox_layer_norm = T5LayerNorm(self.t5_config.hidden_size)
-        self.ocr_text_layer_norm = T5LayerNorm(self.t5_config.hidden_size)
-        self.ocr_drop = nn.Dropout(self.config.OCR_EMBEDDING.DROPOUT)
+        self.ocr_feat_layer_norm = T5LayerNorm(self.config.hidden_size)
+        self.ocr_bbox_layer_norm = T5LayerNorm(self.config.hidden_size)
+        self.ocr_text_layer_norm = T5LayerNorm(self.config.hidden_size)
+        self.ocr_drop = nn.Dropout(self.config.dropout_rate)
 
-        self.tss = TextSemanticSeparate(self.config.TSS)
-        self.scp = SpatialCirclePosition(self.config.SCP)
+        self.tss = TextSemanticSeparate(self.tts_config)
+        self.tss_layer_norm = T5LayerNorm(self.config.hidden_size)
 
-    def _build_encoder(self):
-        encoder_config = deepcopy(self.t5_config)
-        encoder_config.is_decoder = False
-        encoder_config.use_cache = False
-        encoder_config.is_encoder_decoder = False
-        self.encoder = T5Stack(encoder_config, self.shared)
-
-    def _build_decoder(self):
-        decoder_config = deepcopy(self.t5_config)
-        decoder_config.is_decoder = True
-        decoder_config.is_encoder_decoder = False
-        decoder_config.num_layers = self.t5_config.num_decoder_layers
-        self.decoder = T5Stack(decoder_config, self.shared)
+        self.scp = SpatialCirclePosition(self.scp_config)
+        self.scp_layer_norm = T5LayerNorm(self.config.hidden_size)
 
     def forward(self, items):
         if self.training:
@@ -197,14 +128,17 @@ class MMF_SAL(nn.Module):
         fwd_results["obj_mask"] = _get_mask(obj_nums, obj_mmt_in.size(1))
 
     def _forward_ocr_embedding(self, items, fwd_results):
-        # OCR rec feature (256-dim) extracted from swintextspotter
+        # OCR rec feature (256-dim), replace the OCR PHOC features, extracted from swintextspotter
         ocr_phoc = items.ocr_rec_features
         ocr_phoc = F.normalize(ocr_phoc, dim=-1)
-        assert ocr_phoc.size(-1) == 256
 
         # OCR appearance feature, extracted from swintextspotter
-        ocr_feat = items.ocr_det_features + items.ocr_rec_features
-        ocr_feat = F.normalize(ocr_feat, dim=-1)
+        ocr_fc = items.ocr_det_features
+        ocr_fc = F.normalize(ocr_fc, dim=-1)
+
+        ocr_feat = torch.cat(
+            [ocr_phoc, ocr_fc], dim=-1
+        )
         ocr_emb = self.ocr_feat_layer_norm(
             self.linear_ocr_feat_to_mmt_in(ocr_feat)
         )
@@ -215,24 +149,24 @@ class MMF_SAL(nn.Module):
         )
         
         ocr_text = items.ocr_tokens.long()
-        ocr_text_emb = self.shared(ocr_text)
+        ocr_text_emb = F.normalize(self.shared(ocr_text), dim=-1)
 
         # binary mask of valid OCR vs padding
-        ocr_nums = (ocr_emb.sum(dim=-1) != 0).sum(dim=-1)
+        ocr_nums = (items.ocr_det_features.sum(dim=-1) != 0).sum(dim=-1)
         ocr_mask = _get_mask(ocr_nums, ocr_emb.size(1))
 
-        ocr_tss = self.tss(
+        ocr_tss = self.tss_layer_norm(self.tss(
             ocr_emb,
             ocr_box_emb,
             ocr_text_emb
-        )
+        ))
 
-        ocr_scp, _ = self.scp(
+        ocr_scp = self.scp_layer_norm(self.scp(
             ocr_features=ocr_tss,
             ocr_boxes=ocr_bbox, 
             ocr_padding_masks=ocr_mask, 
             image_sizes=items.image_size
-        )
+        ))
 
         fwd_results["ocr_mmt_in"] = ocr_scp
         fwd_results["ocr_mask"] = ocr_mask
@@ -286,7 +220,7 @@ class MMF_SAL(nn.Module):
 
         # greedy decoding at test time
         last_ids = torch.zeros((items.batch_size, )).to(self.device)
-        for ith in range(1, self.vocab.max_answer_length):
+        for ith in range(1, self.max_iter):
             bs, seq_len = fwd_results["prev_inds"].shape
 
             answer_lens = (fwd_results["prev_inds"] != self.vocab.padding_idx).sum(dim=-1)

@@ -39,10 +39,10 @@ class ViTmBERTGeneration(BaseTransformer):
         return F.log_softmax(out, dim=-1)
 
     def encoder_forward(self, inputs: Instance):
-        features = inputs.grid_features
+        images = inputs.image
         questions = inputs.question
 
-        vision_features, vision_padding_mask = self.vision_encoder(features)
+        vision_features, vision_padding_mask = self.vision_encoder(images)
         text_features, text_padding_mask = self.text_embedding(questions)
 
         fused_features = torch.cat([vision_features, text_features], dim=1)

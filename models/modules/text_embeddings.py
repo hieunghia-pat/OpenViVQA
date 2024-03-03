@@ -6,6 +6,8 @@ from builders.text_embedding_builder import META_TEXT_EMBEDDING
 from builders.word_embedding_builder import build_word_embedding
 from models.utils import generate_sequential_mask, generate_padding_mask
 
+from transformers import AutoTokenizer
+
 from transformers.models.bert.modeling_bert import (
     BertConfig,
     BertEmbeddings,
@@ -47,6 +49,11 @@ from transformers import (
     RobertaTokenizer,
     DebertaTokenizer,
     XLMTokenizer
+)
+
+from transformers.models.t5.modeling_t5 import (
+    T5Config,
+    T5ForConditionalGeneration
 )
 
 from typing import Dict, List
@@ -564,6 +571,42 @@ class XLMRobertaEmbedding(nn.Module):
         inputs = self.tokenizer(questions, return_tensors="pt", padding=True).input_ids.to(self.device)
         padding_mask = generate_padding_mask(inputs, padding_idx=self.tokenizer.pad_token_id)
         features = self.embedding(inputs, padding_mask)
+
+        out = self.proj(features)
+        out = self.dropout(self.gelu(out))
+
+        return out, padding_mask
+
+@META_TEXT_EMBEDDING.register()
+class T5Embedding(nn.Module):
+    def __init__(self, config, vocab):
+        super().__init__()
+
+        self.device = config.DEVICE
+
+        self.tokenizer = AutoTokenizer.from_pretrained(config.PRETRAINED_NAME)
+        if config.LOAD_PRETRAINED:
+            self.embedding = T5ForConditionalGeneration.from_pretrained(config.PRETRAINED_NAME)
+        else:
+            t5_config = T5Config(
+                hidden_size=config.D_MODEL,
+                num_hidden_layers=config.NUM_HIDDEN_LAYERS,
+                num_attention_heads=config.NUM_ATTENTION_HEADS
+            )
+            self.embedding = T5ForConditionalGeneration(t5_config)
+        if config.FREEZE_WEIGHTS:
+            # freeze all parameters of pretrained model
+            for param in self.embedding.parameters():
+                param.requires_grad = False
+
+        self.proj = nn.Linear(self.embedding.model_dim, config.D_MODEL)
+        self.gelu = nn.GELU()
+        self.dropout = nn.Dropout(config.DROPOUT)
+
+    def forward(self, questions: List[str]):
+        inputs = self.tokenizer(questions, return_tensors="pt", padding=True).input_ids.to(self.device)
+        padding_mask = generate_padding_mask(inputs, padding_idx=self.tokenizer.pad_token_id)
+        features = self.embedding(inputs, padding_mask.squeeze(1).squeeze(1))
 
         out = self.proj(features)
         out = self.dropout(self.gelu(out))

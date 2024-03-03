@@ -3,23 +3,23 @@ TASK: VlspEvjVqaTask
 DATASET:
   FEATURE_DATASET:
     TYPE: MultilingualImageQuestionDataset
-    BATCH_SIZE: 60
-    WORKERS: 0
+    BATCH_SIZE: 16
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: null
       SCENE_TEXT: null
-      IMAGE: features/EVJVQA/images
+      IMAGE: data/images
     SCENE_TEXT_THRESHOLD: 0.3
   DICT_DATASET:
     TYPE: MultilingualImageQuestionDictionaryDataset
-    BATCH_SIZE: 60
-    WORKERS: 0
+    BATCH_SIZE: 16
+    WORKERS: 2
     FEATURE_PATH:
       FEATURES: null
       SCENE_TEXT: null
-      IMAGE: features/EVJVQA/images
+      IMAGE: data/images
     SCENE_TEXT_THRESHOLD: 0.3
-  MIN_FREQ: 1
+  MIN_FREQ: 2
   VOCAB:
     TYPE: VlspEvjVqaVocab
     TOKENIZER: null
@@ -30,15 +30,17 @@ DATASET:
     PAD_TOKEN: <pad>
     UNK_TOKEN: <unk>
     USE_MAPPING: False
+    MIN_FREQ: 2
     JSON_PATH:
-      TRAIN: features/OpenViVQA/annotations/OpenViVQA_train.json
-      DEV: features/OpenViVQA/annotations/OpenViVQA_dev.json
-      TEST: features/OpenViVQA/annotations/OpenViVQA_test.json
+      TRAIN: data/evjvqa_train.json
+      DEV: data/evjvqa_dev.json
+      PUBLIC_TEST: data/evjvqa_public_test.json
+      PRIVATE_TEST: data/evjvqa_private_test.json
   JSON_PATH:
-    TRAIN: features/EVJVQA/annotations/evjvqa_train.json
-    DEV: features/EVJVQA/annotations/evjvqa_dev.json
-    PUBLIC_TEST: features/EVJVQA/annotations/evjvqa_public_test.json
-    PRIVATE_TEST: features/EVJVQA/annotations/evjvqa_private_test.json
+    TRAIN: data/evjvqa_train.json
+    DEV: data/evjvqa_dev.json
+    PUBLIC_TEST: data/evjvqa_public_test.json
+    PRIVATE_TEST: data/evjvqa_private_test.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -65,7 +67,8 @@ MODEL:
     ARCHITECTURE: T5Embedding
     PRETRAINED_NAME: google/mt5-small
     DEVICE: cuda
-    D_PRETRAINED_FEATURE: 512
+    LOAD_PRETRAINED: True
+    FREEZE_WEIGHTS: True
     D_MODEL: 512
     DROPOUT: .1
   D_MODEL: 512
@@ -74,29 +77,28 @@ MODEL:
     ARCHITECTURE: Decoder
     D_MODEL: 512
     LAYERS: 3
-    ATTENTION:
-      SELF_ATTENTION:
-        ARCHITECTURE: ScaledDotProductAttention
-        HEAD: 8
-        D_MODEL: 512
-        D_KEY: 64
-        D_VALUE: 64
-        D_FF: 2048
-        D_FEATURE: 2048
-        USE_AOA: False
-        CAN_BE_STATEFUL: True
-        DROPOUT: .1
-      ENC_ATTENTION:
-        ARCHITECTURE: ScaledDotProductAttention
-        HEAD: 8
-        D_MODEL: 512
-        D_KEY: 64
-        D_VALUE: 64
-        D_FF: 2048
-        D_FEATURE: 2048
-        USE_AOA: False
-        CAN_BE_STATEFUL: False
-        DROPOUT: .1
+    SELF_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: True
+      DROPOUT: .1
+    ENC_ATTENTION:
+      ARCHITECTURE: ScaledDotProductAttention
+      HEAD: 8
+      D_MODEL: 512
+      D_KEY: 64
+      D_VALUE: 64
+      D_FF: 2048
+      D_FEATURE: 2048
+      USE_AOA: False
+      CAN_BE_STATEFUL: False
+      DROPOUT: .1
     TEXT_EMBEDDING:
       ARCHITECTURE: UsualEmbedding
       D_MODEL: 512
@@ -104,3 +106,9 @@ MODEL:
       WORD_EMBEDDING: null
       WORD_EMBEDDING_CACHE: null
       DROPOUT: 0.1
+    PFF:
+      D_MODEL: 512
+      D_FF: 2048
+      DROPOUT: .1
+  MULTIMODAL_FUSION:
+    D_MODEL: 512

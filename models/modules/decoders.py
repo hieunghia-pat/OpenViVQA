@@ -65,7 +65,7 @@ class Decoder(Module):
             self.running_seq.add_(1)
             seq = self.running_seq
 
-        embedded_answers = self.word_emb(answer_tokens)
+        embedded_answers, _ = self.word_emb(answer_tokens)
         out = embedded_answers + self.pos_emb(seq)
         for layer in self.layers:
             out = layer(queries=out, 

@@ -3,6 +3,7 @@
 features
 annotations
 saved_models
+data
 images
 *_test
 __pycache__

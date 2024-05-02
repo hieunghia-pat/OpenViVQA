@@ -196,7 +196,7 @@ class SpatialCirclePosition(ScaledDotProductAttention):
         k = self.fc_k(ocr_features).view(bs, nq, self.h, self.d_k).permute(0, 2, 3, 1)  # (bs, h, d_k, nk)
         v = self.fc_v(ocr_features).view(bs, nq, self.h, self.d_v).permute(0, 2, 1, 3)  # (bs, h, nk, d_v)
         att = torch.matmul(q, k) / np.sqrt(self.d_k)  # (bs, h, nq, nq)
-        att += ocr_padding_masks.unsqueeze(1).unsqueeze(1)
+        att += ocr_padding_masks
         att = torch.softmax(att + dist, dim=-1)
         out = torch.matmul(att, v).permute(0, 2, 1, 3).contiguous().view(bs, nq, self.h * self.d_v)  # (bs, nq, h*d_v)
         out = self.fc_o(out)  # (bs, nq, d_model)

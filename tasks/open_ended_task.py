@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 from data_utils.utils import collate_fn
 from .base_task import BaseTask
 from builders.task_builder import META_TASK
+from builders.pretrained_language_model_builder import build_pretrained_language_model
 from builders.dataset_builder import build_dataset
 import evaluation
 from evaluation import Cider
@@ -12,13 +13,18 @@ import os
 import itertools
 from shutil import copyfile
 import json
-import datetime
 from tqdm import tqdm
 
 @META_TASK.register()
 class OpenEndedTask(BaseTask):
     def __init__(self, config):
         super().__init__(config)
+
+    def build_model(self, config):
+        self.logger.info("Building model")
+        self.model = build_pretrained_language_model(config.model)
+        self.config = config
+        self.device = config.model.device
 
     def load_datasets(self, config):
         self.train_dataset = build_dataset(config.train, self.vocab, config)

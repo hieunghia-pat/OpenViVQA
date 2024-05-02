@@ -6,7 +6,6 @@ from torch.optim.lr_scheduler import LambdaLR
 from builders.vocab_builder import build_vocab
 
 from utils.logging_utils import Logger
-from builders.model_builder import build_model
 
 import os
 import numpy as np
@@ -37,16 +36,16 @@ class BaseTask:
         self.load_datasets(config.dataset)
         self.create_dataloaders(config.dataset)
 
-        self.logger.info("Building model")
-        self.model = build_model(config.model, self.vocab)
-        self.config = config
-        self.device = config.model.device
+        self.build_model(config)
 
         self.logger.info("Defining optimizer and objective function")
         self.configuring_hyperparameters(config)
         self.optim = Adam(self.model.parameters(), lr=config.training.learning_rate, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)
         self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_token_idx)
+
+    def build_model(self, config):
+        raise NotImplementedError
 
     def configuring_hyperparameters(self, config):
         raise NotImplementedError

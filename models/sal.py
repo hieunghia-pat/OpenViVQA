@@ -16,8 +16,7 @@ from transformers.modeling_outputs  import (
 )
 
 from utils.instance import InstanceList
-from data_utils.vocabs import Vocab
-from builders.model_builder import META_ARCHITECTURE
+from builders.pretrained_language_model_builder import META_PRETRAINED_LANGUAGE_MODEL
 from models.modules.vision_embeddings import (
     SemanticObjectEmbedding,
     SemanticOCREmbedding,
@@ -118,7 +117,9 @@ class MultiModalEncoder(T5Stack):
 
         if attention_mask is None:
             attention_mask = input_ids.ne(self.config.pad_token_id).to(dtype=inputs_embeds.dtype, device=inputs_embeds.device)
-        attention_mask = torch.cat([attention_mask, object_masks, ocr_masks], dim=1)
+        attention_mask = torch.cat([attention_mask, 
+                                    object_masks.squeeze(1).squeeze(1), 
+                                    ocr_masks.squeeze(1).squeeze(1)], dim=1)
 
         if self.is_decoder and encoder_attention_mask is None and encoder_hidden_states is not None:
             encoder_seq_length = encoder_hidden_states.shape[1]
@@ -250,7 +251,7 @@ class MultiModalEncoder(T5Stack):
             cross_attentions=all_cross_attentions,
         )
 
-@META_ARCHITECTURE.register()
+@META_PRETRAINED_LANGUAGE_MODEL.register()
 class SAL(T5ForConditionalGeneration):
     _keys_to_ignore_on_load_missing = [
         r"encoder.embed_tokens.weight",
@@ -261,8 +262,9 @@ class SAL(T5ForConditionalGeneration):
         r"decoder.block.0.layer.1.EncDecAttention.relative_attention_bias.weight",
     ]
 
-    def __init__(self, config, vocab: Vocab):
-        pretrained_config = T5Config.from_pretrained(config.backbone.name)
+    def __init__(self, config):
+        pretrained_name = config.backbone.name
+        pretrained_config = T5Config.from_pretrained(pretrained_name)
         pretrained_config.update({**config})
         super().__init__(pretrained_config)
 
@@ -284,6 +286,8 @@ class SAL(T5ForConditionalGeneration):
 
         self.lm_head = nn.Linear(pretrained_config.d_model, pretrained_config.vocab_size, bias=False)
 
+        self.from_pretrained(pretrained_name)
+
         # Initialize weights and apply final processing
         self.post_init()
 
@@ -297,6 +301,8 @@ class SAL(T5ForConditionalGeneration):
         past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         encoder_outputs: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+        decoder_input_ids: Optional[torch.LongTensor] = None,
+        decoder_attention_mask: Optional[torch.BoolTensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
@@ -340,8 +346,8 @@ class SAL(T5ForConditionalGeneration):
         if self.model_parallel:
             torch.cuda.set_device(self.decoder.first_device)
 
-        if not self.training:
-            labels = inputs.answer_token
+        if self.training:
+            labels = inputs.answer_tokens
         else:
             labels = None
 
@@ -395,9 +401,8 @@ class SAL(T5ForConditionalGeneration):
 
         loss = None
         if labels is not None:
-            loss_fct = CrossEntropyLoss(ignore_index=-100)
+            loss_fct = CrossEntropyLoss(ignore_index=self.vocab.padding_token_idx)
             loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
-            # TODO(thom): Add z_loss https://github.com/tensorflow/mesh/blob/fa19d69eafc9a482aff0b59ddd96b025c0cb207d/mesh_tensorflow/layers.py#L666
 
         if not return_dict:
             output = (lm_logits,) + decoder_outputs[1:] + encoder_outputs
@@ -417,4 +422,3 @@ class SAL(T5ForConditionalGeneration):
 
     def prepare_decoder_input_ids_from_labels(self, labels: torch.Tensor):
         return self._shift_right(labels)
-    

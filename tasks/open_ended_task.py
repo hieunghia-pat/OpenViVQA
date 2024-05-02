@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 from data_utils.utils import collate_fn
 from .base_task import BaseTask
 from builders.task_builder import META_TASK
-from builders.pretrained_language_model_builder import build_pretrained_language_model
+from builders.model_builder import build_model
 from builders.dataset_builder import build_dataset
 import evaluation
 from evaluation import Cider
@@ -22,7 +22,7 @@ class OpenEndedTask(BaseTask):
 
     def build_model(self, config):
         self.logger.info("Building model")
-        self.model = build_pretrained_language_model(config.model)
+        self.model = build_model(config.model, self.vocab)
         self.config = config
         self.device = config.model.device
 

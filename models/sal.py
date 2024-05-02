@@ -16,7 +16,7 @@ from transformers.modeling_outputs  import (
 )
 
 from utils.instance import InstanceList
-from builders.pretrained_language_model_builder import META_PRETRAINED_LANGUAGE_MODEL
+from builders.model_builder import META_ARCHITECTURE
 from models.modules.vision_embeddings import (
     SemanticObjectEmbedding,
     SemanticOCREmbedding,
@@ -418,7 +418,7 @@ class SaL_Backbone(T5ForConditionalGeneration):
     def prepare_decoder_input_ids_from_labels(self, labels: torch.Tensor):
         return self._shift_right(labels)
 
-@META_PRETRAINED_LANGUAGE_MODEL.register()
+@META_ARCHITECTURE.register()
 class SaL(nn.Module):
     def __init__(self, config, vocab: Vocab) -> None:
         super().__init__()
@@ -429,7 +429,7 @@ class SaL(nn.Module):
             "padding_token_idx": vocab.padding_token_idx
         })
 
-        self.backbone = SaL_Backbone(pretrained_config).from_pretrained(config.model.pretrained_name)
+        self.backbone = SaL_Backbone(pretrained_config).from_pretrained(pretrained_name)
 
     def forward(self, inputs):
         self.backbone(inputs)

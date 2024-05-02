@@ -39,10 +39,10 @@ class InstanceList(OrderedDict):
             v0 = values[0]
             if isinstance(v0, np.ndarray):
                 values = [torch.tensor(value) for value in values]
-                values = self.pad_values(values, key)
+                values = self.pad_values(values)
                 values = torch.cat(values, dim=0)
             if isinstance(v0, torch.Tensor):
-                values = self.pad_values(values, key)
+                values = self.pad_values(values)
                 values = torch.cat(values, dim=0)
             elif hasattr(type(v0), "cat"):
                 values = type(v0).cat(values)
@@ -159,7 +159,7 @@ class InstanceList(OrderedDict):
         return ret
 
     # special method for concatenating tensor objects
-    def pad_values(self, values: List[torch.tensor], key, padding_value=0) -> List[torch.tensor]:
+    def pad_values(self, values: List[torch.tensor], padding_value=0) -> List[torch.tensor]:
         # infering the shape and dimension
         dim = 0
         n_dims = 0

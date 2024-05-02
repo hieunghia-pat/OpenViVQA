@@ -3,14 +3,11 @@ from torch import nn
 from torch.nn import functional as F
 from transformers.models.bert.modeling_bert import BertConfig
 
-from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
 from builders.encoder_builder import build_encoder
 from builders.text_embedding_builder import build_text_embedding
 from .utils import generate_padding_mask
 from .mmf_m4c import OcrPtrNet, MMT
-
-logger = setup_logger()
 
 @META_ARCHITECTURE.register()
 class MMF_IterativeLoRRA(nn.Module):

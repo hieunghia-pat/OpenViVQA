@@ -10,5 +10,4 @@ from .vlsp_evjvqa_vocab import VlspEvjVqaVocab
 from .vlsp_vqa_multimodal_vocab import VlspVqaMultiModalVocab
 from .bert_vocab import BERTVocab
 from .bert_ocr_vocab import BertOcrVocab
-from .t5_ocr_vocab import T5OcrVocab
 from .pretrained_vocab import PretrainedVocab

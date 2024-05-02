@@ -7,9 +7,8 @@ from .multilingual_image_question_classification_dataset import MultilingualImag
 from .image_question_datasets import ImageQuestionDataset, ImageQuestionDictionaryDataset
 from .multilingual_datasets import MultilingualFeatureDataset, MultilingualDictionaryDataset
 from .multilingual_image_question_datasets import MultilingualImageQuestionDataset, MultilingualImageQuestionDictionaryDataset
-from .ocr_datasets import OcrFeatureDataset, OcrDictionaryDataset
-from .bert_ocr_datasets import BertOcrDictionaryDataset
-from .t5_ocr_datasets import *
+from .ocr_datasets import OcrDataset
+from .pretrained_ocr_datasets import *
 from .ocr_classification_dataset import OcrClassificationDataset
 from .raw_question_datasets import RawQuestionFeatureDataset, RawQuestionDictionaryDataset
 from .raw_question_multilingual_datasets import RawQuestionMultilingualFeatureDataset, RawQuestionMultilingualDictionaryDataset

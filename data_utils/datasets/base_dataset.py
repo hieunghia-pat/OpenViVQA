@@ -19,7 +19,7 @@ class BaseDataset(data.Dataset):
         self.annotations = self.load_annotations(json_data)
 
         # image features
-        self.image_features_path = config.FEATURE_PATH.FEATURES
+        self.image_features_path = config.feature_path.features
 
     def load_annotations(self, json_data: Dict) -> List[Dict]:
         raise NotImplementedError

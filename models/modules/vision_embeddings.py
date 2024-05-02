@@ -28,13 +28,11 @@ class SemanticOCREmbedding(nn.Module):
     def __init__(self, config, embedding: nn.Module) -> None:
         super().__init__()
 
-        self.max_scene_text = config.max_scene_text
-
         self.embedding = embedding
 
-        self.linear_det_features = nn.Linear(config.d_det, config.d_model)
-        self.linear_rec_features = nn.Linear(config.d_rec, config.d_model)
-        self.linear_boxes = nn.Linear(4,config.d_model)
+        self.linear_det_features = nn.Linear(config.ocr_embedding.d_det, config.d_model)
+        self.linear_rec_features = nn.Linear(config.ocr_embedding.d_rec, config.d_model)
+        self.linear_boxes = nn.Linear(4, config.d_model)
 
         self.layer_norm_det = nn.LayerNorm(config.d_model)
         self.layer_norm_rec = nn.LayerNorm(config.d_model)
@@ -43,8 +41,7 @@ class SemanticOCREmbedding(nn.Module):
         self.gelu = nn.GELU()
         self.dropout = nn.Dropout(0.1)
 
-        self.cuda_device=config.cuda_device
-        self.device = torch.device(f'{self.cuda_device}' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(f'{config.device}' if torch.cuda.is_available() else 'cpu')
 
     def forward(self,
                 det_features: torch.FloatTensor,
@@ -52,16 +49,12 @@ class SemanticOCREmbedding(nn.Module):
                 bboxes: torch.FloatTensor,
                 ocr_token_ids: torch.FloatTensor):
         
-        ocr_text_emb = []
-        for batch in range(len(ocr_token_ids)):
-            ids = ocr_token_ids[batch]
-            embedded_tokens = []
-            for token in ids:
-                embedded_token = self.embedding(token).sum()
-                embedded_tokens.append(embedded_token)
-            ocr_text_emb.append(embedded_tokens)
-        ocr_text_emb = torch.Tensor(ocr_text_emb).to(self.device)
-        
+        ocr_token_ids = ocr_token_ids.to(torch.long)
+        ocr_text_emb = self.embedding(ocr_token_ids)
+        embedding_mask = (ocr_token_ids == 0).unsqueeze(-1)
+        ocr_text_emb = ocr_text_emb.masked_fill(embedding_mask, 0)
+        ocr_text_emb = ocr_text_emb.sum(dim=-2)
+    
         ocr_feature_emb = (self.layer_norm_det(self.linear_det_features(det_features))+
                         self.layer_norm_rec(self.linear_rec_features(rec_features)))
         ocr_box_emb = self.layer_norm_bboxes(self.linear_boxes(bboxes))
@@ -70,7 +63,7 @@ class SemanticOCREmbedding(nn.Module):
         ocr_features = self.dropout(self.gelu(ocr_features))
 
         mask = generate_padding_mask(det_features, padding_idx=0)
-        mask = (1 - mask).bool()
+        mask = torch.logical_not(mask)
 
         return ocr_features, mask
     
@@ -79,13 +72,11 @@ class SemanticObjectEmbedding(nn.Module):
     def __init__(self, config, embedding: nn.Module) -> None:
         super().__init__()
 
-        self.max_bbox = config.max_bbox
-        self.cuda_device=config.cuda_device
-        self.device = torch.device(f'{self.cuda_device}' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(f'{config.device}' if torch.cuda.is_available() else 'cpu')
 
         self.embedding = embedding
 
-        self.linear_region_features = nn.Linear(config.d_obj,config.d_model)
+        self.linear_region_features = nn.Linear(config.object_embedding.d_feature, config.d_model)
         self.linear_region_boxes = nn.Linear(4, config.d_model)
 
         self.layer_norm_region = nn.LayerNorm(config.d_model)
@@ -94,31 +85,19 @@ class SemanticObjectEmbedding(nn.Module):
         self.gelu = nn.GELU()
         self.dropout = nn.Dropout(0.1)
 
-    def pad_tensor(self, tensor: torch.Tensor, max_len: int, value):
-        if max_len == 0:
-            tensor = torch.zeros((0, tensor.shape[-1]))
-        else:
-            pad_value_tensor = torch.zeros((max_len-tensor.shape[0], tensor.shape[-1])).fill_(value).to(self.device)
-            tensor = torch.cat([tensor, pad_value_tensor], dim=0)
-        return tensor
-
     def forward(self,
                 features: torch.FloatTensor,
                 bboxes: torch.FloatTensor,
-                tag_ids: list[list]) -> torch.Tensor:
-        
-        tag_embs = []
-        for batch in range(len(tag_ids)):
-            ids = tag_ids[batch]
-            embedded_tokens = []
-            for token in ids:
-                embedded_token = self.embedding(token).sum()
-                embedded_tokens.append(embedded_token)
-            tag_embs.append(embedded_tokens)
-        tag_embs = torch.Tensor(tag_embs).to(self.device)
+                tag_ids: torch.LongTensor) -> torch.Tensor:
 
-        mask = generate_padding_mask(features)
-        mask = (1 - mask).bool()
+        tag_ids = tag_ids.to(torch.long)
+        tag_embs = self.embedding(tag_ids)
+        embedding_mask = (tag_ids == 0).unsqueeze(-1)
+        tag_embs = tag_embs.masked_fill(embedding_mask, 0)
+        tag_embs = tag_embs.sum(dim=-2)
+
+        mask = generate_padding_mask(features, padding_idx=0)
+        mask = torch.logical_not(mask)
 
         features = self.linear_region_features(features)
         bboxes = self.linear_region_boxes(bboxes)
@@ -137,8 +116,8 @@ class SpatialCirclePosition(ScaledDotProductAttention):
         super().__init__(config)
 
         self.dist_embedding = nn.Embedding(
-            num_embeddings=config.NUM_DISTANCE,
-            embedding_dim=config.HEAD
+            num_embeddings=config.ocr_embedding.num_distance,
+            embedding_dim=config.num_heads
         )
 
     def patch(self, ocr_boxes: torch.Tensor, image_sizes: torch.Tensor) -> tuple:
@@ -199,9 +178,9 @@ class SpatialCirclePosition(ScaledDotProductAttention):
             ocr_padding_masks: (bs, n_ocr)
             image_sizes: (bs, 4)
         """
+
         bs, nq, _ = ocr_boxes.shape
-        image_sizes = image_sizes
-        ocr_boxes = (ocr_boxes * image_sizes.unsqueeze(1)).long()
+        ocr_boxes = (ocr_boxes * image_sizes.unsqueeze(1))
 
         patch_x, patch_y = self.patch(ocr_boxes, image_sizes)
         patch_i_x = patch_x.unsqueeze(-1).repeat(1, 1, nq).unsqueeze(-1) # (bs, n_ocr, n_ocr, 1)
@@ -229,8 +208,8 @@ class TextSemanticSeparate(nn.Module):
     def __init__(self, config) -> None:
         super().__init__()
 
-        self.device = torch.device(config.DEVICE)
-        self.context_emb = nn.Parameter(torch.zeros(1, config.D_MODEL))
+        self.device = torch.device(config.device)
+        self.context_emb = nn.Parameter(torch.zeros(1, config.d_model))
         nn.init.xavier_uniform_(self.context_emb)
 
     def forward(self,

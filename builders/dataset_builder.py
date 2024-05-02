@@ -6,6 +6,6 @@ def build_dataset(json_path, vocab, config):
     if json_path is None:
         return None
     
-    dataset = META_DATASET.get(config.TYPE)(json_path, vocab, config)
+    dataset = META_DATASET.get(config.type)(json_path, vocab, config)
 
     return dataset

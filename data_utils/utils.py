@@ -1,6 +1,6 @@
 import torch
 import re
-from typing import List
+from typing import List, Union
 
 from utils.instance import Instance, InstanceList
 
@@ -49,8 +49,11 @@ def get_tokenizer(tokenizer):
                   "See the docs at https://github.com/vncorenlp/VnCoreNLP for more information.")
             raise
 
-def preprocess_sentence(sentence: str, tokenizer: str):
-    sentence = sentence.lower()
+def preprocess_sentence(sentence: Union[str, List[str]]) -> str:
+    if isinstance(sentence, list):
+        sentence = " ".join(sentence)
+    
+    sentence = sentence.lower()    
     sentence = re.sub(r"[“”]", "\"", sentence)
     sentence = re.sub(r"!", " ! ", sentence)
     sentence = re.sub(r"\?", " ? ", sentence)
@@ -69,16 +72,11 @@ def preprocess_sentence(sentence: str, tokenizer: str):
     sentence = re.sub(r"\$", " $ ", sentence)
     sentence = re.sub(r"\&", " & ", sentence)
     sentence = re.sub(r"\*", " * ", sentence)
-    # tokenize the sentence
-    tokenizer = get_tokenizer(tokenizer)
-    sentence = tokenizer(sentence)
-    if isinstance(sentence, str):
-        sentence = " ".join(sentence.strip().split()) # remove duplicated spaces
-        tokens = sentence.strip().split()
-    else:
-        tokens = sentence
+
+    sentence = " ".join(sentence.strip().split()) # remove duplicated spaces
+    tokens = sentence.strip().split()
     
-    return tokens
+    return " ".join(tokens)
 
 def reporthook(t):
     """

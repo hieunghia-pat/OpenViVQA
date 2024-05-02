@@ -3,10 +3,12 @@ from typing import *
 from transformers import AutoTokenizer
 
 from data_utils.vocabs import Vocab
+from builders.vocab_builder import META_VOCAB
 
+@META_VOCAB.register()
 class PretrainedVocab(Vocab):
     def __init__(self, config):
-        self.tokenizer = AutoTokenizer.from_pretrained(config.TOKENIZER)
+        self.tokenizer = AutoTokenizer.from_pretrained(config.pretrained_name)
 
     @property
     def padding_token(self) -> str:
@@ -40,25 +42,36 @@ class PretrainedVocab(Vocab):
     def unk_token_idx(self) -> str:
         return self.tokenizer.unk_token_id
 
-    def encode_question(self, question: List[str]) -> torch.Tensor:
+    def encode_question(self, question: str, context: str) -> Tuple[torch.LongTensor, torch.BoolTensor]:
         tokenized_questions = self.tokenizer(
             question,
-            padding="max_length",
+            context,
             add_special_tokens=True,
             return_tensors="pt"
         )
 
-        return tokenized_questions.input_ids, tokenized_questions.attention_mask
+        # tensor of input_ids is (n, seq_len), so squeeze its first dimension for later convenience
+        return tokenized_questions.input_ids.squeeze(0), tokenized_questions.attention_mask.squeeze(0)
+    
+    def encode_tokens(self, tokens: str):
+        tokenized_tokens = self.tokenizer(tokens, 
+                                        padding="max_length",
+                                        max_length=20,
+                                        truncation=True,
+                                        return_tensors="pt",
+                                        add_special_tokens=False).input_ids
 
-    def encode_answer(self, answer: List[str]) -> torch.Tensor:
+        return tokenized_tokens
+
+    def encode_answer(self, answer: str) -> Tuple[torch.LongTensor, torch.BoolTensor]:
         tokenized_answers = self.tokenizer(
             answer,
-            padding="max_length",
             add_special_tokens=True,
             return_tensors="pt"
         )
 
-        return tokenized_answers.input_ids, tokenized_answers.attention_mask
+        # tensor of input_ids is (n, seq_len), so squeeze its first dimension for later convenience
+        return tokenized_answers.input_ids.squeeze(0), tokenized_answers.attention_mask.squeeze(0)
 
     def decode_question(self, question_vecs: torch.Tensor, join_words=True) -> List[str]:
         questions = self.tokenizer.batch_decode(

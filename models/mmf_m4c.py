@@ -12,10 +12,7 @@ from transformers.models.bert.modeling_bert import (
     BertPreTrainedModel,
 )
 
-from utils.logging_utils import Logger
 from builders.model_builder import META_ARCHITECTURE
-
-logger = Logger("mmf_m4c.log")
 
 @META_ARCHITECTURE.register()
 class MMF_M4C(nn.Module):
@@ -65,9 +62,6 @@ class MMF_M4C(nn.Module):
         # multimodal transformer (mmt) hidden dimension,
         # add a linear projection layer between the two
         if self.mmt_config.hidden_size != TEXT_BERT_HIDDEN_SIZE:
-            logger.info(
-                f"Projecting text_bert output to {self.mmt_config.hidden_size} dim"
-            )
 
             self.text_bert_out_linear = nn.Linear(
                 self.config.TEXT_BERT.HIDDEN_SIZE, self.mmt_config.hidden_size

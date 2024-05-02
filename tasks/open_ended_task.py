@@ -1,5 +1,4 @@
 import torch
-from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 from data_utils.utils import collate_fn
@@ -10,124 +9,71 @@ import evaluation
 from evaluation import Cider
 
 import os
-import numpy as np
 import itertools
 from shutil import copyfile
 import json
 import datetime
+from tqdm import tqdm
 
 @META_TASK.register()
 class OpenEndedTask(BaseTask):
     def __init__(self, config):
         super().__init__(config)
 
-    def load_feature_datasets(self, config):
-        train_dataset = build_dataset(config.JSON_PATH.TRAIN, self.vocab, config.FEATURE_DATASET)
-        dev_dataset = build_dataset(config.JSON_PATH.DEV, self.vocab, config.FEATURE_DATASET)
-        test_dataset = build_dataset(config.JSON_PATH.TEST, self.vocab, config.FEATURE_DATASET)
-
-        return train_dataset, dev_dataset, test_dataset
-
-    def load_dict_datasets(self, config):
-        train_dataset = build_dataset(config.JSON_PATH.TRAIN, self.vocab, config.DICT_DATASET)
-        dev_dataset = build_dataset(config.JSON_PATH.DEV, self.vocab, config.DICT_DATASET)
-        test_dataset = build_dataset(config.JSON_PATH.TEST, self.vocab, config.DICT_DATASET)
-
-        return train_dataset, dev_dataset, test_dataset
-
     def load_datasets(self, config):
-        self.train_dataset, self.dev_dataset, self.test_dataset = self.load_feature_datasets(config)
-        self.train_dict_dataset, self.dev_dict_dataset, self.test_dict_dataset = self.load_dict_datasets(config)
+        self.train_dataset = build_dataset(config.train, self.vocab, config)
+        self.dev_dataset = build_dataset(config.dev, self.vocab, config)
+        self.test_dataset = build_dataset(config.test, self.vocab, config)
 
-    def create_feature_dataloaders(self, config):
+    def create_dataloaders(self, config):
         # creating iterable-dataset data loader
         self.train_dataloader = DataLoader(
             dataset=self.train_dataset,
-            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
+            batch_size=config.batch_size,
             shuffle=True,
-            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
+            num_workers=config.workers,
             collate_fn=collate_fn
         )
         self.dev_dataloader = DataLoader(
             dataset=self.dev_dataset,
-            batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
+            batch_size=config.batch_size,
             shuffle=True,
-            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
+            num_workers=config.workers,
             collate_fn=collate_fn
         )
         self.test_dataloader = DataLoader(
             dataset=self.test_dataset,
             batch_size=1,
             shuffle=True,
-            num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
+            num_workers=config.workers,
             collate_fn=collate_fn
         )
-
-    def create_dict_dataloaders(self, config):
-        # creating dictionary iterable-dataset data loader
-        self.train_dict_dataloader = DataLoader(
-            dataset=self.train_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE,
-            shuffle=True,
-            collate_fn=collate_fn
-        )
-        self.dev_dict_dataloader = DataLoader(
-            dataset=self.dev_dict_dataset,
-            batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE,
-            shuffle=True,
-            collate_fn=collate_fn
-        )
-        self.test_dict_dataloader = DataLoader(
-            dataset=self.test_dict_dataset,
-            batch_size=1,
-            shuffle=True,
-            collate_fn=collate_fn
-        )
-
-    def create_dataloaders(self, config):
-        self.create_feature_dataloaders(config)
-        self.create_dict_dataloaders(config)
 
     def configuring_hyperparameters(self, config):
         self.epoch = 0
-        self.warmup = config.TRAINING.WARMUP
-        self.score = config.TRAINING.SCORE
-        self.learning_rate = config.TRAINING.LEARNING_RATE
-        self.rl_learning_rate = config.TRAINING.RL_LEARNING_RATE
-        self.training_beam_size = config.TRAINING.TRAINING_BEAM_SIZE
-        self.evaluating_beam_size = config.TRAINING.EVALUATING_BEAM_SIZE
-        self.patience = config.TRAINING.PATIENCE
+        self.warmup = config.training.warmup
+        self.score = config.training.score
+        self.learning_rate = config.training.learning_rate
+        self.beam_size = config.training.beam_size
+        self.patience = config.training.patience
         self.train_cider = Cider({f"{idx}": answer for idx, answer in enumerate(self.train_dataset.answers)})
 
-    def evaluate_metrics(self, dataloader):
-        self.model.eval()
+    def evaluate_metrics(self):
         gens = {}
         gts = {}
-        # for estimating the eslapsed time
-        durations = []
-        for it, items in enumerate(dataloader):
-            start_moment = datetime.datetime.now()
-            items = items.to(self.device)
-            outs = self.model.generate(items)
+        with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(self.test_dataloader)) as pbar:
+            for it, items in enumerate(self.test_dataloader):
+                items = items.to(self.device)
+                outs, _ = self.model.generate(items)
 
-            answers_gt = items.answers
-            answers_gen = self.vocab.decode_answer(outs.contiguous(), 
-                                                    join_words=False)
-            for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
-                gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
-                gens['%d_%d' % (it, i)] = [gen_i, ]
-                gts['%d_%d' % (it, i)] = gts_i
-
-            # get the time of the ending moment
-            end_moment = datetime.datetime.now()
-            # estimating esplapsed time
-            durations.append((end_moment - start_moment).total_seconds())
-            avg_duration = np.array(durations).mean()
-            remain_its = len(dataloader) - it
-            total_time = str(datetime.timedelta(seconds=int(avg_duration * remain_its)))
-
-            if it > 0 and it % self.config.TRAINING.ITER_TO_VERBOSE == 0:
-                self.logger.info(f"Epoch {self.epoch+1} - Evaluating - Iter {it}/{len(dataloader)} - Estimating remaining: {total_time}")
+                answers_gt = items.answers
+                answers_gen = self.vocab.decode_answer(outs)
+                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
+                    gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
+                    gens['%d_%d' % (it, i)] = [gen_i, ]
+                    gts['%d_%d' % (it, i)] = gts_i
+                
+                pbar.update()
 
         scores, _ = evaluation.compute_scores(gts, gens)
 
@@ -136,37 +82,29 @@ class OpenEndedTask(BaseTask):
     def train(self):
         self.model.train()
         running_loss = .0
-        # for estimating the eslapsed time
-        durations = []
-        for it, items in enumerate(self.train_dataloader):
-            # get the time of the starting moment
-            start_moment = datetime.datetime.now()
-            # forward pass
-            items = items.to(self.device)
-            out = self.model(items).continuous
+        with tqdm(desc='Epoch %d - Training' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
+            for ith, items in enumerate(self.train_dataloader, start=1):
+                # forward pass
+                with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
+                    items = items.to(self.device)
+                    returns = self.model(items)
 
-            # backward pass
-            shifted_right_answer_tokens = items.shifted_right_answer_tokens
-            self.optim.zero_grad()
-            loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
-            loss.backward()
+                    # backward pass
+                    self.optim.zero_grad()
+                    loss = returns.loss
+                    loss.backward()
+                    self.optim.step()
 
-            self.optim.step()
-            this_loss = loss.item()
-            running_loss += this_loss
+                    # update the training status
+                    this_loss = loss.item()
+                    running_loss += this_loss
 
-            self.scheduler.step()
+                    self.scheduler.step()
 
-            # get the time of the ending moment
-            end_moment = datetime.datetime.now()
-            # estimating esplapsed time
-            durations.append((end_moment - start_moment).total_seconds())
-            avg_duration = np.array(durations).mean()
-            remain_its = len(self.train_dataloader) - it
-            total_time = str(datetime.timedelta(seconds=int(avg_duration * remain_its)))
-
-            if it > 0 and it % self.config.TRAINING.ITER_TO_VERBOSE == 0:
-                self.logger.info(f"Epoch {self.epoch+1} - Training - Iter {it}/{len(self.train_dataloader)} - Loss: {running_loss / (it + 1)} - Estimating remaining: {total_time}")
+                    pbar.set_postfix({
+                        "Loss": running_loss / ith
+                    })
+                    pbar.update()
 
     def start(self):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
@@ -184,9 +122,8 @@ class OpenEndedTask(BaseTask):
             self.train()
 
             # val scores
-            self.logger.info(f"Epoch {self.epoch+1} - Validating")
             scores = self.evaluate_metrics(self.dev_dict_dataloader)
-            scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
+            scores = {key: value for key, value in scores.items() if key in self.config.training.verbose_scores}
             self.logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 
@@ -257,7 +194,7 @@ class OpenEndedTask(BaseTask):
             })
 
         scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
-        scores = {key: value for key, value in scores.items() if key in self.config.TRAINING.VERBOSE_SCORES}
+        scores = {key: value for key, value in scores.items() if key in self.config.training.verbose_scores}
         self.logger.info("Evaluation scores on test: %s", scores)
 
         json.dump({

@@ -7,8 +7,6 @@ from builders.attention_builder import build_attention
 from builders.text_embedding_builder import build_text_embedding
 from .utils import generate_padding_mask
 
-logger = Logger("mmf_lorra.log")
-
 @META_ARCHITECTURE.register()
 class MMF_LoRRA(nn.Module):
     """

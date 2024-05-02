@@ -7,9 +7,6 @@ from typing import Optional, Tuple, Union, List
 from .mmf_regional_m4c import PrevPredEmbeddings
 from .mmf_m4c import OcrPtrNet
 from builders.model_builder import META_ARCHITECTURE
-from utils.logging_utils import setup_logger
-
-logger = setup_logger()
 
 class MultiLevelBertDecoder(BertEncoder):
     """

@@ -15,8 +15,8 @@ from transformers.modeling_outputs  import (
     Seq2SeqLMOutput
 )
 
-from utils.logging_utils import Logger
 from utils.instance import InstanceList
+from data_utils.vocabs import Vocab
 from builders.model_builder import META_ARCHITECTURE
 from models.modules.vision_embeddings import (
     SemanticObjectEmbedding,
@@ -24,8 +24,6 @@ from models.modules.vision_embeddings import (
     SpatialCirclePosition,
     TextSemanticSeparate
 )
-
-logger = Logger()
 
 class MultiModalEncoder(T5Stack):
     def __init__(self, config, embed_tokens=None):
@@ -57,12 +55,11 @@ class MultiModalEncoder(T5Stack):
         object_features: torch.FloatTensor,
         object_bboxes: torch.FloatTensor,
         object_tag_ids: list[list],
-        object_mask: torch.FloatTensor,
-        ocr_features: torch.FloatTensor,
+        ocr_det_features: torch.FloatTensor,
+        ocr_rec_features: torch.FloatTensor,
         ocr_bboxes: torch.FloatTensor,
         ocr_token_ids: list[list],
-        ocr_mask: torch.FloatTensor,
-        image_sizes: list[tuple],
+        image_sizes: torch.LongTensor,
         input_ids=None,
         attention_mask=None,
         encoder_hidden_states=None,
@@ -100,10 +97,10 @@ class MultiModalEncoder(T5Stack):
         else:
             err_msg_prefix = "decoder_" if self.is_decoder else ""
             raise ValueError(f"You have to specify either {err_msg_prefix}input_ids or {err_msg_prefix}inputs_embeds")
-        
-        object_features = self.semantic_object_embedding(object_features, object_bboxes, object_tag_ids)
-        ocr_features = self.semantic_ocr_embedding(ocr_features, ocr_bboxes, ocr_token_ids)
-        ocr_features = self.spatial_embedding(ocr_features, ocr_bboxes, ocr_mask, image_sizes)
+
+        object_features, object_masks = self.semantic_object_embedding(object_features, object_bboxes, object_tag_ids)
+        ocr_features, ocr_masks = self.semantic_ocr_embedding(ocr_det_features, ocr_rec_features, ocr_bboxes, ocr_token_ids)
+        ocr_features = self.spatial_embedding(ocr_features, ocr_bboxes, ocr_masks, image_sizes)
 
         if inputs_embeds is None:
             assert self.embed_tokens is not None, "You have to initialize the model with valid token embeddings"
@@ -121,7 +118,7 @@ class MultiModalEncoder(T5Stack):
 
         if attention_mask is None:
             attention_mask = input_ids.ne(self.config.pad_token_id).to(dtype=inputs_embeds.dtype, device=inputs_embeds.device)
-        attention_mask = torch.cat([attention_mask, object_mask, ocr_mask], dim=1)
+        attention_mask = torch.cat([attention_mask, object_masks, ocr_masks], dim=1)
 
         if self.is_decoder and encoder_attention_mask is None and encoder_hidden_states is not None:
             encoder_seq_length = encoder_hidden_states.shape[1]
@@ -264,25 +261,28 @@ class SAL(T5ForConditionalGeneration):
         r"decoder.block.0.layer.1.EncDecAttention.relative_attention_bias.weight",
     ]
 
-    def __init__(self, config: T5Config):
-        super().__init__(config)
-        self.model_dim = config.d_model
+    def __init__(self, config, vocab: Vocab):
+        pretrained_config = T5Config.from_pretrained(config.backbone.name)
+        pretrained_config.update({**config})
+        super().__init__(pretrained_config)
 
-        self.shared = nn.Embedding(config.vocab_size, config.d_model)
+        self.model_dim = pretrained_config.d_model
 
-        encoder_config = copy.deepcopy(config)
+        self.shared = nn.Embedding(pretrained_config.vocab_size, pretrained_config.d_model)
+
+        encoder_config = copy.deepcopy(pretrained_config)
         encoder_config.is_decoder = False
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
         self.encoder = MultiModalEncoder(encoder_config, self.shared)
 
-        decoder_config = copy.deepcopy(config)
+        decoder_config = copy.deepcopy(pretrained_config)
         decoder_config.is_decoder = True
         decoder_config.is_encoder_decoder = False
-        decoder_config.num_layers = config.num_decoder_layers
+        decoder_config.num_layers = pretrained_config.num_decoder_layers
         self.decoder = T5Stack(decoder_config, self.shared)
 
-        self.lm_head = nn.Linear(config.d_model, config.vocab_size, bias=False)
+        self.lm_head = nn.Linear(pretrained_config.d_model, pretrained_config.vocab_size, bias=False)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -296,11 +296,11 @@ class SAL(T5ForConditionalGeneration):
         inputs: InstanceList,
         past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
         head_mask: Optional[torch.FloatTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
+        encoder_outputs: Optional[Tuple[Tuple[torch.Tensor]]] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
+        return_dict: Optional[bool] = True,
     ) -> Union[Tuple[torch.FloatTensor], Seq2SeqLMOutput]:
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
@@ -308,21 +308,21 @@ class SAL(T5ForConditionalGeneration):
         input_ids = inputs.question_tokens
         attention_mask = inputs.question_mask
 
+
         # Encode if needed (training, first prediction pass)
         if encoder_outputs is None:
             # Convert encoder inputs in embeddings if needed
             encoder_outputs = self.encoder(
                 input_ids=inputs.question_tokens,
                 attention_mask=inputs.question_mask,
-                object_features=inputs.features,
-                object_bboxes=inputs.boxes,
+                object_features=inputs.region_features,
+                object_bboxes=inputs.region_boxes,
                 object_tag_ids=inputs.tags,
                 ocr_det_features=inputs.ocr_det_features,
                 ocr_rec_features=inputs.ocr_rec_features,
                 ocr_bboxes=inputs.ocr_boxes,
-                ocr_token_ids=inputs.ocr_texts,
-                image_sizes=inputs.image_sizes,
-                attention_mask=attention_mask,
+                ocr_token_ids=inputs.ocr_tokens,
+                image_sizes=inputs.image_size,
                 head_mask=head_mask,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
@@ -339,6 +339,11 @@ class SAL(T5ForConditionalGeneration):
 
         if self.model_parallel:
             torch.cuda.set_device(self.decoder.first_device)
+
+        if not self.training:
+            labels = inputs.answer_token
+        else:
+            labels = None
 
         if labels is not None and decoder_input_ids is None:
             # get decoder inputs from shifting lm labels to the right

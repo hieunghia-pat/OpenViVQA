@@ -16,10 +16,10 @@ class ScaledDotProductAttention(nn.Module):
     def __init__(self, config):
         super(ScaledDotProductAttention, self).__init__()
 
-        d_model = config.D_MODEL
-        h = config.HEAD
-        d_k = config.D_KEY
-        d_v = config.D_VALUE
+        d_model = config.d_model
+        h = config.num_heads
+        d_k = d_model // h
+        d_v = d_model // h
 
         self.fc_q = nn.Linear(d_model, h * d_k)
         self.fc_k = nn.Linear(d_model, h * d_k)
@@ -68,11 +68,11 @@ class AugmentedGeometryScaledDotProductAttention(nn.Module):
     def __init__(self, config):
         super(AugmentedGeometryScaledDotProductAttention, self).__init__()
 
-        d_model = config.D_MODEL
-        h = config.HEAD
-        d_k = config.D_KEY
-        d_v = config.D_VALUE
-        trignometric_embedding = config.TRIGNOMETRIC_EMBEDDING
+        d_model = config.d_model
+        h = config.num_heads
+        d_k = d_model // h
+        d_v = d_model // h
+        trignometric_embedding = config.trignometric_embedding
 
         self.trignometric_embedding = trignometric_embedding
         if trignometric_embedding:
@@ -145,11 +145,11 @@ class AugmentedMemoryScaledDotProductAttention(nn.Module):
     def __init__(self, config):
         super(AugmentedMemoryScaledDotProductAttention, self).__init__()
 
-        d_model = config.D_MODEL
-        h = config.HEAD
-        d_k = config.D_KEY
-        d_v = config.D_VALUE
-        m = config.MEMORY
+        d_model = config.d_model
+        h = config.num_heads
+        d_k = d_model // h
+        d_v = d_model // h
+        m = config.memory
 
         self.fc_q = nn.Linear(d_model, h * d_k)
         self.fc_k = nn.Linear(d_model, h * d_k)
@@ -216,11 +216,11 @@ class AdaptiveScaledDotProductAttention(nn.Module):
     def __init__(self, config):
         super(AdaptiveScaledDotProductAttention, self).__init__()
 
-        d_model = config.D_MODEL
-        h = config.HEAD
-        d_k = config.D_KEY
-        d_v = config.D_VALUE
-        dropout = config.DROPOUT
+        d_model = config.d_model
+        h = config.num_heads
+        d_k = d_model // h
+        d_v = d_model // h
+        dropout = config.dropout
 
         self.fc_q = nn.Linear(d_model, h * d_k)
         self.fc_k = nn.Linear(d_model, h * d_k)
@@ -298,9 +298,9 @@ class MultiHeadAttention(Module):
     def __init__(self, config):
         super(MultiHeadAttention, self).__init__()
         
-        d_model = config.D_MODEL
+        d_model = config.d_model
 
-        self.use_aoa = config.USE_AOA # whether to use Attention on Attention (AoA) mechanism or not
+        self.use_aoa = config.use_aoa # whether to use Attention on Attention (AoA) mechanism or not
         
         if self.use_aoa:    # define additionally AoA layers
             self.informative_attention = nn.Linear(2*d_model, d_model)
@@ -308,10 +308,10 @@ class MultiHeadAttention(Module):
 
         self.attention = build_attention(config)
 
-        self.dropout = nn.Dropout(p=config.DROPOUT)
+        self.dropout = nn.Dropout(p=config.dropout)
         self.layer_norm = nn.LayerNorm(d_model)
 
-        self.can_be_stateful = config.CAN_BE_STATEFUL
+        self.can_be_stateful = config.can_be_stateful
         if self.can_be_stateful:
             self.register_state('running_keys', torch.zeros((0, d_model)))
             self.register_state('running_values', torch.zeros((0, d_model)))

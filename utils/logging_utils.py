@@ -71,7 +71,7 @@ class Logger(logging.Logger):
                 filename = os.path.join(output, "log.txt")
             if self.__distributed_rank > 0:
                 filename = filename + ".rank{}".format(self.__distributed_rank)
-            if os.path.isdir(os.path.dirname(filename)):
+            if not os.path.isdir(os.path.dirname(filename)):
                 os.makedirs(os.path.dirname(filename))
 
             fh = logging.StreamHandler(_cached_log_stream(filename))

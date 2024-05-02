@@ -7,10 +7,7 @@ from transformers.models.bert.modeling_bert import (
 )
 
 from .mmf_m4c import MMF_M4C, PrevPredEmbeddings
-from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
-
-logger = setup_logger()
 
 @META_ARCHITECTURE.register()
 class MMF_REGIONAL_M4C(MMF_M4C):

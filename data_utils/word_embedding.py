@@ -8,9 +8,6 @@ from data_utils.utils import reporthook, unk_init
 import zipfile
 
 from builders.word_embedding_builder import META_WORD_EMBEDDING
-from utils.logging_utils import Logger
-
-logger = Logger("word_embedding.log")
 
 def _infer_shape(f):
     num_lines, vector_dim = 0, None
@@ -83,7 +80,6 @@ class WordEmbedding(object):
 
         if not os.path.isfile(path_pt):
             if not os.path.isfile(path) and url:
-                logger.info('Downloading vectors from {}'.format(url))
                 if not os.path.exists(cache):
                     os.makedirs(cache)
                 dest = os.path.join(cache, os.path.basename(url))
@@ -94,7 +90,6 @@ class WordEmbedding(object):
                         except KeyboardInterrupt as e:  # remove the partial zip file
                             os.remove(dest)
                             raise e
-                logger.info('Extracting vectors into {}'.format(cache))
                 ext = os.path.splitext(dest)[1][1:]
                 if ext == 'zip':
                     with zipfile.ZipFile(dest, "r") as zf:
@@ -106,7 +101,6 @@ class WordEmbedding(object):
             if not os.path.isfile(path):
                 raise RuntimeError('no vectors found at {}'.format(path))
 
-            logger.info("Loading vectors from {}".format(path))
             ext = os.path.splitext(path)[1][1:]
             if ext == 'gz':
                 open_file = gzip.open
@@ -141,7 +135,6 @@ class WordEmbedding(object):
                         if isinstance(word, bytes):
                             word = word.decode('utf-8')
                     except UnicodeDecodeError:
-                        logger.info("Skipping non-UTF8 token {}".format(repr(word)))
                         continue
 
                     vectors[vectors_loaded] = torch.tensor([float(x) for x in entries])
@@ -155,12 +148,10 @@ class WordEmbedding(object):
             self.stoi = {word: i for i, word in enumerate(itos)}
             self.vectors = torch.Tensor(vectors).view(-1, dim)
             self.dim = dim
-            logger.info('Saving vectors to {}'.format(path_pt))
             if not os.path.exists(cache):
                 os.makedirs(cache)
             torch.save((self.itos, self.stoi, self.vectors, self.dim), path_pt)
         else:
-            logger.info('Loading vectors from {}'.format(path_pt))
             self.itos, self.stoi, self.vectors, self.dim = torch.load(path_pt)
 
     def __len__(self):

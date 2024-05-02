@@ -15,16 +15,18 @@ import random
 
 class BaseTask:
     def __init__(self, config):
-        self.logger = Logger("task.log")
-
-        self.checkpoint_path = os.path.join(config.TRAINING.CHECKPOINT_PATH, config.MODEL.NAME)
+        self.checkpoint_path = os.path.join(config.training.checkpoint_path, config.model.name)
         if not os.path.isdir(self.checkpoint_path):
-            self.logger.info("Creating checkpoint path")
             os.makedirs(self.checkpoint_path)
+
+        log_file = os.path.join(config.training.checkpoint_path, 
+                       config.model.name,
+                       f"task_{config.model.name}.log")
+        self.logger = Logger(log_file)
 
         if not os.path.isfile(os.path.join(self.checkpoint_path, "vocab.bin")):
             self.logger.info("Creating vocab")
-            self.vocab = self.load_vocab(config.DATASET.VOCAB)
+            self.vocab = self.load_vocab(config.dataset.vocab)
             self.logger.info("Saving vocab to %s" % os.path.join(self.checkpoint_path, "vocab.bin"))
             pickle.dump(self.vocab, open(os.path.join(self.checkpoint_path, "vocab.bin"), "wb"))
         else:
@@ -32,19 +34,19 @@ class BaseTask:
             self.vocab = pickle.load(open(os.path.join(self.checkpoint_path, "vocab.bin"), "rb"))
 
         self.logger.info("Loading data")
-        self.load_datasets(config.DATASET)
-        self.create_dataloaders(config)
+        self.load_datasets(config.dataset)
+        self.create_dataloaders(config.dataset)
 
         self.logger.info("Building model")
-        self.model = build_model(config.MODEL, self.vocab)
+        self.model = build_model(config.model, self.vocab)
         self.config = config
-        self.device = torch.device(config.MODEL.DEVICE)
+        self.device = config.model.device
 
         self.logger.info("Defining optimizer and objective function")
         self.configuring_hyperparameters(config)
-        self.optim = Adam(self.model.parameters(), lr=config.TRAINING.LEARNING_RATE, betas=(0.9, 0.98))
+        self.optim = Adam(self.model.parameters(), lr=config.training.learning_rate, betas=(0.9, 0.98))
         self.scheduler = LambdaLR(self.optim, self.lambda_lr)
-        self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
+        self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_token_idx)
 
     def configuring_hyperparameters(self, config):
         raise NotImplementedError
@@ -72,7 +74,7 @@ class BaseTask:
     def lambda_lr(self, step):
         warm_up = self.warmup
         step += 1
-        return (self.model.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
+        return (self.model.config.d_model ** -.5) * min(step ** -.5, step * warm_up ** -1.5)
 
     def load_checkpoint(self, fname) -> dict:
         if not os.path.exists(fname):

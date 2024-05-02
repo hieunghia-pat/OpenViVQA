@@ -23,6 +23,7 @@ from models.modules.vision_embeddings import (
     SpatialCirclePosition,
     TextSemanticSeparate
 )
+from data_utils.vocabs import Vocab
 
 class MultiModalEncoder(T5Stack):
     def __init__(self, config, embed_tokens=None):
@@ -251,8 +252,7 @@ class MultiModalEncoder(T5Stack):
             cross_attentions=all_cross_attentions,
         )
 
-@META_PRETRAINED_LANGUAGE_MODEL.register()
-class SAL(T5ForConditionalGeneration):
+class SaL_Backbone(T5ForConditionalGeneration):
     _keys_to_ignore_on_load_missing = [
         r"encoder.embed_tokens.weight",
         r"decoder.embed_tokens.weight",
@@ -263,30 +263,25 @@ class SAL(T5ForConditionalGeneration):
     ]
 
     def __init__(self, config):
-        pretrained_name = config.backbone.name
-        pretrained_config = T5Config.from_pretrained(pretrained_name)
-        pretrained_config.update({**config})
-        super().__init__(pretrained_config)
+        super().__init__(config)
 
-        self.model_dim = pretrained_config.d_model
+        self.model_dim = config.d_model
 
-        self.shared = nn.Embedding(pretrained_config.vocab_size, pretrained_config.d_model)
+        self.shared = nn.Embedding(config.vocab_size, config.d_model)
 
-        encoder_config = copy.deepcopy(pretrained_config)
+        encoder_config = copy.deepcopy(config)
         encoder_config.is_decoder = False
         encoder_config.use_cache = False
         encoder_config.is_encoder_decoder = False
         self.encoder = MultiModalEncoder(encoder_config, self.shared)
 
-        decoder_config = copy.deepcopy(pretrained_config)
+        decoder_config = copy.deepcopy(config)
         decoder_config.is_decoder = True
         decoder_config.is_encoder_decoder = False
-        decoder_config.num_layers = pretrained_config.num_decoder_layers
+        decoder_config.num_layers = config.num_decoder_layers
         self.decoder = T5Stack(decoder_config, self.shared)
 
-        self.lm_head = nn.Linear(pretrained_config.d_model, pretrained_config.vocab_size, bias=False)
-
-        self.from_pretrained(pretrained_name)
+        self.lm_head = nn.Linear(config.d_model, config.vocab_size, bias=False)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -401,7 +396,7 @@ class SAL(T5ForConditionalGeneration):
 
         loss = None
         if labels is not None:
-            loss_fct = CrossEntropyLoss(ignore_index=self.vocab.padding_token_idx)
+            loss_fct = CrossEntropyLoss(ignore_index=self.config.padding_token_idx)
             loss = loss_fct(lm_logits.view(-1, lm_logits.size(-1)), labels.view(-1))
 
         if not return_dict:
@@ -422,3 +417,19 @@ class SAL(T5ForConditionalGeneration):
 
     def prepare_decoder_input_ids_from_labels(self, labels: torch.Tensor):
         return self._shift_right(labels)
+
+@META_PRETRAINED_LANGUAGE_MODEL.register()
+class SaL(nn.Module):
+    def __init__(self, config, vocab: Vocab) -> None:
+        super().__init__()
+        pretrained_name = config.backbone.name
+        pretrained_config = T5Config.from_pretrained(pretrained_name)
+        pretrained_config.update({
+            **config,
+            "padding_token_idx": vocab.padding_token_idx
+        })
+
+        self.backbone = SaL_Backbone(pretrained_config).from_pretrained(config.model.pretrained_name)
+
+    def forward(self, inputs):
+        self.backbone(inputs)

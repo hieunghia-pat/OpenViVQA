@@ -427,8 +427,14 @@ class SaL(nn.Module):
             **config,
             "padding_token_idx": vocab.padding_token_idx
         })
+        self.config = pretrained_config
 
         self.backbone = SaL_Backbone(pretrained_config).from_pretrained(pretrained_name, config=pretrained_config)
 
     def forward(self, inputs):
-        self.backbone(inputs)
+        if self.training:
+            returns = self.backbone(inputs)
+        else:
+            returns = self.backbone.generate(inputs)
+
+        return returns

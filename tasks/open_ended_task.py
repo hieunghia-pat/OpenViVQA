@@ -70,7 +70,7 @@ class OpenEndedTask(BaseTask):
         with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(self.test_dataloader)) as pbar:
             for it, items in enumerate(self.test_dataloader):
                 items = items.to(self.device)
-                outs, _ = self.model.generate(items)
+                outs, _ = self.model(items)
 
                 answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs)
@@ -95,22 +95,22 @@ class OpenEndedTask(BaseTask):
                     items = items.to(self.device)
                     returns = self.model(items)
 
-                    # backward pass
-                    self.optim.zero_grad()
-                    loss = returns.loss
-                    loss.backward()
-                    self.optim.step()
+                # backward pass
+                self.optim.zero_grad()
+                loss = returns.loss
+                loss.backward()
+                self.optim.step()
 
-                    # update the training status
-                    this_loss = loss.item()
-                    running_loss += this_loss
+                # update the training status
+                this_loss = loss.item()
+                running_loss += this_loss
 
-                    self.scheduler.step()
+                self.scheduler.step()
 
-                    pbar.set_postfix({
-                        "Loss": running_loss / ith
-                    })
-                    pbar.update()
+                pbar.set_postfix({
+                    "Loss": running_loss / ith
+                })
+                pbar.update()
 
     def start(self):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
@@ -128,7 +128,7 @@ class OpenEndedTask(BaseTask):
             self.train()
 
             # val scores
-            scores = self.evaluate_metrics(self.dev_dict_dataloader)
+            scores = self.evaluate_metrics()
             scores = {key: value for key, value in scores.items() if key in self.config.training.verbose_scores}
             self.logger.info("Validation scores %s", scores)
             val_score = scores[self.score]

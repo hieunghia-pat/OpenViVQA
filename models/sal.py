@@ -309,7 +309,6 @@ class SaL_Backbone(T5ForConditionalGeneration):
         input_ids = inputs.question_tokens
         attention_mask = inputs.question_mask
 
-
         # Encode if needed (training, first prediction pass)
         if encoder_outputs is None:
             # Convert encoder inputs in embeddings if needed
@@ -429,7 +428,7 @@ class SaL(nn.Module):
             "padding_token_idx": vocab.padding_token_idx
         })
 
-        self.backbone = SaL_Backbone(pretrained_config).from_pretrained(pretrained_name)
+        self.backbone = SaL_Backbone(pretrained_config).from_pretrained(pretrained_name, config=pretrained_config)
 
     def forward(self, inputs):
         self.backbone(inputs)

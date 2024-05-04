@@ -4,7 +4,6 @@ from typing import Dict, List
 
 from data_utils.datasets.ocr_datasets import OcrDataset
 from utils.instance import Instance
-from data_utils.utils import preprocess_sentence
 from builders.dataset_builder import META_DATASET
 
 @META_DATASET.register()
@@ -60,9 +59,9 @@ class PretrainedOcrDataset(OcrDataset):
             **features,
             image_id=item["image_id"],
             filename=item["filename"],
-            image_size=img_size,
-            tags=object_tag_ids,
-            ocr_tokens=ocr_token_ids,
+            image_sizes=img_size,
+            object_tag_ids=object_tag_ids,
+            ocr_token_ids=ocr_token_ids,
             question=question,
             input_ids=question_tokens,
             attention_mask=question_mask,

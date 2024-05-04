@@ -52,12 +52,12 @@ class MultiModalEncoder(T5Stack):
 
     def forward(
         self,
-        object_features: torch.FloatTensor,
-        object_bboxes: torch.FloatTensor,
+        region_features: torch.FloatTensor,
+        region_boxes: torch.FloatTensor,
         object_tag_ids: list[list],
         ocr_det_features: torch.FloatTensor,
         ocr_rec_features: torch.FloatTensor,
-        ocr_bboxes: torch.FloatTensor,
+        ocr_boxes: torch.FloatTensor,
         ocr_token_ids: list[list],
         image_sizes: torch.LongTensor,
         input_ids=None,
@@ -99,9 +99,9 @@ class MultiModalEncoder(T5Stack):
             err_msg_prefix = "decoder_" if self.is_decoder else ""
             raise ValueError(f"You have to specify either {err_msg_prefix}input_ids or {err_msg_prefix}inputs_embeds")
 
-        object_features, object_masks = self.semantic_object_embedding(object_features, object_bboxes, object_tag_ids)
-        ocr_features, ocr_masks = self.semantic_ocr_embedding(ocr_det_features, ocr_rec_features, ocr_bboxes, ocr_token_ids)
-        ocr_features = self.spatial_embedding(ocr_features, ocr_bboxes, ocr_masks, image_sizes)
+        object_features, object_masks = self.semantic_object_embedding(region_features, region_boxes, object_tag_ids)
+        ocr_features, ocr_masks = self.semantic_ocr_embedding(ocr_det_features, ocr_rec_features, ocr_boxes, ocr_token_ids)
+        ocr_features = self.spatial_embedding(ocr_features, ocr_boxes, ocr_masks, image_sizes)
 
         if inputs_embeds is None:
             assert self.embed_tokens is not None, "You have to initialize the model with valid token embeddings"
@@ -462,10 +462,10 @@ class SaL(nn.Module):
 
         self.backbone = SaL_Backbone(pretrained_config).from_pretrained(pretrained_name, config=pretrained_config)
 
-    def forward(self, inputs):
+    def forward(self, **kwargs):
         if self.training:
-            returns = self.backbone(inputs)
+            returns = self.backbone(**kwargs)
         else:
-            returns = self.backbone.generate(inputs)
+            returns = self.backbone.generate(**kwargs)
 
         return returns

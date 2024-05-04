@@ -72,6 +72,7 @@ class MultiModalEncoder(T5Stack):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        **kwargs
     ):
         # Model parallel
         if self.model_parallel:
@@ -292,41 +293,39 @@ class SaL_Backbone(T5ForConditionalGeneration):
 
     def forward(
         self,
-        inputs: InstanceList,
-        past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
-        head_mask: Optional[torch.FloatTensor] = None,
-        encoder_outputs: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+        input_ids: Optional[torch.LongTensor] = None,
+        attention_mask: Optional[torch.FloatTensor] = None,
         decoder_input_ids: Optional[torch.LongTensor] = None,
         decoder_attention_mask: Optional[torch.BoolTensor] = None,
+        head_mask: Optional[torch.FloatTensor] = None,
+        decoder_head_mask: Optional[torch.FloatTensor] = None,
+        cross_attn_head_mask: Optional[torch.Tensor] = None,
+        encoder_outputs: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+        past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        decoder_inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = True,
+        **kwargs
     ) -> Union[Tuple[torch.FloatTensor], Seq2SeqLMOutput]:
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
-        input_ids = inputs.question_tokens
-        attention_mask = inputs.question_mask
 
         # Encode if needed (training, first prediction pass)
         if encoder_outputs is None:
             # Convert encoder inputs in embeddings if needed
             encoder_outputs = self.encoder(
-                input_ids=inputs.question_tokens,
-                attention_mask=inputs.question_mask,
-                object_features=inputs.region_features,
-                object_bboxes=inputs.region_boxes,
-                object_tag_ids=inputs.tags,
-                ocr_det_features=inputs.ocr_det_features,
-                ocr_rec_features=inputs.ocr_rec_features,
-                ocr_bboxes=inputs.ocr_boxes,
-                ocr_token_ids=inputs.ocr_tokens,
-                image_sizes=inputs.image_size,
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                inputs_embeds=inputs_embeds,
                 head_mask=head_mask,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
+                **kwargs
             )
         elif return_dict and not isinstance(encoder_outputs, BaseModelOutput):
             encoder_outputs = BaseModelOutput(
@@ -339,11 +338,6 @@ class SaL_Backbone(T5ForConditionalGeneration):
 
         if self.model_parallel:
             torch.cuda.set_device(self.decoder.first_device)
-
-        if self.training:
-            labels = inputs.answer_tokens
-        else:
-            labels = None
 
         if labels is not None and decoder_input_ids is None:
             # get decoder inputs from shifting lm labels to the right
@@ -369,13 +363,16 @@ class SaL_Backbone(T5ForConditionalGeneration):
         decoder_outputs = self.decoder(
             input_ids=decoder_input_ids,
             attention_mask=decoder_attention_mask,
+            inputs_embeds=decoder_inputs_embeds,
             past_key_values=past_key_values,
             encoder_hidden_states=hidden_states,
             encoder_attention_mask=encoder_attention_mask,
+            head_mask=decoder_head_mask,
+            cross_attn_head_mask=cross_attn_head_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
+            return_dict=return_dict
         )
 
         sequence_output = decoder_outputs[0]
@@ -416,6 +413,40 @@ class SaL_Backbone(T5ForConditionalGeneration):
 
     def prepare_decoder_input_ids_from_labels(self, labels: torch.Tensor):
         return self._shift_right(labels)
+    
+    def prepare_inputs_for_generation(self, 
+                                      input_ids, 
+                                      past_key_values=None, 
+                                      attention_mask=None, 
+                                      head_mask=None, 
+                                      decoder_head_mask=None, 
+                                      decoder_attention_mask=None, 
+                                      cross_attn_head_mask=None, 
+                                      use_cache=None, 
+                                      encoder_outputs=None, 
+                                      **kwargs):
+        # cut decoder_input_ids if past is used
+        if past_key_values is not None:
+            input_ids = input_ids[:, -1:]
+
+        return {
+            "decoder_input_ids": input_ids,
+            "past_key_values": past_key_values,
+            "encoder_outputs": encoder_outputs,
+            "attention_mask": attention_mask,
+            "decoder_attention_mask": decoder_attention_mask,
+            "head_mask": head_mask,
+            "decoder_head_mask": decoder_head_mask,
+            "cross_attn_head_mask": cross_attn_head_mask,
+            "use_cache": use_cache,
+            "ocr_ids": kwargs.get("ocr_ids", None),
+            "obj_word_ids":  kwargs.get("obj_word_ids", None),
+            "obj_ids": kwargs.get("obj_ids", None),
+            "obj_word_ids": kwargs.get("obj_word_ids", None),
+            "ocr_info": kwargs.get("ocr_info", None),
+            "obj_info": kwargs.get("obj_info",None),
+            **kwargs
+        }
 
 @META_ARCHITECTURE.register()
 class SaL(nn.Module):

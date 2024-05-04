@@ -64,9 +64,9 @@ class PretrainedOcrDataset(OcrDataset):
             tags=object_tag_ids,
             ocr_tokens=ocr_token_ids,
             question=question,
-            question_tokens=question_tokens,
-            question_mask=question_mask,
+            input_ids=question_tokens,
+            attention_mask=question_mask,
             answer=answer,
-            answer_tokens=answer_tokens,
-            answer_mask=answer_mask
+            labels=answer_tokens,
+            decoder_attention_mask=answer_mask
         )

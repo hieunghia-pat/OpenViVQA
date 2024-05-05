@@ -3,7 +3,7 @@ task: OpenEndedTask
 dataset:
   type: PretrainedOcrDataset
   batch_size: 16
-  workers: 0
+  workers: 2
   feature_path:
     features: data/vinvl_vinvl
     scene_text: data/swintext_spotter
@@ -33,7 +33,7 @@ training:
 model:
   architecture: SaL
   name: sal_vinvl
-  device: mps
+  device: cuda
   backbone:
     name: "VietAI/vit5-base"
   object_embedding:

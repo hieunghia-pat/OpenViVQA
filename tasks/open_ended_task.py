@@ -65,16 +65,16 @@ class OpenEndedTask(BaseTask):
         self.train_cider = Cider({f"{idx}": answer for idx, answer in enumerate(self.train_dataset.answers)})
 
     def evaluate_metrics(self):
+        self.model.eval()
         gens = {}
         gts = {}
         with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(self.test_dataloader)) as pbar:
             for it, items in enumerate(self.test_dataloader):
                 items = items.to(self.device)
-                outs, _ = self.model(**items)
+                predicted_ids, labels = self.model(**items)
 
-                answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs)
-                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
+                answers_gen = self.vocab.decode_answer(predicted_ids)
+                for i, (gts_i, gen_i) in enumerate(zip(labels, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = gts_i
@@ -125,7 +125,7 @@ class OpenEndedTask(BaseTask):
             patience = 0
 
         while True:
-            self.train()
+            # self.train()
 
             # val scores
             scores = self.evaluate_metrics()

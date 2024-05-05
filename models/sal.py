@@ -413,6 +413,9 @@ class SaL_Backbone(T5ForConditionalGeneration):
     def prepare_decoder_input_ids_from_labels(self, labels: torch.Tensor):
         return self._shift_right(labels)
     
+    def _validate_model_kwargs(self, model_kwargs: Dict[str, Any]):
+        pass
+    
     def prepare_inputs_for_generation(self, 
                                       input_ids, 
                                       past_key_values=None, 
@@ -446,9 +449,6 @@ class SaL_Backbone(T5ForConditionalGeneration):
             "obj_info": kwargs.get("obj_info",None),
             **kwargs
         }
-    
-    def _validate_model_kwargs(self, model_kwargs: Dict[str, Any]):
-        pass
 
 @META_ARCHITECTURE.register()
 class SaL(nn.Module):
@@ -461,6 +461,14 @@ class SaL(nn.Module):
             "padding_token_idx": vocab.padding_token_idx
         })
         self.config = pretrained_config
+        self.generator_args ={
+            'max_length': 24,
+            'min_length': 1,
+            'num_beams': 4,
+            'length_penalty': 1.5,
+            'no_repeat_ngram_size': 3,
+            'early_stopping': True,
+        }
 
         self.backbone = SaL_Backbone(pretrained_config).from_pretrained(pretrained_name, config=pretrained_config)
 
@@ -468,6 +476,8 @@ class SaL(nn.Module):
         if self.training:
             returns = self.backbone(**kwargs)
         else:
-            returns = self.backbone.generate(**kwargs)
+            labels = kwargs.pop("labels")
+            kwargs.pop("decoder_attention_mask")
+            returns = self.backbone.generate(**kwargs, **self.generator_args)
 
-        return returns
+        return returns, labels

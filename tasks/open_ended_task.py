@@ -70,7 +70,7 @@ class OpenEndedTask(BaseTask):
         with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(self.test_dataloader)) as pbar:
             for it, items in enumerate(self.test_dataloader):
                 items = items.to(self.device)
-                outs, _ = self.model(items)
+                outs, _ = self.model(**items)
 
                 answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs)
@@ -93,7 +93,7 @@ class OpenEndedTask(BaseTask):
                 # forward pass
                 with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=True):
                     items = items.to(self.device)
-                    returns = self.model(items)
+                    returns = self.model(**items)
 
                 # backward pass
                 self.optim.zero_grad()

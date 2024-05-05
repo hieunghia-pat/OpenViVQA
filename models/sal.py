@@ -15,7 +15,6 @@ from transformers.modeling_outputs  import (
     Seq2SeqLMOutput
 )
 
-from utils.instance import InstanceList
 from builders.model_builder import META_ARCHITECTURE
 from models.modules.vision_embeddings import (
     SemanticObjectEmbedding,
@@ -447,6 +446,9 @@ class SaL_Backbone(T5ForConditionalGeneration):
             "obj_info": kwargs.get("obj_info",None),
             **kwargs
         }
+    
+    def _validate_model_kwargs(self, model_kwargs: Dict[str, Any]):
+        pass
 
 @META_ARCHITECTURE.register()
 class SaL(nn.Module):

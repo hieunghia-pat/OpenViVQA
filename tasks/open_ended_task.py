@@ -49,7 +49,7 @@ class OpenEndedTask(BaseTask):
         )
         self.test_dataloader = DataLoader(
             dataset=self.test_dataset,
-            batch_size=1,
+            batch_size=config.batch_size,
             shuffle=True,
             num_workers=config.workers,
             collate_fn=collate_fn
@@ -77,7 +77,7 @@ class OpenEndedTask(BaseTask):
                 for i, (gts_i, gen_i) in enumerate(zip(labels, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
-                    gts['%d_%d' % (it, i)] = gts_i
+                    gts['%d_%d' % (it, i)] = [gts_i, ]
                 
                 pbar.update()
 
@@ -125,7 +125,7 @@ class OpenEndedTask(BaseTask):
             patience = 0
 
         while True:
-            # self.train()
+            self.train()
 
             # val scores
             scores = self.evaluate_metrics()
@@ -189,7 +189,7 @@ class OpenEndedTask(BaseTask):
                 gens['%d_%d' % (it, i)] = gen_i
                 gts['%d_%d' % (it, i)] = gts_i
                 overall_gens['%d_%d' % (it, i)] = [gen_i, ]
-                overall_gts['%d_%d' % (it, i)] = gts_i
+                overall_gts['%d_%d' % (it, i)] = [gts_i, ]
 
             results.append({
                 "id": items.question_id,

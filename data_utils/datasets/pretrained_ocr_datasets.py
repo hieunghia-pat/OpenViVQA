@@ -65,7 +65,7 @@ class PretrainedOcrDataset(OcrDataset):
             question=question,
             input_ids=question_tokens,
             attention_mask=question_mask,
-            labels=answer,
-            answer_tokens=answer_tokens,
+            answer=answer,
+            labels=answer_tokens,
             decoder_attention_mask=answer_mask
         )

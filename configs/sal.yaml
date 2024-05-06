@@ -23,8 +23,6 @@ training:
   score: Accuracy
   verbose_scores:
     - Accuracy
-    - Precision
-    - Recall
     - F1
   get_scores: True
   beam_size: 1

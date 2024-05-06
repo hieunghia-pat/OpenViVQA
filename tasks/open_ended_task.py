@@ -71,10 +71,11 @@ class OpenEndedTask(BaseTask):
         with tqdm(desc='Epoch %d - Evaluation' % self.epoch, unit='it', total=len(self.test_dataloader)) as pbar:
             for it, items in enumerate(self.test_dataloader):
                 items = items.to(self.device)
-                predicted_ids, labels = self.model(**items)
+                predicted_ids = self.model(**items)
 
+                answers = items.answer
                 answers_gen = self.vocab.decode_answer(predicted_ids)
-                for i, (gts_i, gen_i) in enumerate(zip(labels, answers_gen)):
+                for i, (gts_i, gen_i) in enumerate(zip(answers, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
                     gts['%d_%d' % (it, i)] = [gts_i, ]

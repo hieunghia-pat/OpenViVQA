@@ -475,11 +475,9 @@ class SaL(nn.Module):
     def forward(self, **kwargs):
         if self.training:
             returns = self.backbone(**kwargs)
-            
-            return returns
         else:
-            labels = kwargs.pop("labels")
+            kwargs.pop("labels")
             kwargs.pop("decoder_attention_mask")
             returns = self.backbone.generate(**kwargs, **self.generator_args)
 
-            return returns, labels
+        return returns

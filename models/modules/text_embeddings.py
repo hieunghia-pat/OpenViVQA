@@ -26,21 +26,20 @@ from transformers.models.roberta.modeling_roberta import (
     RobertaEncoder,
     RobertaPreTrainedModel
 )
-
 from transformers.models.deberta_v2.modeling_deberta_v2 import (
     DebertaV2Config,
     DebertaV2Embeddings,
     DebertaV2Encoder,
     DebertaV2PreTrainedModel
 )
-
+'''
 from transformers.models.xlm_roberta.modeling_xlm_roberta import (
     XLMRobertaConfig,
     XLMRobertaEmbeddings,
     XLMRobertaEncoder,
     XLMRobertaPreTrainedModel
 )
-
+'''
 from transformers import (
     BertTokenizer,
     AlbertTokenizer, 
@@ -511,7 +510,8 @@ class DebertaEmbedding(nn.Module):
         out = self.dropout(self.gelu(out))
 
         return out, padding_mask
-    
+
+'''    
 class TextXLM(XLMRobertaPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
@@ -569,3 +569,4 @@ class XLMRobertaEmbedding(nn.Module):
         out = self.dropout(self.gelu(out))
 
         return out, padding_mask
+        '''

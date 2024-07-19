@@ -15,6 +15,8 @@ class DictionaryDataset(BaseDataset):
         for ann in json_data["annotations"]:
             # find the appropriate image
             for image in json_data["images"]:
+                print(image)
+                print(ann)
                 if image["id"] == ann["image_id"]:
                     question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
                     answers = [preprocess_sentence(answer, self.vocab.tokenizer) for answer in ann["answers"]]

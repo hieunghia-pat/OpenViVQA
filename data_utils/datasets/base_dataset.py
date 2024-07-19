@@ -9,7 +9,7 @@ from typing import Dict, List, Any
 class BaseDataset(data.Dataset):
     def __init__(self, json_path: str, vocab, config) -> None:
         super(BaseDataset, self).__init__()
-        with open(json_path, 'r') as file:
+        with open(json_path, 'r', encoding='utf-8') as file:
             json_data = json.load(file)
 
         # vocab

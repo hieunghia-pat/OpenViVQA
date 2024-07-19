@@ -116,6 +116,7 @@ class MMF_M4C(nn.Module):
         # fwd_results holds intermediate forward pass results
         # TODO possibly replace it with another sample list
         fwd_results = {}
+        print(items)
         self._forward_txt_encoding(items, fwd_results)
         self._forward_obj_encoding(items, fwd_results)
         self._forward_ocr_encoding(items, fwd_results)
@@ -139,6 +140,8 @@ class MMF_M4C(nn.Module):
             padding_idx=self.vocab.padding_idx
         )
         fwd_results["txt_mask"] = mask
+        print(items)
+        print(fwd_results)
 
     def _forward_obj_encoding(self, items, fwd_results):
         # object appearance feature

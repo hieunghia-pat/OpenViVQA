@@ -37,7 +37,6 @@ class FeatureDataset(BaseDataset):
                         }
                         annotations.append(annotation)
                     break
-
         return annotations
 
     def __getitem__(self, idx: int):

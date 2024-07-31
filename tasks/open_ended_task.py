@@ -52,6 +52,7 @@ class OpenEndedTask(BaseTask):
             num_workers=config.DATASET.FEATURE_DATASET.WORKERS,
             collate_fn=collate_fn
         )
+
         self.dev_dataloader = DataLoader(
             dataset=self.dev_dataset,
             batch_size=config.DATASET.FEATURE_DATASET.BATCH_SIZE,
@@ -75,6 +76,7 @@ class OpenEndedTask(BaseTask):
             shuffle=True,
             collate_fn=collate_fn
         )
+
         self.dev_dict_dataloader = DataLoader(
             dataset=self.dev_dict_dataset,
             batch_size=config.DATASET.DICT_DATASET.BATCH_SIZE // config.TRAINING.EVALUATING_BEAM_SIZE,
@@ -89,8 +91,10 @@ class OpenEndedTask(BaseTask):
         )
 
     def create_dataloaders(self, config):
+        
         self.create_feature_dataloaders(config)
         self.create_dict_dataloaders(config)
+
 
     def configuring_hyperparameters(self, config):
         self.epoch = 0
@@ -326,3 +330,22 @@ class OpenEndedTask(BaseTask):
             "results": results,
             **scores,
         }, open(os.path.join(self.checkpoint_path, "test_results.json"), "w+"), ensure_ascii=False)
+        
+if __name__ == "__main__":
+    
+    import argparse
+    from configs.utils import get_config
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config-file", type=str, required=True)
+
+    args = parser.parse_args()
+    config = get_config(args.config_file)
+    task = OpenEndedTask(config)
+    
+    task.load_datasets(config)
+    task.create_dataloaders(config)
+    
+    print("Train DataLoader:", task.train_dataloader)
+    print("Train Dict DataLoader:", task.train_dict_dataloader)
+

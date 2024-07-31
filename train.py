@@ -3,6 +3,7 @@ import argparse
 from configs.utils import get_config
 from builders.task_builder import build_task
 from utils.logging_utils import setup_logger
+from tasks.training_vitextcaps_task import TrainingCaption 
 
 logger = setup_logger()
 
@@ -17,3 +18,4 @@ task = build_task(config)
 task.start()
 task.get_predictions()
 logger.info("Task done.")
+

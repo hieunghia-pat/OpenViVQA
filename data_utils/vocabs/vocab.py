@@ -8,6 +8,7 @@ from collections import Counter
 import json
 from typing import List
 
+
 @META_VOCAB.register()
 class Vocab(object):
     """
@@ -178,3 +179,4 @@ class Vocab(object):
                 self.word_embeddings[i] = word_embeddings[we_index]
             else:
                 self.word_embeddings[i] = unk_init(self.word_embeddings[i])
+                

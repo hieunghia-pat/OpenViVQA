@@ -23,6 +23,8 @@ class ViTextCapsDataset:
         self.scene_text_features_path = config.FEATURE_DATASET.FEATURE_PATH.SCENE_TEXT
         self.scene_text_threshold = config.FEATURE_DATASET.SCENE_TEXT_THRESHOLD
         self.max_scene_text = config.FEATURE_DATASET.MAX_SCENE_TEXT
+        
+        self.fasttext_features_path = config.FEATURE_DATASET.FEATURE_PATH.FASTTEXT
 
     def load_annotations(self, json_path: str) -> List[Dict]:
 
@@ -69,13 +71,20 @@ class ViTextCapsDataset:
             "ocr_texts": features["texts"],
             "ocr_boxes": features["boxes"]
         }
+    
+    def load_fasttext_features(self, image_id: int):
+        feature_file = os.path.join(self.fasttext_path, f"{image_id}.npy")
+        feature = np.load(feature_file, allow_pickle=True)[()]
+        return {'ocr_token_embeddings': feature}
 
     def load_features(self, image_id: int) -> Dict[str, Any]:
         image_features = self.load_image_features(image_id)
         scene_text_features = self.load_scene_text_features(image_id)
+        fasttext_features = self.load_fasttext_features(image_id)
         features = {
             **image_features,
-            **scene_text_features
+            **scene_text_features,
+            **fasttext_features
         }
 
         return features
@@ -99,6 +108,7 @@ class ViTextCapsDataset:
         shifted_right_answer_tokens = torch.zeros_like(answer_tokens).fill_(self.vocab.padding_idx)
         shifted_right_answer_tokens[:-1] = answer_tokens[1:]
         answer_tokens = torch.where(answer_tokens == self.vocab.eos_idx, self.vocab.padding_idx, answer_tokens) # remove eos_token in answer
+        answer_mask = torch.where(answer_tokens > 0, 1, 0)
 
         return Instance(
             **features,
@@ -109,5 +119,6 @@ class ViTextCapsDataset:
             question_tokens=question_tokens,
             answer=answer,
             answer_tokens=answer_tokens,
-            shifted_right_answer_tokens=shifted_right_answer_tokens
+            shifted_right_answer_tokens=shifted_right_answer_tokens,
+            answer_mask=answer_mask
         )

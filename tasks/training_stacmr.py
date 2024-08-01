@@ -1,15 +1,14 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.nn import NLLLoss
 
 from utils.logging_utils import setup_logger
 from tasks.open_ended_task import OpenEndedTask
 from builders.task_builder import META_TASK
 import evaluation
-import evaluate
-from pycocoevalcap.cider.cider import Cider
+from torch.autograd import Variable
 
+from models.stacmr import VSRN
 import os
 from tqdm import tqdm
 import itertools
@@ -18,34 +17,112 @@ import json
 
 logger = setup_logger()
 
-class BCEWithMaskLogitsLoss(nn.Module):
-    def __init__(self, ignore_index=0):
-        super().__init__()
+def cosine_sim(im, s):
+    """Cosine similarity between all the image and sentence pairs
+    """
+    return im.mm(s.t())
 
-        self.ignore_index = ignore_index
 
-    def forward(self, input: torch.Tensor, target: torch.Tensor):
-        loss_mask = (target == self.ignore_index)
+def order_sim(im, s):
+    """Order embeddings similarity measure $max(0, s-im)$
+    """
+    YmX = (s.unsqueeze(1).expand(s.size(0), im.size(0), s.size(1))
+           - im.unsqueeze(0).expand(s.size(0), im.size(0), s.size(1)))
+    score = -YmX.clamp(min=0).pow(2).sum(2).sqrt().t()
+    return score
 
-        source = torch.ones_like(input)
-        scattered_target = torch.zeros_like(input)
-        scattered_target.scatter_(dim=-1, index=target.unsqueeze(-1), src=source)
+class ContrastiveLoss(nn.Module):
+    """
+    Compute contrastive loss
+    """
 
-        losses = F.binary_cross_entropy_with_logits(input, scattered_target, reduction="none")
-        losses = losses.masked_fill(loss_mask.unsqueeze(-1), value=0)
+    def __init__(self, margin=0, measure=False, max_violation=False):
+        super(ContrastiveLoss, self).__init__()
+        self.margin = margin
+        if measure == 'order':
+            self.sim = order_sim
+        else:
+            self.sim = cosine_sim
 
-        count = torch.max(torch.sum(loss_mask), torch.ones((1, )))
-        loss = torch.sum(losses) / count
+        self.max_violation = max_violation
 
-        return loss
+    def forward(self, im, s):
+        # compute image-sentence score matrix
+        scores = self.sim(im, s)
+        diagonal = scores.diag().view(im.size(0), 1)
+        d1 = diagonal.expand_as(scores)
+        d2 = diagonal.t().expand_as(scores)
+
+        # compare every diagonal score to scores in its column
+        # caption retrieval
+        cost_s = (self.margin + scores - d1).clamp(min=0)
+        # compare every diagonal score to scores in its row
+        # image retrieval
+        cost_im = (self.margin + scores - d2).clamp(min=0)
+
+        # clear diagonals
+        mask = torch.eye(scores.size(0)) > .5
+        I = Variable(mask)
+        if torch.cuda.is_available():
+            I = I.cuda()
+        cost_s = cost_s.masked_fill_(I, 0)
+        cost_im = cost_im.masked_fill_(I, 0)
+
+        # keep the maximum violating negative for each query
+        if self.max_violation:
+            cost_s = cost_s.max(1)[0]
+            cost_im = cost_im.max(0)[0]
+
+        return cost_s.sum() + cost_im.sum()
+
+class LanguageModelCriterion(nn.Module):
+
+    def __init__(self, config):
+        super(LanguageModelCriterion, self).__init__()
+        self.loss_fn = nn.NLLLoss(ignore_index=config.TOKENIZER.PAD_ID_TOKEN)
+
+    def forward(self, logits, target, mask):
+        """
+        logits: shape of (N, seq_len, vocab_size)
+        target: shape of (N, seq_len)
+        mask: shape of (N, seq_len)
+        """
+        # truncate to the same size
+        batch_size = logits.shape[0]
+        target = target[:, :logits.shape[1]]
+        mask = mask[:, :logits.shape[1]]
+        logits = logits.contiguous().view(-1, logits.shape[2])
+        target = target.contiguous().view(-1)
+        mask = mask.contiguous().view(-1)
+        # print(logits.shape)
+        # print(target.shape)
+        loss = self.loss_fn(logits, target)
+        output = torch.sum(loss * mask) / batch_size
+        return output
+
+def stacmr_loss_fn(outputs, labels, masks, config):
+
+    criterion = ContrastiveLoss(margin=config.MODEL.MARGIN,
+                                measure=config.MODEL.MEASURE,
+                                max_violation=config.MODEL.MAX_VIOLATION)
+    crit = LanguageModelCriterion(config)
+    # rl_crit = RewardCriterion()
+
+    caption_loss = crit(outputs['seq_probs'], labels[:, 1:], masks[:, 1:])
+    retrieval_loss = criterion(outputs['img_emb'], outputs['cap_emb'])
+
+    loss = 2.0 * retrieval_loss + caption_loss
+
+    return loss
+
 
 @META_TASK.register()
-class TrainingMMF(OpenEndedTask):
+class TrainingStacMR(OpenEndedTask):
     def __init__(self, config):
         super().__init__(config)
-
-        # self.loss_fn = BCEWithMaskLogitsLoss(ignore_index=self.vocab.padding_idx)
-        self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
+        self.model = VSRN(config.MODEL)
+        self.loss_fn = stacmr_loss_fn
+        self.config = config
 
     def evaluate_loss(self, dataloader):
         self.model.eval()
@@ -55,13 +132,25 @@ class TrainingMMF(OpenEndedTask):
                 for it, items in enumerate(dataloader):
                     items = items.to(self.device)
                     with torch.no_grad():
-                        results = self.model(items)
+                        outputs = self.model(obj_boxes=items['grid_boxes'].squeeze(),
+                                             obj_features=items['grid_features'],
+                                             ocr_boxes=items['ocr_boxes'],
+                                             ocr_token_embeddings=items['ocr_token_embeddings'],
+                                             ocr_rec_features=items['rec_features'],
+                                             ocr_det_features=items['det_features'],
+                                             caption_tokens=items['answer_tokens'].squeeze(),
+                                             caption_masks=items['answer_mask'].squeeze(),
+                                             mode='train')
 
-                    out = results["scores"].contiguous()
-                    out = F.log_softmax(out, dim=-1)
+                    # out = results["scores"].contiguous()
+                    # out = F.log_softmax(out, dim=-1)
                     
-                    shifted_right_answer_tokens = items.shifted_right_answer_tokens
-                    loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
+                    # shifted_right_answer_tokens = items.shifted_right_answer_tokens
+                    # loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
+                    loss = stacmr_loss_fn(outputs,
+                                          items['answer_tokens'].squeeze(),
+                                          items['answer_mask'].squeeze(),
+                                          self.config)
                     this_loss = loss.item()
                     running_loss += this_loss
 
@@ -80,9 +169,18 @@ class TrainingMMF(OpenEndedTask):
             for it, items in enumerate(dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    results = self.model(items)
-                outs = results["scores"].argmax(dim=-1)
-
+                    # results = self.model(items)
+                    outputs = self.model(obj_boxes=items['grid_boxes'].squeeze(),
+                                             obj_features=items['grid_features'],
+                                             ocr_boxes=items['ocr_boxes'],
+                                             ocr_token_embeddings=items['ocr_token_embeddings'],
+                                             ocr_rec_features=items['rec_features'],
+                                             ocr_det_features=items['det_features'],
+                                             caption_tokens=items['answer_tokens'].squeeze(),
+                                             caption_masks=items['answer_mask'].squeeze(),
+                                             mode='inference')
+                # outs = results["scores"].argmax(dim=-1)
+                outs = outputs['predicted_token']
                 answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous(),
                                                        items.ocr_tokens,
@@ -185,12 +283,21 @@ class TrainingMMF(OpenEndedTask):
             for it, items in enumerate(self.test_dict_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    result = self.model(items)
-                outs = result["scores"].argmax(dim=-1)
+                    outputs = self.model(obj_boxes=items['grid_boxes'].squeeze(),
+                                             obj_features=items['grid_features'],
+                                             ocr_boxes=items['ocr_boxes'],
+                                             ocr_token_embeddings=items['ocr_token_embeddings'],
+                                             ocr_rec_features=items['rec_features'],
+                                             ocr_det_features=items['det_features'],
+                                             caption_tokens=items['answer_tokens'].squeeze(),
+                                             caption_masks=items['answer_mask'].squeeze(),
+                                             mode='inference')
+                outs = outputs['predicted_token']
 
                 answers_gt = items.answers
                 answers_gen, in_fixed_vocab = self.vocab.decode_answer_with_determination(outs.contiguous().view(-1, self.vocab.max_answer_length),
-                                                        items.ocr_tokens, join_words=False)
+                                                                                          items.ocr_tokens,
+                                                                                          join_words=False)
                 gts = {}
                 gens = {}
                 for i, (gts_i, gen_i, in_fixed_vocab_i) in enumerate(zip(answers_gt, answers_gen, in_fixed_vocab)):

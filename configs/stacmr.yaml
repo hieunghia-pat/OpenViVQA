@@ -1,0 +1,101 @@
+TASK: TrainingStacMR
+
+DATASET:
+  FEATURE_DATASET:
+    TYPE: OcrFeatureDataset
+    BATCH_SIZE: 64
+    WORKERS: 2
+    FEATURE_PATH:
+      FEATURES: ./data/object_features
+      SCENE_TEXT: ./data/ocr_features
+      FASTTEXT: ./data/fasttext
+      IMAGE: null
+    SCENE_TEXT_THRESHOLD: 0.0
+    MAX_SCENE_TEXT: 100
+    WORD_EMBEDDING: ViFastText
+    WORD_EMBEDDING_CACHE: null
+  DICT_DATASET:
+    TYPE: OcrDictionaryDataset
+    BATCH_SIZE: 64
+    WORKERS: 2
+    FEATURE_PATH:
+      FEATURES: ./data/object_features
+      SCENE_TEXT: ./data/ocr_features
+      FASTTEXT: ./data/fasttext
+      IMAGE: null
+    SCENE_TEXT_THRESHOLD: 0.0
+    MAX_SCENE_TEXT: 100
+    WORD_EMBEDDING: ViFastText
+    WORD_EMBEDDING_CACHE: null
+  MIN_FREQ: 1
+  VOCAB:
+    TYPE: OcrVocab
+    TOKENIZER: null
+    WORD_EMBEDDING: null
+    WORD_EMBEDDING_CACHE: null
+    MIN_FREQ: 1
+    BOS_TOKEN: <bos>
+    EOS_TOKEN: <eos>
+    PAD_TOKEN: <pad>
+    UNK_TOKEN: <unk>
+    IMG_TOKEN: <img>
+    FEAT_TOKEN: <feat>
+    BOX_TOKEN: <box>
+    OCR_TOKEN: <ocr>
+    OCR_DET_TOKEN: <ocr_det>
+    OCR_REC_TOKEN: <ocr_rec>
+    QUESTION_TOKEN: <question>
+    ANSWER_TOKEN: <answer>
+    JSON_PATH:
+      TRAIN: data\train.json
+      DEV: data\dev.json
+      TEST: data\test.json
+  JSON_PATH:
+    TRAIN: data\train.json
+    DEV: data\dev.json
+    TEST: data\test.json
+
+TRAINING:
+  CHECKPOINT_PATH: saved_models
+  LEARNING_RATE: 1.
+  RL_LEARNING_RATE: 0.000005
+  WARMUP: 10000
+  SCORE: CIDEr
+  TRAINING_BEAM_SIZE: 1
+  EVALUATING_BEAM_SIZE: 1
+  PATIENCE: 5
+
+MODEL:
+    ARCHITECTURE: VSRN
+    DEVICE: cuda
+    BATCH_SIZE: 16
+    LEARNING_RATE: 1.e-4
+    METRIC: cider
+    MAX_PATIENT: 5
+    OBJ_IN_DIM: 1024
+    OCR_IN_DIM: 812
+    EMBED_SIZE: 512
+    WORD_DIM: 300
+    VOCAB_SIZE: 119547
+    USE_ABS: True
+    NUM_LAYERS: 1
+    RNN_TYPE: gru
+    MAX_LEN: 60
+    BIDIRECTIONAL: False
+    MARGIN: 0.2
+    MEASURE: cosine
+    MAX_VIOLATION: True
+    INPUT_DROPOUT_P: 0.2
+    RNN_DROPOUT_P: 0.5
+    NO_IMGNORM: True
+
+TOKENIZER:
+    NAME: bert-base-uncased
+    PAD_ID_TOKEN: 1
+
+FEATURE_PATH:
+  FEATURES: data\object_features
+  SCENE_TEXT: data\ocr_features
+  FASTTEXT: data\fasttext
+  IMAGE: null
+

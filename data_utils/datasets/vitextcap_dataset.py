@@ -17,6 +17,7 @@ class ViTextCapsDataset:
         self.vocab = vocab
 
         self.image_features_path = config.FEATURE_DATASET.FEATURE_PATH.FEATURES
+        self.fasttext_path = config.FEATURE_DATASET.FEATURE_PATH.FASTTEXT
 
         self.annotations = self.load_annotations(json_path)
         
@@ -57,6 +58,12 @@ class ViTextCapsDataset:
                 features[key] = torch.tensor(feature)
 
         return features
+    
+    def load_fasttext_features(self, image_id: int) -> Dict[str, Any]:
+        feature_file = os.path.join(self.fasttext_path, f"{image_id}.npy")
+        features = np.load(feature_file, allow_pickle=True)[()]
+                
+        return torch.tensor(features)
 
     def load_scene_text_features(self, image_id: int) -> Dict[str, Any]:
         feature_file = os.path.join(self.scene_text_features_path, f"{image_id}.npy")
@@ -64,12 +71,15 @@ class ViTextCapsDataset:
         for key, feature in features.items():
             if isinstance(feature, np.ndarray):
                 features[key] = torch.tensor(feature)
+        
+        ocr_fasttext_features = self.load_fasttext_features(image_id)
 
         return {
             "ocr_det_features": features["det_features"],
             "ocr_rec_features": features["rec_features"],
             "ocr_texts": features["texts"],
-            "ocr_boxes": features["boxes"]
+            "ocr_boxes": features["boxes"],
+            "ocr_fasttext_features": ocr_fasttext_features,  # Thêm đặc trưng FastText
         }
     
     def load_fasttext_features(self, image_id: int):
@@ -108,8 +118,7 @@ class ViTextCapsDataset:
         shifted_right_answer_tokens = torch.zeros_like(answer_tokens).fill_(self.vocab.padding_idx)
         shifted_right_answer_tokens[:-1] = answer_tokens[1:]
         answer_tokens = torch.where(answer_tokens == self.vocab.eos_idx, self.vocab.padding_idx, answer_tokens) # remove eos_token in answer
-        answer_mask = torch.where(answer_tokens > 0, 1, 0)
-
+        answer_mask = torch.where(answer_tokens>0, 1, 0)
         return Instance(
             **features,
             image_id=item["image_id"],

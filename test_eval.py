@@ -205,37 +205,46 @@ train_dataloader = DataLoader(
             shuffle=True,
             collate_fn=collate_fn
         )
-device = 'cuda'
-model = VSRN(config.MODEL)
-model.to(device)
-model.eval()
-it = 0
-gens = {}
-gts = {}
+# device = 'cuda'
+# model = VSRN(config.MODEL)
+# model.to(device)
+# model.eval()
+# it = 0
+# gens = {}
+# gts = {}
 items = next(iter(train_dataloader))
-items = items.to(device)
-with torch.no_grad():
-    # results = self.model(items)
-    outputs = model(obj_boxes=items['grid_boxes'].squeeze().to(device),
-                    obj_features=items['grid_features'].to(device),
-                    ocr_boxes=items['ocr_boxes'].to(device),
-                    ocr_token_embeddings=items['ocr_token_embeddings'].to(device),
-                    ocr_rec_features=items['ocr_rec_features'].to(device),
-                    ocr_det_features=items['ocr_det_features'].to(device),
-                    caption_tokens=items['answer_tokens'].squeeze().to(device),
-                    caption_masks=items['answer_mask'].squeeze().to(device),
-                    mode='inference')
+# items = items.to(device)
+# with torch.no_grad():
+#     # results = self.model(items)
+#     outputs = model(obj_boxes=items['grid_boxes'].squeeze().to(device),
+#                     obj_features=items['grid_features'].to(device),
+#                     ocr_boxes=items['ocr_boxes'].to(device),
+#                     ocr_token_embeddings=items['ocr_token_embeddings'].to(device),
+#                     ocr_rec_features=items['ocr_rec_features'].to(device),
+#                     ocr_det_features=items['ocr_det_features'].to(device),
+#                     caption_tokens=items['answer_tokens'].squeeze().to(device),
+#                     caption_masks=items['answer_mask'].squeeze().to(device),
+#                     mode='inference')
     
-# outs = results["scores"].argmax(dim=-1)
-outs = outputs['predicted_token']
-answers_gt = items.answer
-answers_gen = vocab.decode_answer(outs.contiguous(),
-                                  items.ocr_tokens,
-                                  join_words=False)
-for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
-    gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
-    gens['%d_%d' % (it, i)] = [gen_i, ]
-    gts['%d_%d' % (it, i)] = gts_i
 
-scores, _ = evaluation.compute_scores(gts, gens)
-print(scores)
+# outs = outputs['predicted_token']
+
+# answers_gt = items.answer
+# answers_gen = vocab.decode_answer(outs.contiguous(),
+#                                   items.ocr_tokens,
+#                                   join_words=False)
+# for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
+#     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
+#     gens['%d_%d' % (it, i)] = [gen_i, ]
+#     gts['%d_%d' % (it, i)] = gts_i
+
+# scores, _ = evaluation.compute_scores(gts, gens)
+print(items.keys())
+
+print(items['ocr_det_features'].shape)
+print(items['ocr_rec_features'].shape)
+print(items['ocr_token_embeddings'].shape)
+a = torch.cat([items['ocr_det_features'],
+               items['ocr_rec_features'],
+               items['ocr_token_embeddings']], dim=-1)
+print(a.shape)

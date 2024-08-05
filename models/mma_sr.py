@@ -7,13 +7,7 @@ from torch import nn
 import numpy
 import torch.nn.functional as F
 from omegaconf import OmegaConf
-from transformers.models.bert.modeling_bert import (
-    BertConfig,
-    BertEmbeddings,
-    BertEncoder,
-    BertPreTrainedModel,
-    BertLayerNorm
-)
+from transformers.models.bert.modeling_bert import BertConfig
 
 from utils.logging_utils import setup_logger
 from builders.model_builder import META_ARCHITECTURE
@@ -25,6 +19,8 @@ logger = setup_logger()
 class MMA_SR_Model(nn.Module):    
 
     def __init__(self, config, vocab):
+        super().__init__()
+        self.config = config
         self.mmt_config = BertConfig(hidden_size=self.config.MMT.HIDDEN_SIZE,
                                      num_hidden_layers=self.config.MMT.NUM_HIDDEN_LAYERS,
                                      num_attention_heads=self.config.MMT.NUM_ATTENTION_HEADS)
@@ -32,6 +28,12 @@ class MMA_SR_Model(nn.Module):
         self.d_model = self.mmt_config.hidden_size
         self.device = config.DEVICE
         self.max_iter = vocab.max_answer_length
+    
+    def build(self):
+        # split model building into several components
+        self._build_obj_encoding()
+        self._build_ocr_encoding()
+        self._build_mma_sr()
 
     def _build_obj_encoding(self):
         self.linear_obj_feat_to_mmt_in = nn.Linear(
@@ -62,13 +64,32 @@ class MMA_SR_Model(nn.Module):
         self.ocr_drop = nn.Dropout(self.config.OCR_EMBEDDING.DROPOUT)
 
     def _build_mma_sr(self):
-        hidden_size = 1000
+        hidden_size = 768
         self.mma_sr = MMA_SR(decoder_dim=hidden_size,
                              obj_dim=hidden_size,
                              ocr_dim=hidden_size,
                              emb_dim=hidden_size,
                              attention_dim=hidden_size,
+                             vocab=self.vocab,
                              mmt_config=self.mmt_config)
+    
+    def _build_output(self):
+
+        self.ocr_ptr_net = OcrPtrNet(hidden_size=self.config.OCR_PTR_NET.HIDDEN_SIZE,
+                                     query_key_size=self.config.OCR_PTR_NET.QUERY_KEY_SIZE)
+        num_choices = len(self.vocab)
+        self.classifier = nn.Linear(self.mmt_config.hidden_size, num_choices)
+
+    def forward(self, item):
+        # fwd_results holds intermediate forward pass results
+        # TODO possibly replace it with another sample list
+        fwd_results = {}
+        self._forward_obj_encoding(item, fwd_results)
+        self._forward_ocr_encoding(item, fwd_results)
+        self._foward_mma_sr(item, fwd_results)
+        results = {"scores": fwd_results["scores"]}
+        
+        return results
 
     def _forward_obj_encoding(self, items, fwd_results):
         # object appearance feature
@@ -101,7 +122,18 @@ class MMA_SR_Model(nn.Module):
         # OCR appearance feature, extracted from swintextspotter
         ocr_fc = items.ocr_det_features
         ocr_fc = F.normalize(ocr_fc, dim=-1)
-
+        max_len = max(ocr_fasttext.shape[1], ocr_phoc.shape[1], ocr_fc.shape[1])
+        
+        if ocr_fasttext.shape[1] < max_len:
+            ocr_fasttext = torch.nn.functional.pad(ocr_fasttext,
+                                                    (0, 0, 0, max_len - ocr_fasttext.shape[1], 0, 0))
+        elif ocr_phoc.shape[1] < max_len:
+            ocr_phoc = torch.nn.functional.pad(ocr_phoc,
+                                               (0, 0, 0, max_len - ocr_phoc.shape[1], 0, 0))
+        elif ocr_fc.shape[1] < max_len:
+            ocr_fc = torch.nn.functional.pad(ocr_fc,
+                                             (0, 0, 0, max_len - ocr_fc.shape[1], 0, 0))
+            
         ocr_feat = torch.cat(
             [ocr_fasttext, ocr_phoc, ocr_fc], dim=-1
         )
@@ -123,14 +155,15 @@ class MMA_SR_Model(nn.Module):
         if self.training:
 
             fwd_results["prev_inds"] = items.answer_tokens.clone()
-            target_caption = items.anser_tokens.clone()
+            target_caption = items.answer_tokens.clone()
+            print(target_caption.dtype)
             target_cap_len = items["answer_mask"].sum(dim=-1).unsqueeze(1)
 
             fwd_results["scores"] = self.mma_sr(fwd_results["obj_mmt_in"], fwd_results["ocr_mmt_in"],
                                                 fwd_results["ocr_mask"], target_caption, target_cap_len)
         else:
 
-            fwd_results["prev_inds"] = torch.zeros_like(items.anser_tokens)
+            fwd_results["prev_inds"] = torch.zeros_like(items.answer_tokens)
             fwd_results["prev_inds"][:, 0] = 1  # self.answer_processor.BOS_IDX = 1
             fwd_results["scores"] = self.mma_sr(fwd_results["obj_mmt_in"], fwd_results["ocr_mmt_in"],
                                                 fwd_results["ocr_mask"], training=False,
@@ -290,13 +323,14 @@ class MMA_SR(nn.Module):
                  emb_dim=768,
                  attention_dim=768,
                  mmt_config=None,
+                 vocab=None,
                  ss_prob=0.0):
 
         super(MMA_SR, self).__init__()
         self.dropout = nn.Dropout(0.3)
         self.decoder_dim = decoder_dim
         self.embed_config = mmt_config
-        self.vocab_size = 6736
+        self.vocab_size = len(vocab)
         self.ocr_size = 50
         self.voc_emb = nn.Embedding(self.vocab_size, emb_dim)
         self.embed = PrevPredEmbeddings(self.embed_config)

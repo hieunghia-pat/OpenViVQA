@@ -31,7 +31,6 @@ class ViTextCapsDataset:
 
         with open(json_path, 'r', encoding='utf-8') as file:
             json_data = json.load(file)
-
         annotations = []
         for ann in json_data["annotations"]:
             # find the appropriate image
@@ -40,6 +39,7 @@ class ViTextCapsDataset:
                     for answer in ann["answers"]:
                         question = preprocess_sentence(ann["question"], self.vocab.tokenizer)
                         answer = preprocess_sentence(answer, self.vocab.tokenizer)
+
                         annotation = {
                             "question": question,
                             "answer": answer,
@@ -73,7 +73,10 @@ class ViTextCapsDataset:
                 features[key] = torch.tensor(feature)
         
         ocr_fasttext_features = self.load_fasttext_features(image_id)
-
+        ocr_nums = ocr_fasttext_features.shape[0]
+        keys = ["det_features", "rec_features", "texts", "boxes"]
+        for key in keys:
+            features[key] = features[key][:ocr_nums]
         return {
             "ocr_det_features": features["det_features"],
             "ocr_rec_features": features["rec_features"],
@@ -82,19 +85,12 @@ class ViTextCapsDataset:
             "ocr_fasttext_features": ocr_fasttext_features,  # Thêm đặc trưng FastText
         }
     
-    def load_fasttext_features(self, image_id: int):
-        feature_file = os.path.join(self.fasttext_path, f"{image_id}.npy")
-        feature = np.load(feature_file, allow_pickle=True)[()]
-        return {'ocr_token_embeddings': feature}
-
     def load_features(self, image_id: int) -> Dict[str, Any]:
         image_features = self.load_image_features(image_id)
         scene_text_features = self.load_scene_text_features(image_id)
-        fasttext_features = self.load_fasttext_features(image_id)
         features = {
             **image_features,
             **scene_text_features,
-            **fasttext_features
         }
 
         return features
@@ -119,6 +115,10 @@ class ViTextCapsDataset:
         shifted_right_answer_tokens[:-1] = answer_tokens[1:]
         answer_tokens = torch.where(answer_tokens == self.vocab.eos_idx, self.vocab.padding_idx, answer_tokens) # remove eos_token in answer
         answer_mask = torch.where(answer_tokens > 0, 1, 0)
+<<<<<<< HEAD
+=======
+
+>>>>>>> b8b80abbda2f49ae74e7472727287cab71db6d7a
         return Instance(
             **features,
             image_id=item["image_id"],

@@ -115,10 +115,7 @@ class ViTextCapsDataset:
         shifted_right_answer_tokens[:-1] = answer_tokens[1:]
         answer_tokens = torch.where(answer_tokens == self.vocab.eos_idx, self.vocab.padding_idx, answer_tokens) # remove eos_token in answer
         answer_mask = torch.where(answer_tokens > 0, 1, 0)
-<<<<<<< HEAD
-=======
 
->>>>>>> b8b80abbda2f49ae74e7472727287cab71db6d7a
         return Instance(
             **features,
             image_id=item["image_id"],

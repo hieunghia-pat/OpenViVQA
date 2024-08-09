@@ -33,11 +33,13 @@ class TrainingCaption(BaseTask):
         dev_dataset = ViTextCapsDataset(config.JSON_PATH.DEV, self.vocab, config)
         test_dataset = ViTextCapsDataset(config.JSON_PATH.TEST, self.vocab, config)
         
+        print(len(self.vocab))
         self.train_dataset, self.dev_dataset, self.test_dataset = (
             train_dataset,
             dev_dataset,
             test_dataset,
         )
+
         
     def create_feature_dataloaders(self, config):
         self.train_dataloader = DataLoader(
@@ -105,6 +107,7 @@ class TrainingCaption(BaseTask):
         return val_loss
 
     def evaluate_metrics(self, dataloader):
+        
         self.model.eval()
         gens = {}
         gts = {}
@@ -112,10 +115,15 @@ class TrainingCaption(BaseTask):
             for it, items in enumerate(dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs = self.model(items)['prev_inds']
+                    outs = self.model(items)['scores']
+                    
                 answers_gt = items.answer
+                outs = outs.argmax(dim=-1)
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), 
                                                         items.ocr_tokens, join_words=False)
+                print('-'*30)
+                print('gens_dev: ', answers_gen)
+                print('gts_dev: ', answers_gt)
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
@@ -147,45 +155,6 @@ class TrainingCaption(BaseTask):
                 pbar.set_postfix(loss=running_loss / (it + 1))
                 pbar.update()
                 self.scheduler.step()
-
-    def train_scst(self):
-        # design especially for self-critical sequential learning
-        running_reward = .0
-        running_reward_baseline = .0
-
-        self.model.train()
-
-        running_loss = .0
-        with tqdm(desc='Epoch %d - Training with self-critical learning' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
-            for it, items in enumerate(self.train_dataloader):
-                items = items.to(self.device)
-                outs, log_probs = self.model.beam_search(items, batch_size=items.batch_size, 
-                                                            beam_size=self.training_beam_size, out_size=self.training_beam_size)
-                
-                self.optim.zero_grad()
-
-                # Rewards
-                bs = items.question_tokens.shape[0]
-                answers_gt = items.answers
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), join_words=True)
-                answers_gt = list(itertools.chain(*([a, ] * self.training_beam_size for a in answers_gt)))
-                gens = {f"{idx}": [answer_gen, ] for idx, answer_gen in enumerate(answers_gen)}
-                gts = {f"{idx}": answer_gt for idx, answer_gt in enumerate(answers_gt)}
-                reward = self.train_cider.compute_score(gts, gens)[1].astype(np.float32)
-                reward = torch.from_numpy(reward).to(self.device).view(bs, self.training_beam_size)
-                reward_baseline = torch.mean(reward, dim=-1, keepdim=True)
-                loss = -torch.mean(log_probs, -1) * (reward - reward_baseline)
-
-                loss = loss.mean()
-                loss.backward()
-                self.optim.step()
-
-                running_loss += loss.item()
-                running_reward += reward.mean().item()
-                running_reward_baseline += reward_baseline.mean().item()
-                pbar.set_postfix(loss=running_loss / (it + 1), reward=running_reward / (it + 1),
-                                reward_baseline=running_reward_baseline / (it + 1))
-                pbar.update()
 
     def start(self):
             if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
@@ -238,7 +207,7 @@ class TrainingCaption(BaseTask):
                 self.epoch += 1
 
     def get_predictions(self):
-        if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
+        if not os.path.isfile(os.path.join(self.checkpoint_path, 'last_model.pth')):
             logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
 
@@ -253,12 +222,11 @@ class TrainingCaption(BaseTask):
                 # items = Instance.cat([items])
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs = self.model(items)['prev_inds']
+                    outs = self.model(items)['scores']
                     
-                print(len(outs))
-                print(len(self.vocab))
 
                 answers_gt = items.answer
+                outs = outs.argmax(dim=-1)
                 answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length),
                                                         items.ocr_tokens, join_words=False)
                 gts = {}
@@ -278,6 +246,11 @@ class TrainingCaption(BaseTask):
                     "gens": gens,
                     "gts": gts
                 })
+                
+                print('-'*30)
+                print('gens: ', gens)
+                print('gts: ', gts)
+
 
                 pbar.update()
 

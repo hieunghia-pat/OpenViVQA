@@ -1,11 +1,34 @@
-OpenViVQA - Open-source Vietnamese Visual Question Answering
-===
+# Hướng dẫn Cài đặt và Chạy Dự án ViTextCaps Captioning
 
-This is an open-source repository for exploring and researching deep learning methods for Vietnamese Visual Question Answering task. We include in this repository most state-of-the-art (SOTA) approaches for VQA in English and evaluate them on the first two Vietnamese VQA dataset [ViVQA]() and [UIT-EVJVQA](https://arxiv.org/abs/2302.11752).
+Mục tiêu của dự án là tạo chú thích cho hình ảnh một cách chính xác và hiệu quả.
 
-## Contact
-This repository is constructed under instruction of NLP@UIT. For more information about relevant published papers and datasets, please visit [http://nlp.uit.edu.vn](http://nlp.uit.edu.vn).
+## Hướng dẫn Cài đặt và Chạy
 
-Authors:
-- Nghia Hieu Nguyen: [19520178@gm.uit.edu.vn](mailto:19520178@gm.uit.edu.vn)
-- Duong T.D Vo: [19520483@gm.uit.edu.vn](mailto:19520483@gm.uit.edu.vn)
+1. **Clone Repository**
+
+   Đầu tiên, clone repository về máy của bạn bằng lệnh sau:
+
+   ```bash
+   !git clone -b NhiNguyen34-patch-1 https://github.com/NhiNguyen34/vitextcaps-captioning.git
+
+2. Cài đặt các thư viện cần thiết:
+    ```bash
+    %cd vitextcaps-captioning 
+    !pip install -r requirements.txt
+
+3. Tạo thư mục và giải nén dữ liệu:
+       ```bash
+
+        !mkdir -p /content/vitextcaps-captioning/data/fasttext
+   
+        %cd /content/vitextcaps-captioning/data/fasttext
+        !unzip /content/drive/MyDrive/ViTextCap/Data/newData/fasttext.zip
+        
+        %cd /content/vitextcaps-captioning/data
+        !unzip /content/drive/MyDrive/ViTextCap/Data/features/vinvl_vinvl.zip
+        !unzip /content/drive/MyDrive/ViTextCap/Data/features/swintextspotter.zip 
+
+5. Chạy mô hình:
+      ```bash
+      
+      !python /content/vitextcaps-captioning/train.py --config-file /content/vitextcaps-captioning/configs/mmf_m4c_captioner.yaml

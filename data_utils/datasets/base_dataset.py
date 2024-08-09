@@ -11,7 +11,6 @@ class BaseDataset(data.Dataset):
         super(BaseDataset, self).__init__()
         with open(json_path, 'r', encoding='utf-8') as file:
             json_data = json.load(file)
-            
 
         # vocab
         self.vocab = vocab
@@ -20,7 +19,7 @@ class BaseDataset(data.Dataset):
         self.annotations = self.load_annotations(json_data)
 
         # image features
-        self.image_features_path = config.DATASET.FEATURE_PATH.FEATURES
+        self.image_features_path = config.FEATURE_PATH.FEATURES
 
     def load_annotations(self, json_data: Dict) -> List[Dict]:
         raise NotImplementedError

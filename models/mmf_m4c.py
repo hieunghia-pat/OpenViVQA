@@ -4,13 +4,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from torch import nn
-# from transformers.models.bert.modeling_bert import (
-#     BertConfig,
-#     BertEmbeddings,
-#     BertEncoder,
-#     BertPreTrainedModel,
-# )
-
 from transformers.models.bert.modeling_bert import (
     BertConfig,
     BertEmbeddings,
@@ -39,6 +32,7 @@ class MMF_M4C(nn.Module):
         self.d_model = self.mmt_config.hidden_size
         self.device = config.DEVICE
         self.max_iter = vocab.max_answer_length
+        print('vocab.max_answer_length', vocab.max_answer_length)
 
         self.build()
 
@@ -123,7 +117,6 @@ class MMF_M4C(nn.Module):
         # fwd_results holds intermediate forward pass results
         # TODO possibly replace it with another sample list
         fwd_results = {}
-        print(items)
         self._forward_txt_encoding(items, fwd_results)
         self._forward_obj_encoding(items, fwd_results)
         self._forward_ocr_encoding(items, fwd_results)
@@ -147,8 +140,6 @@ class MMF_M4C(nn.Module):
             padding_idx=self.vocab.padding_idx
         )
         fwd_results["txt_mask"] = mask
-        print(items)
-        print(fwd_results)
 
     def _forward_obj_encoding(self, items, fwd_results):
         # object appearance feature
@@ -231,11 +222,14 @@ class MMF_M4C(nn.Module):
     def _forward_output(self, items, fwd_results):
         mmt_dec_output = fwd_results["mmt_dec_output"]
         mmt_ocr_output = fwd_results["mmt_ocr_output"]
+
         ocr_mask = fwd_results["ocr_mask"]
 
         fixed_scores = self.classifier(mmt_dec_output)
         dynamic_ocr_scores = self.ocr_ptr_net(mmt_dec_output, mmt_ocr_output, ocr_mask)
+
         scores = torch.cat([fixed_scores, dynamic_ocr_scores], dim=-1)
+
         fwd_results["scores"] = scores
 
     def _forward_mmt_and_output(self, items, fwd_results):
@@ -261,7 +255,7 @@ class MMF_M4C(nn.Module):
                 fwd_results["prev_inds"][:, 1:] = argmax_inds[:, :-1]
                 
                 # whether or not to interrupt the decoding process
-                last_ids = torch.where(last_ids == self.vocab.eos_idx, last_ids, argmax_inds[:, ith])
+                last_ids = torch.where(last_ids.float() == self.vocab.eos_idx, last_ids.float(), argmax_inds[:, ith].float())
                 if last_ids.mean() == self.vocab.eos_idx:
                     break
 

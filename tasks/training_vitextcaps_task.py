@@ -92,7 +92,10 @@ class TrainingCaption(BaseTask):
                 for it, items in enumerate(dataloader):
                     items = items.to(self.device)
                     with torch.no_grad():
-                        out = self.model(items).contiguous()
+                        results = self.model(items)
+
+                    out = results["scores"].contiguous()
+                    out = F.log_softmax(out, dim=-1)
                     
                     shifted_right_answer_tokens = items.shifted_right_answer_tokens
                     loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
@@ -107,7 +110,6 @@ class TrainingCaption(BaseTask):
         return val_loss
 
     def evaluate_metrics(self, dataloader):
-        
         self.model.eval()
         gens = {}
         gts = {}
@@ -115,15 +117,14 @@ class TrainingCaption(BaseTask):
             for it, items in enumerate(dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outs = self.model(items)['scores']
-                    
+                    results = self.model(items)
+                outs = results["scores"].argmax(dim=-1)
+
                 answers_gt = items.answer
-                outs = outs.argmax(dim=-1)
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length), 
-                                                        items.ocr_tokens, join_words=False)
-                print('-'*30)
-                print('gens_dev: ', answers_gen)
-                print('gts_dev: ', answers_gt)
+                answers_gen = self.vocab.decode_answer(outs.contiguous(),
+                                                       items.ocr_tokens,
+                                                       join_words=False)
+
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
@@ -223,43 +224,40 @@ class TrainingCaption(BaseTask):
                 items = items.to(self.device)
                 with torch.no_grad():
                     outs = self.model(items)['scores']
-                    
 
                 answers_gt = items.answer
                 outs = outs.argmax(dim=-1)
-                answers_gen = self.vocab.decode_answer(outs.contiguous().view(-1, self.vocab.max_answer_length),
+                answers_gen, in_fixed_vocab = self.vocab.decode_answer_with_determination(outs.contiguous().view(-1, self.vocab.max_answer_length),
                                                         items.ocr_tokens, join_words=False)
+                print('answers_gen: ', answers_gen)
+                
                 gts = {}
                 gens = {}
-                for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
+                for i, (gts_i, gen_i, in_fixed_vocab_i) in enumerate(zip(answers_gt, answers_gen, in_fixed_vocab)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
-                    gens['%d_%d' % (it, i)] = gen_i
+                    gens['%d_%d' % (it, i)] = (gen_i, in_fixed_vocab_i)
                     gts['%d_%d' % (it, i)] = gts_i
                     overall_gens['%d_%d' % (it, i)] = [gen_i, ]
                     overall_gts['%d_%d' % (it, i)] = gts_i
                 pbar.update()
 
                 results.append({
-                    "id": items.image_id,
+                    "id": items.question_id,
                     "image_id": items.image_id,
                     "filename": items.filename,
                     "gens": gens,
                     "gts": gts
                 })
-                
-                print('-'*30)
-                print('gens: ', gens)
-                print('gts: ', gts)
-
 
                 pbar.update()
 
         scores, _ = evaluation.compute_scores(overall_gts, overall_gens)
         logger.info("Evaluation scores on test: %s", scores)
+
         with open(os.path.join(self.checkpoint_path, "test_results.json"), "w+", encoding='utf-8') as f:
             json.dump({
                     "results": results,
                     **scores,
-                }, f, ensure_ascii=False)  
+                }, f, ensure_ascii=False) 
 
 

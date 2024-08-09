@@ -1,4 +1,4 @@
-# Hướng dẫn Cài đặt và Chạy Dự án ViTextCaps Captioning
+# vitextcaps captioning
 
 Mục tiêu của dự án là tạo chú thích cho hình ảnh một cách chính xác và hiệu quả.
 

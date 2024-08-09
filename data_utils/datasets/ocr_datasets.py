@@ -28,39 +28,13 @@ class OcrFeatureDataset(FeatureDataset):
                 features[key] = torch.tensor(feature)
 
         return features
+  
+    def load_fasttext_features(self, image_id: int) -> Dict[str, Any]:
+        feature_file = os.path.join(self.fasttext_path, f"{image_id}.npy")
+        features = np.load(feature_file, allow_pickle=True)[()]
+                
+        return torch.tensor(features)
 
-    # def load_scene_text_features(self, image_id: int) -> Dict[str, Any]:
-    #     feature_file = os.path.join(self.scene_text_features_path, f"{image_id}.npy")
-    #     features = np.load(feature_file, allow_pickle=True)[()]
-    #     for key, feature in features.items():
-    #         if isinstance(feature, np.ndarray):
-    #             features[key] = torch.tensor(feature)
-
-    #     # select ocr features and tokens having confident score greater than a threshold
-    #     selected_ids = (np.array(features["scores"]) >= self.scene_text_threshold).tolist()
-    #     for key, feature in features.items():
-    #         if isinstance(feature, torch.Tensor) or isinstance(feature, np.ndarray):
-    #             feature = feature[selected_ids]
-    #         else:
-    #             feature = [feature[idx] for idx, selected_id in enumerate(selected_ids) if selected_id]
-    #         features[key] = feature
-    #     # get the top confident-score ocr features and tokens
-    #     if np.array(selected_ids).sum() > self.max_scene_text:
-    #         topk_scores = torch.topk(torch.tensor(features["scores"]), k=self.max_scene_text)
-    #         for key, feature in features.items():
-    #             if isinstance(feature, torch.Tensor):
-    #                 feature = feature[topk_scores.indices]
-    #             else:
-    #                 feature = [feature[idx] for idx in topk_scores.indices]
-    #             features[key] = feature
-
-    #     return {
-    #         "ocr_det_features": features["det_features"],
-    #         "ocr_rec_features": features["rec_features"],
-    #         "ocr_texts": features["texts"],
-    #         "ocr_boxes": features["boxes"],
-    #         "ocr_scores": features["scores"]
-    #     }
     
     def load_scene_text_features(self, image_id: int) -> Dict[str, Any]:
         feature_file = os.path.join(self.scene_text_features_path, f"{image_id}.npy")
@@ -82,11 +56,7 @@ class OcrFeatureDataset(FeatureDataset):
             "ocr_fasttext_features": ocr_fasttext_features,  # Thêm đặc trưng FastText
         }
         
-    def load_fasttext_features(self, image_id: int) -> Dict[str, Any]:
-        feature_file = os.path.join(self.fasttext_path, f"{image_id}.npy")
-        features = np.load(feature_file, allow_pickle=True)[()]
-                
-        return torch.tensor(features)
+
 
     def load_features(self, image_id: int) -> Dict[str, Any]:
         image_features = self.load_image_features(image_id)
@@ -130,6 +100,7 @@ class OcrFeatureDataset(FeatureDataset):
 class OcrDictionaryDataset(DictionaryDataset):
     def __init__(self, json_path: str, vocab, config) -> None:
         super().__init__(json_path, vocab, config)
+        self.fasttext_path = config.FEATURE_PATH.FASTTEXT
 
         # scene text features
         self.scene_text_features_path = config.FEATURE_PATH.SCENE_TEXT
@@ -145,38 +116,33 @@ class OcrDictionaryDataset(DictionaryDataset):
 
         return features
 
+    def load_fasttext_features(self, image_id: int) -> Dict[str, Any]:
+        feature_file = os.path.join(self.fasttext_path, f"{image_id}.npy")
+        features = np.load(feature_file, allow_pickle=True)[()]
+                
+        return torch.tensor(features)
+
+    
     def load_scene_text_features(self, image_id: int) -> Dict[str, Any]:
         feature_file = os.path.join(self.scene_text_features_path, f"{image_id}.npy")
         features = np.load(feature_file, allow_pickle=True)[()]
         for key, feature in features.items():
             if isinstance(feature, np.ndarray):
                 features[key] = torch.tensor(feature)
-
-        # select ocr features and tokens having confident score greater than a threshold
-        selected_ids = (np.array(features["scores"]) >= self.scene_text_threshold).tolist()
-        for key, feature in features.items():
-            if isinstance(feature, torch.Tensor) or isinstance(feature, np.ndarray):
-                feature = feature[selected_ids]
-            else:
-                feature = [feature[idx] for idx, selected_id in enumerate(selected_ids) if selected_id]
-            features[key] = feature
-        # get the top confident-score ocr features and tokens
-        if np.array(selected_ids).sum() > self.max_scene_text:
-            topk_scores = torch.topk(torch.tensor(features["scores"]), k=self.max_scene_text)
-            for key, feature in features.items():
-                if isinstance(feature, torch.Tensor):
-                    feature = feature[topk_scores.indices]
-                else:
-                    feature = [feature[idx] for idx in topk_scores.indices]
-                features[key] = feature
-
+        
+        ocr_fasttext_features = self.load_fasttext_features(image_id)
+        ocr_nums = ocr_fasttext_features.shape[0]
+        keys = ["det_features", "rec_features", "texts", "boxes"]
+        for key in keys:
+            features[key] = features[key][:ocr_nums]
         return {
             "ocr_det_features": features["det_features"],
             "ocr_rec_features": features["rec_features"],
             "ocr_texts": features["texts"],
             "ocr_boxes": features["boxes"],
-            "ocr_scores": features["scores"]
+            "ocr_fasttext_features": ocr_fasttext_features,  # Thêm đặc trưng FastText
         }
+        
 
     def load_features(self, image_id: int) -> Dict[str, Any]:
         image_features = self.load_image_features(image_id)

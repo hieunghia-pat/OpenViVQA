@@ -3,7 +3,7 @@ TASK: TrainingMMF
 DATASET:
   FEATURE_DATASET:
     TYPE: OcrFeatureDataset
-    BATCH_SIZE: 1
+    BATCH_SIZE: 64
     WORKERS: 0
     FEATURE_PATH:
       FEATURES: /content/vitextcaps-captioning/data/vinvl_vinvl
@@ -16,7 +16,7 @@ DATASET:
     WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
     TYPE: OcrDictionaryDataset
-    BATCH_SIZE: 1
+    BATCH_SIZE: 64
     WORKERS: 0
     FEATURE_PATH:
       FEATURES: /content/vitextcaps-captioning/data/vinvl_vinvl

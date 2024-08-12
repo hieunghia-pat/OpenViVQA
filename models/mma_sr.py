@@ -16,7 +16,7 @@ from models.utils import generate_padding_mask, generate_sequential_mask
 logger = setup_logger()
 
 @META_ARCHITECTURE.register()
-class MMA_SR_Model(nn.Module):    
+class MMA_SR_Model(nn.Module):
 
     def __init__(self, config, vocab):
         super().__init__()
@@ -28,7 +28,8 @@ class MMA_SR_Model(nn.Module):
         self.d_model = self.mmt_config.hidden_size
         self.device = config.DEVICE
         self.max_iter = vocab.max_answer_length
-    
+        # self.training = True
+
     def build(self):
         # split model building into several components
         self._build_obj_encoding()
@@ -72,7 +73,7 @@ class MMA_SR_Model(nn.Module):
                              attention_dim=hidden_size,
                              vocab=self.vocab,
                              mmt_config=self.mmt_config)
-    
+
     def _build_output(self):
 
         self.ocr_ptr_net = OcrPtrNet(hidden_size=self.config.OCR_PTR_NET.HIDDEN_SIZE,
@@ -88,7 +89,7 @@ class MMA_SR_Model(nn.Module):
         self._forward_ocr_encoding(item, fwd_results)
         self._foward_mma_sr(item, fwd_results)
         results = {"scores": fwd_results["scores"]}
-        
+
         return results
 
     def _forward_obj_encoding(self, items, fwd_results):
@@ -100,12 +101,8 @@ class MMA_SR_Model(nn.Module):
         ) + self.obj_bbox_layer_norm(self.linear_obj_bbox_to_mmt_in(obj_bbox))
         obj_mmt_in = self.obj_drop(obj_mmt_in)
         fwd_results["obj_mmt_in"] = obj_mmt_in
-
-        mask = generate_padding_mask(
-            obj_feat,
-            padding_idx=0
-        )
-        fwd_results["obj_mask"] = mask
+        obj_nums = torch.tensor([obj_feat.shape[1]]*obj_mmt_in.shape[0])
+        fwd_results["obj_mask"] = _get_mask(obj_nums, obj_mmt_in.size(1))
 
 
     def _forward_ocr_encoding(self, items, fwd_results):
@@ -123,7 +120,7 @@ class MMA_SR_Model(nn.Module):
         ocr_fc = items.ocr_det_features
         ocr_fc = F.normalize(ocr_fc, dim=-1)
         max_len = max(ocr_fasttext.shape[1], ocr_phoc.shape[1], ocr_fc.shape[1])
-        
+
         if ocr_fasttext.shape[1] < max_len:
             ocr_fasttext = torch.nn.functional.pad(ocr_fasttext,
                                                     (0, 0, 0, max_len - ocr_fasttext.shape[1], 0, 0))
@@ -133,7 +130,7 @@ class MMA_SR_Model(nn.Module):
         elif ocr_fc.shape[1] < max_len:
             ocr_fc = torch.nn.functional.pad(ocr_fc,
                                              (0, 0, 0, max_len - ocr_fc.shape[1], 0, 0))
-            
+
         ocr_feat = torch.cat(
             [ocr_fasttext, ocr_phoc, ocr_fc], dim=-1
         )
@@ -142,13 +139,18 @@ class MMA_SR_Model(nn.Module):
             self.linear_ocr_feat_to_mmt_in(ocr_feat)
         ) + self.ocr_bbox_layer_norm(self.linear_ocr_bbox_to_mmt_in(ocr_bbox))
         ocr_mmt_in = self.ocr_drop(ocr_mmt_in)
-        fwd_results["ocr_mmt_in"] = ocr_mmt_in
 
-        mask = generate_padding_mask(
-            ocr_feat,
-            padding_idx=0
-        )
-        fwd_results["ocr_mask"] = mask
+        fwd_results["ocr_mmt_in"] = ocr_mmt_in
+        mask = ocr_fc.sum(dim=1) != 0
+
+        max_feat = []
+        for i in range(items.ocr_token_embeddings.shape[0]):
+            item_ = items.ocr_token_embeddings[i]
+            mask = item_.sum(dim=1) != 0
+            max_feat.append(item_[mask].shape[0])
+        max_feat = torch.tensor(max_feat)
+        fwd_results["ocr_mask"] = _get_mask(max_feat, ocr_mmt_in.size(1)).squeeze()
+        
 
     def _foward_mma_sr(self, items, fwd_results):
 
@@ -156,7 +158,7 @@ class MMA_SR_Model(nn.Module):
 
             fwd_results["prev_inds"] = items.answer_tokens.clone()
             target_caption = items.answer_tokens.clone()
-            print(target_caption.dtype)
+
             target_cap_len = items["answer_mask"].sum(dim=-1).unsqueeze(1)
 
             fwd_results["scores"] = self.mma_sr(fwd_results["obj_mmt_in"], fwd_results["ocr_mmt_in"],
@@ -165,6 +167,7 @@ class MMA_SR_Model(nn.Module):
 
             fwd_results["prev_inds"] = torch.zeros_like(items.answer_tokens)
             fwd_results["prev_inds"][:, 0] = 1  # self.answer_processor.BOS_IDX = 1
+
             fwd_results["scores"] = self.mma_sr(fwd_results["obj_mmt_in"], fwd_results["ocr_mmt_in"],
                                                 fwd_results["ocr_mask"], training=False,
                                                 )
@@ -211,10 +214,10 @@ class PrevPredEmbeddings(nn.Module):
         super().__init__()
         MAX_DEC_LENGTH = 100
         MAX_TYPE_NUM = 5
-    
+
         hidden_size = config.hidden_size
         ln_eps = config.layer_norm_eps
-    
+
         self.token_type_embeddings = nn.Embedding(MAX_TYPE_NUM, hidden_size)
 
         self.ans_layer_norm = nn.LayerNorm(hidden_size, eps=ln_eps)
@@ -224,7 +227,6 @@ class PrevPredEmbeddings(nn.Module):
 
 
     def forward(self, ans_emb, ocr_emb, prev_inds):
-
         assert prev_inds.dim() == 2 and prev_inds.dtype == torch.long
         assert ans_emb.dim() == 2
         batch_size = prev_inds.size(0)
@@ -303,14 +305,17 @@ class AttentionC(nn.Module):
     def forward(self, attended_features, decoder_hidden, attention_mask=None):
 
         att1 = self.features_att(attended_features)  # (batch_size, attend_features_dim, attention_dim)
+
         att2 = self.decoder_att(decoder_hidden)  # (batch_size, decoder_features_dim, attention_dim)
+
         att = self.full_att(self.tanh(att1 + att2.unsqueeze(1))).squeeze(2)  # (batch_size, m, n)
+
         if attention_mask is not None:
             extended_attention_mask = (1.0 - attention_mask) * -10000.0
             alpha = self.softmax(att + extended_attention_mask)  # (batch_size, 36)
         else:
             alpha = self.softmax(att)
-        context = (attended_features * alpha.unsqueeze(2)).sum(dim=1)  
+        context = (attended_features * alpha.unsqueeze(2)).sum(dim=1)
         return context
 
 
@@ -331,7 +336,7 @@ class MMA_SR(nn.Module):
         self.decoder_dim = decoder_dim
         self.embed_config = mmt_config
         self.vocab_size = len(vocab)
-        self.ocr_size = 50
+        self.ocr_size = 100
         self.voc_emb = nn.Embedding(self.vocab_size, emb_dim)
         self.embed = PrevPredEmbeddings(self.embed_config)
         self.ss_prob = 0.0
@@ -375,9 +380,13 @@ class MMA_SR(nn.Module):
         predictions = torch.zeros(batch_size, max_len, self.vocab_size + self.ocr_size).to(device)
 
         ocr_num = ocr_mask.sum(dim=-1)
+
         ocr_nums = (ocr_num + (ocr_num == 0).long())
+
         ocr_mean = ocr_features.sum(dim=1) / ocr_nums.unsqueeze(1)
+
         obj_mean = obj_features.mean(1)
+
         dec_num = int(max(decode_lengths))
         if dec_num > max_len:
             dec_num = max_len
@@ -395,10 +404,11 @@ class MMA_SR(nn.Module):
                     it.index_copy_(0, sample_ind, torch.multinomial(prob_prev, 1).view(-1).index_select(0, sample_ind))
             else:
                 it = target_caption[:, t].clone()
-
+            if it.dim() == 1:
+                it = it.unsqueeze(dim=-1)
             y = self.embed(self.voc_emb.weight, ocr_features, it)
 
-            x_fu = torch.cat([h_obj + h_ocr, obj_mean + ocr_mean, y], dim=-1)
+            x_fu = torch.cat([h_obj + h_ocr, obj_mean + ocr_mean, y.squeeze()], dim=-1)
             h_fu, c_fu = self.fusion_lstm(x_fu, (h_fu, c_fu))
 
             v_obj_weighted = self.obj_attention(obj_features, h_fu)
@@ -414,7 +424,7 @@ class MMA_SR(nn.Module):
             scores = torch.cat([s_v, s_o], dim=-1)
 
             if not training and t < dec_num - 1:
-              
+
                 scores[:, 3] = -1e10
                 scores = scores + repeat_mask
                 pre_idx = (scores.argmax(dim=-1)).long()

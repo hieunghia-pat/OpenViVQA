@@ -60,16 +60,18 @@ class VSRN(nn.Module):
             self.caption_model.cuda()
 
     def forward(self,
-                obj_boxes,
-                obj_features,
-                ocr_boxes,
-                ocr_token_embeddings,
-                ocr_rec_features,
-                ocr_det_features,
-                caption_tokens,
-                caption_masks,
+                item,
                 mode='train'):
 
+        obj_boxes = item.grid_boxes.to(self.config.DEVICE)
+        obj_features = item.grid_features.to(self.config.DEVICE)
+        ocr_boxes = item.ocr_boxes.to(self.config.DEVICE)
+        ocr_token_embeddings = item.ocr_token_embeddings.to(self.config.DEVICE)
+        ocr_rec_features = item.ocr_rec_features.to(self.config.DEVICE)
+        ocr_det_features = item.ocr_det_features.to(self.config.DEVICE)
+        caption_tokens = item.answer_tokens.squeeze().to(self.config.DEVICE)
+        caption_masks = item.answer_mask.squeeze().to(self.config.DEVICE)
+        
         B, _ = caption_masks.shape
         temp = np.zeros(B)
         for i in range(len(temp)):

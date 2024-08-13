@@ -94,7 +94,7 @@ class VSRN(nn.Module):
             out = {
                 'img_emb': img_emb,
                 'cap_emb': cap_emb,
-                'seq_probs': seq_probs,
+                'scores': seq_probs, # seg_probs
                 'GCN_img_emd': GCN_img_emd
             }
 
@@ -104,7 +104,7 @@ class VSRN(nn.Module):
                                                             mode=mode)
             out = {'img_emb': img_emb,
                    'cap_emb': cap_emb,
-                   'seq_probs': seq_probs,
+                   'scores': seq_probs, # seg_probs
                    'GCN_img_emd': GCN_img_emd,
                    'predicted_token': predicted_token
                    }

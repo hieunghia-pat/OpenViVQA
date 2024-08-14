@@ -34,7 +34,7 @@ class BCEWithMaskLogitsLoss(nn.Module):
         losses = F.binary_cross_entropy_with_logits(input, scattered_target, reduction="none")
         losses = losses.masked_fill(loss_mask.unsqueeze(-1), value=0)
 
-        count = torch.max(torch.sum(loss_mask), torch.ones((1, )))
+        count = torch.max(torch.sum(loss_mask), torch.ones((1, )).to(loss_mask.device)) 
         loss = torch.sum(losses) / count
 
         return loss
@@ -44,8 +44,8 @@ class TrainingMMF(OpenEndedTask):
     def __init__(self, config):
         super().__init__(config)
 
-        # self.loss_fn = BCEWithMaskLogitsLoss(ignore_index=self.vocab.padding_idx)
-        self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
+        self.loss_fn = BCEWithMaskLogitsLoss(ignore_index=self.vocab.padding_idx)
+        #self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
 
     def evaluate_loss(self, dataloader):
         self.model.eval()
@@ -58,7 +58,7 @@ class TrainingMMF(OpenEndedTask):
                         results = self.model(items)
 
                     out = results["scores"].contiguous()
-                    out = F.log_softmax(out, dim=-1)
+                    # out = F.log_softmax(out, dim=-1)
                     
                     shifted_right_answer_tokens = items.shifted_right_answer_tokens
                     loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
@@ -105,7 +105,7 @@ class TrainingMMF(OpenEndedTask):
                 items = items.to(self.device)
                 results = self.model(items)
                 out = results["scores"].contiguous()
-                out = F.log_softmax(out, dim=-1)
+                #out = F.log_softmax(out, dim=-1)
 
                 shifted_right_answer_tokens = items.shifted_right_answer_tokens
                 self.optim.zero_grad()
@@ -170,12 +170,13 @@ class TrainingMMF(OpenEndedTask):
 
             self.epoch += 1
 
+
     def get_predictions(self):
-        if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
+        if not os.path.isfile(os.path.join(self.checkpoint_path, 'last_model.pth')):
             logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
 
-        self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
+        self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
 
         self.model.eval()
         results = []
@@ -191,6 +192,7 @@ class TrainingMMF(OpenEndedTask):
                 answers_gt = items.answers
                 answers_gen, in_fixed_vocab = self.vocab.decode_answer_with_determination(outs.contiguous().view(-1, self.vocab.max_answer_length),
                                                         items.ocr_tokens, join_words=False)
+                print(answers_gen)
                 gts = {}
                 gens = {}
                 for i, (gts_i, gen_i, in_fixed_vocab_i) in enumerate(zip(answers_gt, answers_gen, in_fixed_vocab)):

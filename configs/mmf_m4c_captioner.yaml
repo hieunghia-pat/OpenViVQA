@@ -1,8 +1,8 @@
-TASK: TrainingCaption  
+TASK: TrainingMMF
 
 DATASET:
   FEATURE_DATASET:
-    TYPE: ViTextCapsDataset
+    TYPE: OcrFeatureDataset
     BATCH_SIZE: 64
     WORKERS: 0
     FEATURE_PATH:
@@ -15,9 +15,9 @@ DATASET:
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
-    TYPE: ViTextCapsDataset
+    TYPE: OcrDictionaryDataset
     BATCH_SIZE: 64
-    WORKERS: 0 
+    WORKERS: 0
     FEATURE_PATH:
       FEATURES: /content/vitextcaps-captioning/data/vinvl_vinvl
       SCENE_TEXT: /content/vitextcaps-captioning/data/swintextspotter
@@ -47,13 +47,13 @@ DATASET:
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
     JSON_PATH:
-      TRAIN: /content/OpenViVQA_train.json
-      DEV: /content/OpenViVQA_dev.json
-      TEST: /content/OpenViVQA_test.json
+      TRAIN: OpenViVQA_train.json
+      DEV: OpenViVQA_dev.json
+      TEST: OpenViVQA_test.json
   JSON_PATH:
-    TRAIN: /content/OpenViVQA_train.json
-    DEV: /content/OpenViVQA_dev.json
-    TEST: /content/OpenViVQA_test.json
+    TRAIN: OpenViVQA_train.json
+    DEV: OpenViVQA_dev.json
+    TEST: OpenViVQA_test.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -67,7 +67,7 @@ TRAINING:
 
 MODEL:
   ARCHITECTURE: MMF_M4C
-  NAME: mmf_m4c_captinoner_vinvl
+  NAME: mmf_m4c_vinvl_swimspotter
   DEVICE: cuda
   D_MODEL: 768
   OBJECT_EMBEDDING:
@@ -113,4 +113,3 @@ MODEL:
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null  
 
-REMOVE_UNK_IN_PRED: True

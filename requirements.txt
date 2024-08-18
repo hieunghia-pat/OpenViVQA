@@ -5,3 +5,6 @@ evaluate
 pycocoevalcap
 transformers
 gdown
+torch
+termcolor
+tabulate

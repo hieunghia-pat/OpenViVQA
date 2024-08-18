@@ -3,8 +3,7 @@ wget==3.2
 yacs
 evaluate
 pycocoevalcap
-transformers
 gdown
-torch
-termcolor
 tabulate
+torch==1.7.1+cu110 -f https://download.pytorch.org/whl/torch_stable.html
+transformers==4.28.0

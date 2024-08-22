@@ -178,6 +178,9 @@ class MMF_M4C(nn.Module):
         ocr_fc = items.ocr_det_features
         ocr_fc = F.normalize(ocr_fc, dim=-1)
 
+        assert ocr_fc.size(1) == ocr_phoc.size(1), "Second dimensions must match!"
+
+        ocr_fasttext = ocr_fasttext[:, :ocr_phoc.size(1), :]
         ocr_feat = torch.cat(
             [ocr_fasttext, ocr_phoc, ocr_fc], dim=-1
         )

@@ -122,7 +122,7 @@ class TrainingMMF(OpenEndedTask):
 
     def start(self):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
-            checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
+            checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"), weights_only=True)
             best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"] + 1
@@ -176,7 +176,7 @@ class TrainingMMF(OpenEndedTask):
             logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
 
-        self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
+        self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"), weights_only=True)
 
         self.model.eval()
         results = []

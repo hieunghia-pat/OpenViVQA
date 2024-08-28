@@ -1,35 +1,49 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.nn import NLLLoss
 
 from utils.logging_utils import setup_logger
 from tasks.open_ended_task import OpenEndedTask
 from builders.task_builder import META_TASK
 import evaluation
-from torch.autograd import Variable
+import evaluate
+from pycocoevalcap.cider.cider import Cider
 
-from models.stacmr import VSRN
 import os
 from tqdm import tqdm
 import itertools
 from shutil import copyfile
 import json
 
+from torch.autograd import Variable
+
 logger = setup_logger()
 
-def cosine_sim(im, s):
-    """Cosine similarity between all the image and sentence pairs
-    """
-    return im.mm(s.t())
 
+class LanguageModelCriterion(nn.Module):
 
-def order_sim(im, s):
-    """Order embeddings similarity measure $max(0, s-im)$
-    """
-    YmX = (s.unsqueeze(1).expand(s.size(0), im.size(0), s.size(1))
-           - im.unsqueeze(0).expand(s.size(0), im.size(0), s.size(1)))
-    score = -YmX.clamp(min=0).pow(2).sum(2).sqrt().t()
-    return score
+    def __init__(self):
+        super(LanguageModelCriterion, self).__init__()
+        self.loss_fn = nn.NLLLoss(reduce=False)
+
+    def forward(self, logits, target, mask):
+        """
+        logits: shape of (N, seq_len, vocab_size)
+        target: shape of (N, seq_len)
+        mask: shape of (N, seq_len)
+        """
+        # truncate to the same size
+        batch_size = logits.shape[0]
+        target = target[:, :logits.shape[1]]
+        mask = mask[:, :logits.shape[1]]
+        logits = logits.contiguous().view(-1, logits.shape[2])
+        target = target.contiguous().view(-1)
+        mask = mask.contiguous().view(-1)
+        loss = self.loss_fn(logits, target)
+        output = torch.sum(loss * mask) / batch_size
+        return output
+
 
 class ContrastiveLoss(nn.Module):
     """
@@ -75,54 +89,31 @@ class ContrastiveLoss(nn.Module):
 
         return cost_s.sum() + cost_im.sum()
 
-class LanguageModelCriterion(nn.Module):
+def cosine_sim(im, s):
+    """Cosine similarity between all the image and sentence pairs
+    """
+    return im.mm(s.t())
 
-    def __init__(self, config):
-        super(LanguageModelCriterion, self).__init__()
-        self.loss_fn = nn.NLLLoss(ignore_index=config.TOKENIZER.PAD_ID_TOKEN)
 
-    def forward(self, logits, target, mask):
-        """
-        logits: shape of (N, seq_len, vocab_size)
-        target: shape of (N, seq_len)
-        mask: shape of (N, seq_len)
-        """
-        # truncate to the same size
-        batch_size = logits.shape[0]
-        target = target[:, :logits.shape[1]]
-        mask = mask[:, :logits.shape[1]]
-        logits = logits.contiguous().view(-1, logits.shape[2])
-        target = target.contiguous().view(-1)
-        mask = mask.contiguous().view(-1)
-        # print(logits.shape)
-        # print(target.shape)
-        loss = self.loss_fn(logits, target)
-        output = torch.sum(loss * mask) / batch_size
-        return output
-
-def stacmr_loss_fn(outputs, labels, masks, config):
-
-    criterion = ContrastiveLoss(margin=config.MODEL.MARGIN,
-                                measure=config.MODEL.MEASURE,
-                                max_violation=config.MODEL.MAX_VIOLATION)
-    crit = LanguageModelCriterion(config)
-    # rl_crit = RewardCriterion()
-
-    caption_loss = crit(outputs['seq_probs'], labels[:, 1:], masks[:, 1:])
-    retrieval_loss = criterion(outputs['img_emb'], outputs['cap_emb'])
-
-    loss = 2.0 * retrieval_loss + caption_loss
-
-    return loss
+def order_sim(im, s):
+    """Order embeddings similarity measure $max(0, s-im)$
+    """
+    YmX = (s.unsqueeze(1).expand(s.size(0), im.size(0), s.size(1))
+           - im.unsqueeze(0).expand(s.size(0), im.size(0), s.size(1)))
+    score = -YmX.clamp(min=0).pow(2).sum(2).sqrt().t()
+    return score
 
 
 @META_TASK.register()
 class TrainingStacMR(OpenEndedTask):
     def __init__(self, config):
         super().__init__(config)
-        self.model = VSRN(config.MODEL)
-        self.loss_fn = stacmr_loss_fn
-        self.config = config
+
+        self.crit = LanguageModelCriterion()
+        self.criterion = ContrastiveLoss(margin=config.MODEL.LOSS_FN.MARGIN,
+                                         measure=config.MODEL.LOSS_FN.MEASURE,
+                                         max_violation=config.MODEL.LOSS_FN.MAX_VIOLATION)
+        #self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
 
     def evaluate_loss(self, dataloader):
         self.model.eval()
@@ -132,25 +123,25 @@ class TrainingStacMR(OpenEndedTask):
                 for it, items in enumerate(dataloader):
                     items = items.to(self.device)
                     with torch.no_grad():
-                        outputs = self.model(obj_boxes=items['grid_boxes'].squeeze(),
-                                             obj_features=items['grid_features'],
-                                             ocr_boxes=items['ocr_boxes'],
-                                             ocr_token_embeddings=items['ocr_token_embeddings'],
-                                             ocr_rec_features=items['rec_features'],
-                                             ocr_det_features=items['det_features'],
-                                             caption_tokens=items['answer_tokens'].squeeze(),
-                                             caption_masks=items['answer_mask'].squeeze(),
-                                             mode='train')
+                        results = self.model(items, model='inference')
 
-                    # out = results["scores"].contiguous()
+                    out = results["predicted_token"].contiguous()
+                    seq_prob = out['scores']
+                    img_emb = results['img_emb']
+                    cap_emb = results['cap_emb']
                     # out = F.log_softmax(out, dim=-1)
                     
-                    # shifted_right_answer_tokens = items.shifted_right_answer_tokens
+                    shifted_right_answer_tokens = items.shifted_right_answer_tokens
                     # loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
-                    loss = stacmr_loss_fn(outputs,
-                                          items['answer_tokens'].squeeze(),
-                                          items['answer_mask'].squeeze(),
-                                          self.config)
+                    
+                    caption_loss = self.crit(seq_prob, 
+                                             shifted_right_answer_tokens, 
+                                             items.answer_mask)
+                
+                    retrieval_loss = self.forward_loss(img_emb, cap_emb)
+                    
+                    loss = 2.0 * retrieval_loss + caption_loss
+                    
                     this_loss = loss.item()
                     running_loss += this_loss
 
@@ -169,18 +160,9 @@ class TrainingStacMR(OpenEndedTask):
             for it, items in enumerate(dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    # results = self.model(items)
-                    outputs = self.model(obj_boxes=items['grid_boxes'].squeeze(),
-                                             obj_features=items['grid_features'],
-                                             ocr_boxes=items['ocr_boxes'],
-                                             ocr_token_embeddings=items['ocr_token_embeddings'],
-                                             ocr_rec_features=items['rec_features'],
-                                             ocr_det_features=items['det_features'],
-                                             caption_tokens=items['answer_tokens'].squeeze(),
-                                             caption_masks=items['answer_mask'].squeeze(),
-                                             mode='inference')
-                # outs = results["scores"].argmax(dim=-1)
-                outs = outputs['predicted_token']
+                    results = self.model(items, mode='inference')
+                outs = results["predicted_token"]
+
                 answers_gt = items.answers
                 answers_gen = self.vocab.decode_answer(outs.contiguous(),
                                                        items.ocr_tokens,
@@ -201,13 +183,23 @@ class TrainingStacMR(OpenEndedTask):
         with tqdm(desc='Epoch %d - Training with cross-entropy loss' % self.epoch, unit='it', total=len(self.train_dataloader)) as pbar:
             for it, items in enumerate(self.train_dataloader):
                 items = items.to(self.device)
-                results = self.model(items)
-                out = results["scores"].contiguous()
-                out = F.log_softmax(out, dim=-1)
+                results = self.model(items, mode='train')
+                seq_probs = results["scores"].contiguous()
+                img_emb = results['img_emb']
+                cap_emb = results['cap_emb']
+                #out = F.log_softmax(out, dim=-1)
 
                 shifted_right_answer_tokens = items.shifted_right_answer_tokens
                 self.optim.zero_grad()
-                loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
+                # loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
+                caption_loss = self.crit(seq_probs, 
+                                         shifted_right_answer_tokens, 
+                                         items.answer_mask)
+                
+                retrieval_loss = self.criterion(img_emb, cap_emb)
+                
+                loss = 2.0 * retrieval_loss + caption_loss
+                
                 loss.backward()
 
                 self.optim.step()
@@ -220,7 +212,7 @@ class TrainingStacMR(OpenEndedTask):
 
     def start(self):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
-            checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
+            checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"), weights_only=True)
             best_val_score = checkpoint["best_val_score"]
             patience = checkpoint["patience"]
             self.epoch = checkpoint["epoch"] + 1
@@ -232,7 +224,7 @@ class TrainingStacMR(OpenEndedTask):
 
         while True:
             self.train()
-            # self.evaluate_loss(self.dev_dataloader)
+            self.evaluate_loss(self.dev_dataloader)
 
             # val scores
             scores = self.evaluate_metrics(self.dev_dict_dataloader)
@@ -268,12 +260,13 @@ class TrainingStacMR(OpenEndedTask):
 
             self.epoch += 1
 
+
     def get_predictions(self):
-        if not os.path.isfile(os.path.join(self.checkpoint_path, 'best_model.pth')):
+        if not os.path.isfile(os.path.join(self.checkpoint_path, 'last_model.pth')):
             logger.error("Prediction require the model must be trained. There is no weights to load for model prediction!")
             raise FileNotFoundError("Make sure your checkpoint path is correct or the best_model.pth is available in your checkpoint path")
 
-        self.load_checkpoint(os.path.join(self.checkpoint_path, "best_model.pth"))
+        self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"), weights_only=True)
 
         self.model.eval()
         results = []
@@ -283,21 +276,12 @@ class TrainingStacMR(OpenEndedTask):
             for it, items in enumerate(self.test_dict_dataloader):
                 items = items.to(self.device)
                 with torch.no_grad():
-                    outputs = self.model(obj_boxes=items['grid_boxes'].squeeze(),
-                                             obj_features=items['grid_features'],
-                                             ocr_boxes=items['ocr_boxes'],
-                                             ocr_token_embeddings=items['ocr_token_embeddings'],
-                                             ocr_rec_features=items['rec_features'],
-                                             ocr_det_features=items['det_features'],
-                                             caption_tokens=items['answer_tokens'].squeeze(),
-                                             caption_masks=items['answer_mask'].squeeze(),
-                                             mode='inference')
-                outs = outputs['predicted_token']
+                    result = self.model(items, mode='inference')
+                outs = result["predicted_token"]
 
                 answers_gt = items.answers
                 answers_gen, in_fixed_vocab = self.vocab.decode_answer_with_determination(outs.contiguous().view(-1, self.vocab.max_answer_length),
-                                                                                          items.ocr_tokens,
-                                                                                          join_words=False)
+                                                        items.ocr_tokens, join_words=False)
                 gts = {}
                 gens = {}
                 for i, (gts_i, gen_i, in_fixed_vocab_i) in enumerate(zip(answers_gt, answers_gen, in_fixed_vocab)):

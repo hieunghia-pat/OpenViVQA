@@ -1,4 +1,10 @@
-from .modules.stacmr_modules import ObjectEncoder, OCREncoder, EncoderImagePrecompAttn, EncoderText, EncoderRNN, DecoderRNN
+from .modules.stacmr_modules import (
+    ObjectEncoder,
+    OCREncoder,
+    EncoderImagePrecompAttn,
+    EncoderText,
+    EncoderRNN,
+    DecoderRNN)
 import torch
 from torch import nn
 import torch.backends.cudnn as cudnn
@@ -13,46 +19,46 @@ class VSRN(nn.Module):
         # vocab_size, word_dim, embed_size, num_layers, use_abs=False
         self.vocab = vocab
         self.config = config
-        self.obj_enc = ObjectEncoder(obj_in_dim=self.config.OBJ_IN_DIM,
-                                     hidden_size=self.config.EMBED_SIZE)
+        self.obj_enc = ObjectEncoder(obj_in_dim=self.config.OBJECT_EMBEDDING.D_FEATURE,
+                                     hidden_size=self.config.D_MODEL)
 
-        self.ocr_enc = OCREncoder(ocr_in_dim=self.config.OCR_IN_DIM,
-                                  hidden_size=self.config.EMBED_SIZE)
+        self.ocr_enc = OCREncoder(ocr_in_dim=self.config.OCR_EMBEDDING.D_FEATURE,
+                                  hidden_size=self.config.D_MODEL)
 
-        self.img_enc = EncoderImagePrecompAttn(embed_size=self.config.EMBED_SIZE,
-                                               use_abs=self.config.USE_ABS,
-                                               no_imgnorm=self.config.NO_IMGNORM)
+        self.img_enc = EncoderImagePrecompAttn(embed_size=self.config.D_MODEL,
+                                               use_abs=self.config.ENCODER.USE_ABS,
+                                               no_imgnorm=self.config.ENCODER.NO_IMGNORM)
 
-        self.txt_enc = EncoderText(vocab_size=self.config.VOCAB_SIZE,
-                                   word_dim=self.config.WORD_DIM,
-                                   embed_size=self.config.EMBED_SIZE,
-                                   num_layers=self.config.NUM_LAYERS,
-                                   use_abs=self.config.USE_ABS)
+        self.txt_enc = EncoderText(vocab_size=len(self.vocab),
+                                   word_dim=self.config.TEXT_EMBEDDING.D_EMBEDDING,
+                                   embed_size=self.config.D_MODEL,
+                                   num_layers=self.config.RNN.NUM_LAYERS,
+                                   use_abs=self.config.ENCODER.USE_ABS)
 
         if torch.cuda.is_available():
             self.img_enc.cuda()
             self.txt_enc.cuda()
             cudnn.benchmark = True
 
-        #####   captioning elements
+        #   captioning elements
 
         self.encoder = EncoderRNN(
-            dim_vid=self.config.EMBED_SIZE,
-            dim_hidden=self.config.EMBED_SIZE,
-            bidirectional=self.config.BIDIRECTIONAL,
+            dim_vid=self.config.D_MODEL,
+            dim_hidden=self.config.D_MODEL,
+            bidirectional=self.config.RNN.BIDIRECTIONAL,
             input_dropout_p=self.config.INPUT_DROPOUT_P,
-            rnn_cell=self.config.RNN_TYPE,
-            rnn_dropout_p=self.config.RNN_DROPOUT_P)
+            rnn_cell=self.config.RNN.RNN_TYPE,
+            rnn_dropout_p=self.config.RNN.RNN_DROPOUT_P)
 
         self.decoder = DecoderRNN(
-            vocab_size=self.config.VOCAB_SIZE,
-            max_len=self.config.MAX_LEN,
-            dim_hidden=self.config.EMBED_SIZE,
-            dim_word=self.config.WORD_DIM,
+            vocab_size=len(self.vocab),
+            max_len=self.config.CLASSIFIER.MAX_LEN,
+            dim_hidden=self.config.D_MODEL,
+            dim_word=self.config.TEXT_EMBEDDING.D_EMBEDDING,
             input_dropout_p=self.config.INPUT_DROPOUT_P,
-            rnn_cell=self.config.RNN_TYPE,
-            rnn_dropout_p=self.config.RNN_DROPOUT_P,
-            bidirectional=self.config.BIDIRECTIONAL)
+            rnn_cell=self.config.RNN.RNN_TYPE,
+            rnn_dropout_p=self.config.RNN.RNN_DROPOUT_P,
+            bidirectional=self.config.RNN.BIDIRECTIONAL)
 
         self.caption_model = S2VTAttModel(self.encoder, self.decoder)
 
@@ -63,10 +69,10 @@ class VSRN(nn.Module):
                 item,
                 mode='train'):
 
-        obj_boxes = item.grid_boxes.to(self.config.DEVICE)
+        obj_boxes = item.grid_boxes.squeeze().to(self.config.DEVICE)
         obj_features = item.grid_features.to(self.config.DEVICE)
-        ocr_boxes = item.ocr_boxes.to(self.config.DEVICE)
-        ocr_token_embeddings = item.ocr_token_embeddings.to(self.config.DEVICE)
+        ocr_boxes = item.ocr_boxes.squeeze().to(self.config.DEVICE)
+        ocr_token_embeddings = item.ocr_fasttext_features.to(self.config.DEVICE)
         ocr_rec_features = item.ocr_rec_features.to(self.config.DEVICE)
         ocr_det_features = item.ocr_det_features.to(self.config.DEVICE)
         caption_tokens = item.answer_tokens.squeeze().to(self.config.DEVICE)
@@ -94,7 +100,7 @@ class VSRN(nn.Module):
             out = {
                 'img_emb': img_emb,
                 'cap_emb': cap_emb,
-                'scores': seq_probs, # seg_probs
+                'scores': seq_probs,
                 'GCN_img_emd': GCN_img_emd
             }
 
@@ -104,7 +110,7 @@ class VSRN(nn.Module):
                                                             mode=mode)
             out = {'img_emb': img_emb,
                    'cap_emb': cap_emb,
-                   'scores': seq_probs, # seg_probs
+                   'scores': seq_probs,
                    'GCN_img_emd': GCN_img_emd,
                    'predicted_token': predicted_token
                    }

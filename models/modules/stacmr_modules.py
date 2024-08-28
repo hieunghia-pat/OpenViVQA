@@ -100,15 +100,14 @@ class DecoderRNN(nn.Module):
         super(DecoderRNN, self).__init__()
 
         self.bidirectional_encoder = bidirectional
-
         self.dim_output = vocab_size
         self.dim_hidden = dim_hidden * 2 if bidirectional else dim_hidden
         self.dim_word = dim_word
         self.max_length = max_len
-        self.sos_id = 101
-        self.eos_id = 0
+        self.sos_id = 1
+        self.eos_id = 2
         self.input_dropout = nn.Dropout(input_dropout_p)
-        self.embedding = nn.Embedding(self.dim_output, dim_word)
+        self.embedding = nn.Embedding(17000, dim_word)
         self.attention = Attention(self.dim_hidden)
         if rnn_cell.lower() == 'lstm':
             self.rnn_cell = nn.LSTM
@@ -172,8 +171,7 @@ class DecoderRNN(nn.Module):
 
             seq_logprobs = torch.cat(seq_logprobs, 1)
 
-        if mode == 'inference':
-
+        elif mode == 'inference':
             if beam_size > 1:
                 return self.sample_beam(encoder_outputs, decoder_hidden, opt)
 
@@ -185,7 +183,8 @@ class DecoderRNN(nn.Module):
                     it = torch.LongTensor([self.sos_id] * batch_size).cuda()
                 elif sample_max:
                     sampleLogprobs, it = torch.max(logprobs, 1)
-                    seq_logprobs.append(sampleLogprobs.view(-1, 1))
+                    # seq_logprobs.append(sampleLogprobs.view(-1, 1))
+                    seq_logprobs.append(logprobs.unsqueeze(dim=1))
                     it = it.view(-1).long()
 
                 else:
@@ -197,7 +196,8 @@ class DecoderRNN(nn.Module):
                         prob_prev = torch.exp(torch.div(logprobs, temperature))
                     it = torch.multinomial(prob_prev, 1).cuda()
                     sampleLogprobs = logprobs.gather(1, it)
-                    seq_logprobs.append(sampleLogprobs.view(-1, 1))
+                    # seq_logprobs.append(sampleLogprobs.view(-1, 1))
+                    seq_logprobs.append(logprobs.unsqueeze(dim=1))
                     it = it.view(-1).long()
 
                 seq_preds.append(it.view(-1, 1))
@@ -250,6 +250,7 @@ class Attention(nn.Module):
         self.dim = dim
         self.linear1 = nn.Linear(dim * 2, dim)
         self.linear2 = nn.Linear(dim, 1, bias=False)
+        self.tanh = nn.Tanh()
         #self._init_hidden()
 
     def _init_hidden(self):
@@ -269,7 +270,7 @@ class Attention(nn.Module):
         hidden_state = hidden_state.unsqueeze(1).repeat(1, seq_len, 1)
         inputs = torch.cat((encoder_outputs, hidden_state),
                            2).view(-1, self.dim * 2)
-        o = self.linear2(F.tanh(self.linear1(inputs)))
+        o = self.linear2(self.tanh(self.linear1(inputs)))
         e = o.view(batch_size, seq_len)
         alpha = F.softmax(e, dim=1)
         context = torch.bmm(alpha.unsqueeze(1), encoder_outputs).squeeze(1)
@@ -396,18 +397,20 @@ class OCREncoder(nn.Module):
     ocr_det_features = F.normalize(ocr_det_features, dim=-1)
 
     max_len = max(ocr_token_embeddings.shape[1], ocr_rec_features.shape[1], ocr_det_features.shape[1])
+    
     if ocr_token_embeddings.shape[1] < max_len:
         ocr_token_embeddings = torch.nn.functional.pad(ocr_token_embeddings,
                                                        (0, 0, 0, max_len - ocr_token_embeddings.shape[1], 0, 0))
-    elif ocr_rec_features.shape[1] < max_len:
+    if ocr_rec_features.shape[1] < max_len:
         ocr_rec_features = torch.nn.functional.pad(ocr_rec_features,
                                                    (0, 0, 0, max_len - ocr_rec_features.shape[1], 0, 0))
-    elif ocr_det_features.shape[1] < max_len:
+    if ocr_det_features.shape[1] < max_len:
         ocr_det_features = torch.nn.functional.pad(ocr_det_features,
                                                    (0, 0, 0, max_len - ocr_det_features.shape[1], 0, 0))
         
     # get OCR combine features
-    ocr_combine_features = torch.cat([ocr_token_embeddings, ocr_rec_features, ocr_det_features], dim=-1)
+    ocr_combine_features = torch.cat(
+        [ocr_token_embeddings, ocr_rec_features, ocr_det_features], dim=-1)
     ocr_combine_features = self.ocr_feat_layer_norm(self.linear_ocr_feat_to_mmt_in(ocr_combine_features))
 
     # Get OCR bbox features
@@ -529,7 +532,7 @@ class EncoderText(nn.Module):
         self.embed_size = embed_size
 
         # word embedding
-        self.embed = nn.Embedding(vocab_size, word_dim)
+        self.embed = nn.Embedding(17000, word_dim)
 
         # caption embedding
         self.rnn = nn.GRU(word_dim, embed_size, num_layers, batch_first=True)
@@ -556,6 +559,7 @@ class EncoderText(nn.Module):
         padded = pad_packed_sequence(out, batch_first=True)
         I = torch.LongTensor(lengths).view(-1, 1, 1)
         I = Variable(I.expand(x.size(0), 1, self.embed_size)-1).cuda()
+        torch.cuda.synchronize()
         out = torch.gather(padded[0], 1, I).squeeze(1)
 
         # normalization in the joint embedding space

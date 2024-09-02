@@ -146,8 +146,8 @@ class MMA_SR_Model(nn.Module):
         mask = ocr_fc.sum(dim=1) != 0
 
         max_feat = []
-        for i in range(items.ocr_token_embeddings.shape[0]):
-            item_ = items.ocr_token_embeddings[i]
+        for i in range(items.ocr_fasttext_features.shape[0]):
+            item_ = items.ocr_fasttext_features[i]
             mask = item_.sum(dim=1) != 0
             max_feat.append(item_[mask].shape[0])
         max_feat = torch.tensor(max_feat)

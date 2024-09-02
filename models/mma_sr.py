@@ -29,7 +29,9 @@ class MMA_SR_Model(nn.Module):
         self.device = config.DEVICE
         self.max_iter = vocab.max_answer_length
         # self.training = True
-
+        
+        self.build() 
+        
     def build(self):
         # split model building into several components
         self._build_obj_encoding()
@@ -107,7 +109,7 @@ class MMA_SR_Model(nn.Module):
 
     def _forward_ocr_encoding(self, items, fwd_results):
         # OCR FastText feature (300-dim)
-        ocr_fasttext = items.ocr_token_embeddings
+        ocr_fasttext = items.ocr_fasttext_features
         ocr_fasttext = F.normalize(ocr_fasttext, dim=-1)
         assert ocr_fasttext.size(-1) == 300
 

@@ -29,6 +29,7 @@ train_dataloader = DataLoader(
             collate_fn=collate_fn
         )
 item = next(iter(train_dataloader))
+print(item)
 model = MMA_SR_Model(config.MODEL, vocab)
 model.build()
 model.eval()

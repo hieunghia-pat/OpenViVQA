@@ -407,7 +407,7 @@ class PrevPredEmbeddings(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        MAX_DEC_LENGTH = 100
+        MAX_DEC_LENGTH = 410
         MAX_TYPE_NUM = 5
         hidden_size = config.hidden_size
         ln_eps = config.layer_norm_eps

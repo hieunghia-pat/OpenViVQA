@@ -38,6 +38,7 @@ class BaseTask:
 
         logger.info("Building model")
         self.model = build_model(config.MODEL, self.vocab)
+        print(self.model)
         self.config = config
         self.device = torch.device(config.MODEL.DEVICE)
 

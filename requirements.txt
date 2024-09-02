@@ -10,4 +10,4 @@ pycocoevalcap
 gdown
 tabulate
 transformers==4.28.0
-
+omegaconf

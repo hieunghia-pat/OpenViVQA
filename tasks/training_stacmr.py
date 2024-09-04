@@ -113,6 +113,9 @@ class TrainingStacMR(OpenEndedTask):
         self.criterion = ContrastiveLoss(margin=config.MODEL.LOSS_FN.MARGIN,
                                          measure=config.MODEL.LOSS_FN.MEASURE,
                                          max_violation=config.MODEL.LOSS_FN.MAX_VIOLATION)
+
+        self.crit.to(self.device)
+        self.criterion.to(self.device)
         #self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
 
     def evaluate_loss(self, dataloader):
@@ -138,7 +141,7 @@ class TrainingStacMR(OpenEndedTask):
                                              shifted_right_answer_tokens, 
                                              items.answer_mask)
                 
-                    retrieval_loss = self.forward_loss(img_emb, cap_emb)
+                    retrieval_loss = self.criterion(img_emb, cap_emb)
                     
                     loss = 2.0 * retrieval_loss + caption_loss
                     

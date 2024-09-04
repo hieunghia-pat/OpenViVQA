@@ -79,7 +79,7 @@ class Vocab(object):
                     self.freqs.update(question)
                     self.freqs.update(answer)
                     if len(question) + 2 > self.max_question_length:
-                            self.max_question_length = len(question) + 2
+                        self.max_question_length = len(question) + 2
                     if len(answer) + 2 > self.max_answer_length:
                         self.max_answer_length = len(answer) + 2
 

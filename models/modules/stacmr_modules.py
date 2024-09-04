@@ -100,7 +100,8 @@ class DecoderRNN(nn.Module):
         super(DecoderRNN, self).__init__()
 
         self.bidirectional_encoder = bidirectional
-        self.dim_output = vocab_size
+        self.max_ocr = 100
+        self.dim_output = vocab_size + self.max_ocr
         self.dim_hidden = dim_hidden * 2 if bidirectional else dim_hidden
         self.dim_word = dim_word
         self.max_length = max_len

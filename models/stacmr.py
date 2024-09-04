@@ -19,6 +19,7 @@ class VSRN(nn.Module):
         # vocab_size, word_dim, embed_size, num_layers, use_abs=False
         self.vocab = vocab
         self.config = config
+        self.d_model = self.config.D_MODEL
         self.obj_enc = ObjectEncoder(obj_in_dim=self.config.OBJECT_EMBEDDING.D_FEATURE,
                                      hidden_size=self.config.D_MODEL)
 

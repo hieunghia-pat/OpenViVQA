@@ -2,7 +2,7 @@ TASK: TrainingStacMR
 
 DATASET:
   FEATURE_DATASET:
-    TYPE: ViTextCapsDataset
+    TYPE: OcrFeatureDataset
     BATCH_SIZE: 64
     WORKERS: 0
     FEATURE_PATH:
@@ -15,7 +15,7 @@ DATASET:
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
   DICT_DATASET:
-    TYPE: ViTextCapsDataset
+    TYPE: OcrDictionaryDataset
     BATCH_SIZE: 64
     WORKERS: 0 
     FEATURE_PATH:

@@ -4,13 +4,13 @@ import torch
 import json
 
 from data_utils.datasets.feature_dataset import FeatureDataset, BaseDataset 
-from builders.task_builder import META_TASK
+from builders.dataset_builder import META_DATASET
 from utils.instance import Instance  
 from data_utils.utils import preprocess_sentence
 from typing import Dict, List, Any
 
 
-@META_TASK.register()
+@META_DATASET.register()
 class ViTextCapsDataset:
     def __init__(self, json_path: str, vocab, config) -> None:
 

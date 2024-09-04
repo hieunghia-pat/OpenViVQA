@@ -108,7 +108,7 @@ class DecoderRNN(nn.Module):
         self.sos_id = 1
         self.eos_id = 2
         self.input_dropout = nn.Dropout(input_dropout_p)
-        self.embedding = nn.Embedding(17000, dim_word)
+        self.embedding = nn.Embedding(self.dim_output, dim_word)
         self.attention = Attention(self.dim_hidden)
         if rnn_cell.lower() == 'lstm':
             self.rnn_cell = nn.LSTM

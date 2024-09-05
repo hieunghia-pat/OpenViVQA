@@ -10,22 +10,23 @@ from data_utils.utils import preprocess_sentence
 from typing import Dict, List, Any
 
 
+
 @META_DATASET.register()
-class ViTextCapsDataset:
+class ViTextCapsDataset(FeatureDataset):
     def __init__(self, json_path: str, vocab, config) -> None:
 
         self.vocab = vocab
 
-        self.image_features_path = config.FEATURE_DATASET.FEATURE_PATH.FEATURES
-        self.fasttext_path = config.FEATURE_DATASET.FEATURE_PATH.FASTTEXT
+        self.image_features_path = config.FEATURE_PATH.FEATURES
+        self.fasttext_path = config.FEATURE_PATH.FASTTEXT
 
         self.annotations = self.load_annotations(json_path)
         
-        self.scene_text_features_path = config.FEATURE_DATASET.FEATURE_PATH.SCENE_TEXT
-        self.scene_text_threshold = config.FEATURE_DATASET.SCENE_TEXT_THRESHOLD
-        self.max_scene_text = config.FEATURE_DATASET.MAX_SCENE_TEXT
+        self.scene_text_features_path = config.FEATURE_PATH.SCENE_TEXT
+        self.scene_text_threshold = config.SCENE_TEXT_THRESHOLD
+        self.max_scene_text = config.MAX_SCENE_TEXT
         
-        self.fasttext_features_path = config.FEATURE_DATASET.FEATURE_PATH.FASTTEXT
+        self.fasttext_features_path = config.FEATURE_PATH.FASTTEXT
 
     def load_annotations(self, json_path: str) -> List[Dict]:
 

@@ -164,17 +164,7 @@ class OcrDictionaryDataset(DictionaryDataset):
         answers = item["answers"]
 
         ocr_tokens = [text if text.strip() != "" else self.vocab.padding_token for text in features["ocr_texts"]]
-        
-        answer_tokens = self.vocab.encode_answer(answers, ocr_tokens)
-        answer_tokens = torch.where(answer_tokens == self.vocab.eos_idx, 
-                                    self.vocab.padding_idx, 
-                                    answer_tokens) # remove eos_token in answer
-        
-        shifted_right_answer_tokens = torch.zeros_like(answer_tokens).fill_(self.vocab.padding_idx)
-        shifted_right_answer_tokens[:-1] = answer_tokens[1:]
-        
-        answer_mask = torch.where(answer_tokens > 0, 1, 0)
-        
+
         return Instance(
             **features,
             question_id=item["question_id"],
@@ -184,8 +174,5 @@ class OcrDictionaryDataset(DictionaryDataset):
             ocr_tokens=ocr_tokens,
             question=" ".join(question),
             question_tokens=question_tokens,
-            answers=answers,
-            answer_tokens=answer_tokens,
-            shifted_right_answer_tokens=shifted_right_answer_tokens,
-            answer_mask=answer_mask
+            answers=answers
         )

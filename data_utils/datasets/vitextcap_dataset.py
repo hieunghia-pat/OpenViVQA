@@ -106,11 +106,11 @@ class ViTextCapsDataset(FeatureDataset):
         item = self.annotations[idx]
         question = item["question"]
         question_tokens = self.vocab.encode_question(question)
-        answer = item["answer"]
+        answers = item["answer"]
 
         ocr_tokens = [text if text.strip() != "" else self.vocab.padding_token for text in features["ocr_texts"]]
 
-        answer_tokens = self.vocab.encode_answer(answer, ocr_tokens)
+        answer_tokens = self.vocab.encode_answer(answers, ocr_tokens)
 
         shifted_right_answer_tokens = torch.zeros_like(answer_tokens).fill_(self.vocab.padding_idx)
         shifted_right_answer_tokens[:-1] = answer_tokens[1:]
@@ -124,7 +124,7 @@ class ViTextCapsDataset(FeatureDataset):
             ocr_tokens=ocr_tokens,
             question=" ".join(question),
             question_tokens=question_tokens,
-            answer=answer,
+            answers=answers,
             answer_tokens=answer_tokens,
             shifted_right_answer_tokens=shifted_right_answer_tokens,
             answer_mask=answer_mask

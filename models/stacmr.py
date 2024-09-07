@@ -76,8 +76,16 @@ class VSRN(nn.Module):
         ocr_token_embeddings = item.ocr_fasttext_features.to(self.config.DEVICE)
         ocr_rec_features = item.ocr_rec_features.to(self.config.DEVICE)
         ocr_det_features = item.ocr_det_features.to(self.config.DEVICE)
-        caption_tokens = item.answer_tokens.squeeze().to(self.config.DEVICE)
-        caption_masks = item.answer_mask.squeeze().to(self.config.DEVICE)
+        
+        answer_tokens = self.vocab.encode_answer(item.answers, item.ocr_tokens)
+        shifted_right_answer_tokens = torch.zeros_like(answer_tokens).fill_(self.vocab.padding_idx)
+        shifted_right_answer_tokens[:-1] = answer_tokens[1:]
+        
+        answer_tokens = torch.where(answer_tokens == self.vocab.eos_idx, self.vocab.padding_idx, answer_tokens) # remove eos_token in answer
+        answer_mask = torch.where(answer_tokens > 0, 1, 0)
+        
+        caption_tokens = answer_tokens.squeeze().to(self.config.DEVICE)
+        caption_masks = answer_mask.squeeze().to(self.config.DEVICE)
         
         B, _ = caption_masks.shape
         temp = np.zeros(B)

@@ -77,7 +77,7 @@ class VSRN(nn.Module):
         ocr_rec_features = item.ocr_rec_features.to(self.config.DEVICE)
         ocr_det_features = item.ocr_det_features.to(self.config.DEVICE)
         
-        answer_tokens = self.vocab.encode_answer(item.answers, item.ocr_tokens)
+        answer_tokens = self.generate_answer_tokens(item.answer, item.ocr_tokens)
         shifted_right_answer_tokens = torch.zeros_like(answer_tokens).fill_(self.vocab.padding_idx)
         shifted_right_answer_tokens[:-1] = answer_tokens[1:]
         
@@ -125,6 +125,19 @@ class VSRN(nn.Module):
                    }
 
         return out
+    
+    def generate_answer_tokens(self, answers, ocr_tokens, mask=False):
+        answer_tokens = []
+        for i in range(len(answers)):
+            answer_tokens.append(self.vocab.encode_answer(answers[i], ocr_tokens[i]))
+        
+        answer_tokens = torch.stack(answer_tokens).to(self.config.DEVICE)
+        
+        if mask == True:
+            result = torch.where(answer_tokens > 0, 1, 0)
+        else:
+            result = answer_tokens
+        return result
 
 
 class S2VTAttModel(nn.Module):

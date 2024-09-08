@@ -137,9 +137,13 @@ class TrainingStacMR(OpenEndedTask):
                     shifted_right_answer_tokens = items.shifted_right_answer_tokens
                     # loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
                     
+                    answer_mask = self.model.generate_answer_tokens(items.answer,
+                                                                    items.answer_tokens,
+                                                                    mask=True)
+                    
                     caption_loss = self.crit(seq_prob, 
                                              shifted_right_answer_tokens, 
-                                             items.answer_mask)
+                                             answer_mask)
                 
                     retrieval_loss = self.criterion(img_emb, cap_emb)
                     
@@ -195,9 +199,12 @@ class TrainingStacMR(OpenEndedTask):
                 shifted_right_answer_tokens = items.shifted_right_answer_tokens
                 self.optim.zero_grad()
                 # loss = self.loss_fn(out.view(-1, out.shape[-1]), shifted_right_answer_tokens.view(-1))
+                answer_mask = self.model.generate_answer_tokens(items.answer,
+                                                                items.answer_tokens,
+                                                                mask=True)
                 caption_loss = self.crit(seq_probs, 
                                          shifted_right_answer_tokens, 
-                                         items.answer_mask)
+                                         answer_mask)
                 
                 retrieval_loss = self.criterion(img_emb, cap_emb)
                 

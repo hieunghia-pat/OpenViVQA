@@ -1,0 +1,7 @@
+transformers
+torch
+torchvision
+Pillow
+nltk
+rouge-score
+pycocoevalcap

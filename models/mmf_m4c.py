@@ -32,6 +32,7 @@ class MMF_M4C(nn.Module):
         self.d_model = self.mmt_config.hidden_size
         self.device = config.DEVICE
         self.max_iter = vocab.max_answer_length
+        print('vocab.max_answer_length', vocab.max_answer_length)
 
         self.build()
 
@@ -177,6 +178,9 @@ class MMF_M4C(nn.Module):
         ocr_fc = items.ocr_det_features
         ocr_fc = F.normalize(ocr_fc, dim=-1)
 
+        assert ocr_fc.size(1) == ocr_phoc.size(1), "Second dimensions must match!"
+
+        ocr_fasttext = ocr_fasttext[:, :ocr_phoc.size(1), :]
         ocr_feat = torch.cat(
             [ocr_fasttext, ocr_phoc, ocr_fc], dim=-1
         )
@@ -221,11 +225,14 @@ class MMF_M4C(nn.Module):
     def _forward_output(self, items, fwd_results):
         mmt_dec_output = fwd_results["mmt_dec_output"]
         mmt_ocr_output = fwd_results["mmt_ocr_output"]
+
         ocr_mask = fwd_results["ocr_mask"]
 
         fixed_scores = self.classifier(mmt_dec_output)
         dynamic_ocr_scores = self.ocr_ptr_net(mmt_dec_output, mmt_ocr_output, ocr_mask)
+
         scores = torch.cat([fixed_scores, dynamic_ocr_scores], dim=-1)
+
         fwd_results["scores"] = scores
 
     def _forward_mmt_and_output(self, items, fwd_results):
@@ -251,7 +258,7 @@ class MMF_M4C(nn.Module):
                 fwd_results["prev_inds"][:, 1:] = argmax_inds[:, :-1]
                 
                 # whether or not to interrupt the decoding process
-                last_ids = torch.where(last_ids == self.vocab.eos_idx, last_ids, argmax_inds[:, ith])
+                last_ids = torch.where(last_ids.float() == self.vocab.eos_idx, last_ids.float(), argmax_inds[:, ith].float())
                 if last_ids.mean() == self.vocab.eos_idx:
                     break
 
@@ -400,7 +407,7 @@ class PrevPredEmbeddings(nn.Module):
     def __init__(self, config):
         super().__init__()
 
-        MAX_DEC_LENGTH = 100
+        MAX_DEC_LENGTH = 410
         MAX_TYPE_NUM = 5
         hidden_size = config.hidden_size
         ln_eps = config.layer_norm_eps

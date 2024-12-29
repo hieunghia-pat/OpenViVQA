@@ -1,0 +1,13 @@
+--extra-index-url https://download.pytorch.org/whl/cu118
+torch
+torchvision
+torchaudio
+tqdm==4.66.4
+wget==3.2
+yacs
+evaluate
+pycocoevalcap
+gdown
+tabulate
+transformers==4.28.0
+omegaconf

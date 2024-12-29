@@ -8,6 +8,7 @@ from collections import Counter
 import json
 from typing import List
 
+
 @META_VOCAB.register()
 class Vocab(object):
     """
@@ -66,7 +67,11 @@ class Vocab(object):
         self.max_question_length = 0
         self.max_answer_length = 0
         for json_dir in json_dirs:
-            json_data = json.load(open(json_dir))
+            # parts = json_dir.split('/')
+            # json_dir =  './' + '/'.join(parts[-2:])
+            with open(json_dir, 'r', encoding='utf-8') as file:
+                json_data = json.load(file)
+            # json_data = json.load(open(json_dir))
             for ann in json_data["annotations"]:
                 for answer in ann["answers"]:
                     question = preprocess_sentence(ann["question"], self.tokenizer)
@@ -74,7 +79,7 @@ class Vocab(object):
                     self.freqs.update(question)
                     self.freqs.update(answer)
                     if len(question) + 2 > self.max_question_length:
-                            self.max_question_length = len(question) + 2
+                        self.max_question_length = len(question) + 2
                     if len(answer) + 2 > self.max_answer_length:
                         self.max_answer_length = len(answer) + 2
 
@@ -174,3 +179,4 @@ class Vocab(object):
                 self.word_embeddings[i] = word_embeddings[we_index]
             else:
                 self.word_embeddings[i] = unk_init(self.word_embeddings[i])
+                

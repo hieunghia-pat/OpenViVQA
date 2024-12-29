@@ -4,11 +4,10 @@ DATASET:
   FEATURE_DATASET:
     TYPE: OcrFeatureDataset
     BATCH_SIZE: 64
-    WORKERS: 0
+    WORKERS: 2
     FEATURE_PATH:
-      FEATURES: /content/vitextcaps-captioning/data/vinvl_vinvl
-      SCENE_TEXT: /content/vitextcaps-captioning/data/swintextspotter
-      FASTTEXT: /content/vitextcaps-captioning/data/fasttext
+      FEATURES: ./features/x152++_faster_rcnn
+      SCENE_TEXT: ./features/swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -17,11 +16,10 @@ DATASET:
   DICT_DATASET:
     TYPE: OcrDictionaryDataset
     BATCH_SIZE: 64
-    WORKERS: 0
+    WORKERS: 2
     FEATURE_PATH:
-      FEATURES: /content/vitextcaps-captioning/data/vinvl_vinvl
-      SCENE_TEXT: /content/vitextcaps-captioning/data/swintextspotter
-      FASTTEXT: /content/vitextcaps-captioning/data/fasttext
+      FEATURES: ./features/x152++_faster_rcnn
+      SCENE_TEXT: ./features/swintextspotter
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -47,13 +45,13 @@ DATASET:
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
     JSON_PATH:
-      TRAIN: OpenViVQA_train.json
-      DEV: OpenViVQA_dev.json
-      TEST: OpenViVQA_test.json
+      TRAIN: ./annotations/OpenViVQA_train.json
+      DEV: ./annotations/OpenViVQA_dev.json
+      TEST: ./annotations/OpenViVQA_test.json
   JSON_PATH:
-    TRAIN: OpenViVQA_train.json
-    DEV: OpenViVQA_dev.json
-    TEST: OpenViVQA_test.json
+    TRAIN: ./annotations/OpenViVQA_train.json
+    DEV: ./annotations/OpenViVQA_dev.json
+    TEST: ./annotations/OpenViVQA_test.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -66,7 +64,7 @@ TRAINING:
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: MMF_M4C
+  ARCHITECTURE: MMA_SR
   NAME: mmf_m4c_x152++_faster_rcnn
   DEVICE: cuda
   D_MODEL: 768
@@ -97,7 +95,7 @@ MODEL:
     NUM_ATTENTION_HEADS: 8
   TEXT_BERT:
     HIDDEN_SIZE: 768
-    NUM_HIDDEN_LAYERS: 12
+    NUM_HIDDEN_LAYERS: 3
     NUM_ATTENTION_HEADS: 12
     D_MODEL: 512
     DROPOUT: .1

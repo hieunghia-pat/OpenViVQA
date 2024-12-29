@@ -61,8 +61,8 @@ class OcrVocab(Vocab):
         self.stoi = {tok: i for i, tok in enumerate(itos)}
 
         self.specials = [self.padding_token, self.bos_token, self.eos_token, self.unk_token, self.img_token,
-                    self.feat_token, self.box_token, self.ocr_token, self.ocr_det_token, self.ocr_rec_token, 
-                    self.question_token, self.answer_token]
+                         self.feat_token, self.box_token, self.ocr_token, self.ocr_det_token, self.ocr_rec_token, 
+                         self.question_token, self.answer_token]
 
         self.padding_idx = self.stoi[self.padding_token]
         self.bos_idx = self.stoi[self.bos_token]
@@ -123,6 +123,7 @@ class OcrVocab(Vocab):
             answer_vecs: (bs, max_length)
         '''
         ocr_token_of = [{len(self.stoi)+idx: token for idx, token in enumerate(ocr_tokens)} for ocr_tokens in list_ocr_tokens]
+        
         answers = []
         for batch, vec in enumerate(answer_vecs):
             answer = []

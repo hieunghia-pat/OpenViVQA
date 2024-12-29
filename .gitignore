@@ -2,6 +2,9 @@
 features
 saved_models
 images
+test
+data
+annotations
 *_test
 __pycache__
 
@@ -9,5 +12,7 @@ __pycache__
 examine*
 
 statistic.ipynb
+test.ipynb
+test.py
 
 *.zip

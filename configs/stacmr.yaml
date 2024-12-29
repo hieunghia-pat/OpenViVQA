@@ -1,4 +1,4 @@
-TASK: TrainingMMF
+TASK: TrainingStacMR  
 
 DATASET:
   FEATURE_DATASET:
@@ -6,9 +6,9 @@ DATASET:
     BATCH_SIZE: 64
     WORKERS: 0
     FEATURE_PATH:
-      FEATURES: /content/vitextcaps-captioning/data/vinvl_vinvl
-      SCENE_TEXT: /content/vitextcaps-captioning/data/swintextspotter
-      FASTTEXT: /content/vitextcaps-captioning/data/fasttext
+      FEATURES: D:\Research\OpenViVQA\data\vinvl_vinvl
+      SCENE_TEXT: D:\Research\OpenViVQA\data\swintextspotter
+      FASTTEXT: D:\Research\OpenViVQA\data\fasttext
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -17,11 +17,11 @@ DATASET:
   DICT_DATASET:
     TYPE: OcrDictionaryDataset
     BATCH_SIZE: 64
-    WORKERS: 0
+    WORKERS: 0 
     FEATURE_PATH:
-      FEATURES: /content/vitextcaps-captioning/data/vinvl_vinvl
-      SCENE_TEXT: /content/vitextcaps-captioning/data/swintextspotter
-      FASTTEXT: /content/vitextcaps-captioning/data/fasttext
+      FEATURES: D:\Research\OpenViVQA\data\vinvl_vinvl
+      SCENE_TEXT: D:\Research\OpenViVQA\data\swintextspotter
+      FASTTEXT: D:\Research\OpenViVQA\data\fasttext
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -47,13 +47,13 @@ DATASET:
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
     JSON_PATH:
-      TRAIN: OpenViVQA_train.json
-      DEV: OpenViVQA_dev.json
-      TEST: OpenViVQA_test.json
+      TRAIN: D:\Research\OpenViVQA\data\vitextcaps_train.json
+      DEV: D:\Research\OpenViVQA\data\vitextcaps_dev.json
+      TEST: D:\Research\OpenViVQA\data\vitextcaps_test.json
   JSON_PATH:
-    TRAIN: OpenViVQA_train.json
-    DEV: OpenViVQA_dev.json
-    TEST: OpenViVQA_test.json
+    TRAIN: D:\Research\OpenViVQA\data\vitextcaps_train.json
+    DEV: D:\Research\OpenViVQA\data\vitextcaps_dev.json
+    TEST: D:\Research\OpenViVQA\data\vitextcaps_test.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -66,44 +66,34 @@ TRAINING:
   PATIENCE: 5
 
 MODEL:
-  ARCHITECTURE: MMF_M4C
-  NAME: mmf_m4c_x152++_faster_rcnn
+  ARCHITECTURE: VSRN
+  NAME: StacMR
   DEVICE: cuda
   D_MODEL: 768
+  INPUT_DROPOUT_P: 0.2
+
   OBJECT_EMBEDDING:
-    D_FEATURE: 2048
+    D_FEATURE: 1024
     DROPOUT: .1
+
   BOX_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
     DEVICE: cuda
     D_FEATURE: 4
     D_MODEL: 768
     DROPOUT: .1
+
   OCR_TEXT_EMBEDDING:
     WORD_EMBEDDING: ViFastText
     WORD_EMBEDDING_CACHE: null
+
   OCR_EMBEDDING:
     D_FEATURE: 812 # 256 (det features) + 256 (rec features) + 300 (fasttext)
     DROPOUT: .1
-  OCR_PTR_NET:
-    HIDDEN_SIZE: 768
-    QUERY_KEY_SIZE: 768
-    OCR_MAX_NUM: 30
   CLASSIFIER:
     OCR_MAX_NUM: 30
-  MMT:
-    HIDDEN_SIZE: 768
-    NUM_HIDDEN_LAYERS: 4
-    NUM_ATTENTION_HEADS: 8
-  TEXT_BERT:
-    HIDDEN_SIZE: 768
-    NUM_HIDDEN_LAYERS: 12
-    NUM_ATTENTION_HEADS: 12
-    D_MODEL: 512
-    DROPOUT: .1
-    LOAD_PRETRAINED: True
-    FREEZE_WEIGHTS: True
-    PRETRAINED_NAME: "bert-base-uncased"
+    MAX_LEN: 60
+
   TEXT_EMBEDDING:
     ARCHITECTURE: UsualEmbedding
     DEVICE: cuda
@@ -113,3 +103,18 @@ MODEL:
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null  
 
+  RNN:
+    NUM_LAYERS: 1
+    RNN_TYPE: 'gru'
+    BIDIRECTIONAL: False
+    RNN_DROPOUT_P: 0.5
+  
+  LOSS_FN:
+    MARGIN: 0.2
+    MEASURE: cosine
+    MAX_VIOLATION: True
+  
+  ENCODER:
+    NO_IMGNORM: True
+    USE_ABS: True
+REMOVE_UNK_IN_PRED: True

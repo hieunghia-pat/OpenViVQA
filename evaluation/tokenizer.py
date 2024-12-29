@@ -12,6 +12,7 @@ import os
 import subprocess
 import tempfile
 
+
 class PTBTokenizer(object):
     """Python wrapper of Stanford PTBTokenizer"""
 

@@ -4,11 +4,10 @@ DATASET:
   FEATURE_DATASET:
     TYPE: OcrFeatureDataset
     BATCH_SIZE: 64
-    WORKERS: 0
+    WORKERS: 2
     FEATURE_PATH:
-      FEATURES: /content/vitextcaps-captioning/data/vinvl_vinvl
-      SCENE_TEXT: /content/vitextcaps-captioning/data/swintextspotter
-      FASTTEXT: /content/vitextcaps-captioning/data/fasttext
+      FEATURES: ./test/object_features
+      SCENE_TEXT: ./test/ocr_features
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -17,11 +16,10 @@ DATASET:
   DICT_DATASET:
     TYPE: OcrDictionaryDataset
     BATCH_SIZE: 64
-    WORKERS: 0
+    WORKERS: 2
     FEATURE_PATH:
-      FEATURES: /content/vitextcaps-captioning/data/vinvl_vinvl
-      SCENE_TEXT: /content/vitextcaps-captioning/data/swintextspotter
-      FASTTEXT: /content/vitextcaps-captioning/data/fasttext
+      FEATURES: ./test/object_features
+      SCENE_TEXT: ./test/ocr_features
       IMAGE: null
     SCENE_TEXT_THRESHOLD: 0.0
     MAX_SCENE_TEXT: 100
@@ -47,13 +45,13 @@ DATASET:
     QUESTION_TOKEN: <question>
     ANSWER_TOKEN: <answer>
     JSON_PATH:
-      TRAIN: OpenViVQA_train.json
-      DEV: OpenViVQA_dev.json
-      TEST: OpenViVQA_test.json
+      TRAIN: train.json
+      DEV: dev.json
+      TEST: test.json
   JSON_PATH:
-    TRAIN: OpenViVQA_train.json
-    DEV: OpenViVQA_dev.json
-    TEST: OpenViVQA_test.json
+    TRAIN: train.json
+    DEV: dev.json
+    TEST: test.json
 
 TRAINING:
   CHECKPOINT_PATH: saved_models
@@ -67,11 +65,11 @@ TRAINING:
 
 MODEL:
   ARCHITECTURE: MMF_M4C
-  NAME: mmf_m4c_x152++_faster_rcnn
+  NAME: mmf_m4c_captinoner_x152++_faster_rcnn
   DEVICE: cuda
   D_MODEL: 768
   OBJECT_EMBEDDING:
-    D_FEATURE: 2048
+    D_FEATURE: 1024
     DROPOUT: .1
   BOX_EMBEDDING:
     ARCHITECTURE: FeatureEmbedding
@@ -113,3 +111,8 @@ MODEL:
     WORD_EMBEDDING: null
     WORD_EMBEDDING_CACHE: null  
 
+REMOVE_UNK_IN_PRED: True
+FEATURE_PATH:
+  FEATURES: ./test/object_features
+  SCENE_TEXT: ./test/ocr_features
+  IMAGE: null

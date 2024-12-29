@@ -21,3 +21,6 @@ from .visiolinguistic_transformer import VisiolinguisticTransformer
 from .vit_mt5 import ViTmT5
 from .vit_mbert_classification import ViTmBERTClassification
 from .vit_mbert_generation import ViTmBERTGeneration
+from .mma_sr import MMA_SR_Model
+from .stacmr import VSRN
+

@@ -87,6 +87,7 @@ class TrainingMMF(OpenEndedTask):
                 answers_gen = self.vocab.decode_answer(outs.contiguous(),
                                                        items.ocr_tokens,
                                                        join_words=False)
+
                 for i, (gts_i, gen_i) in enumerate(zip(answers_gt, answers_gen)):
                     gen_i = ' '.join([k for k, g in itertools.groupby(gen_i)])
                     gens['%d_%d' % (it, i)] = [gen_i, ]
@@ -122,22 +123,25 @@ class TrainingMMF(OpenEndedTask):
 
     def start(self):
         if os.path.isfile(os.path.join(self.checkpoint_path, "last_model.pth")):
-            checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"), weights_only=True)
-            best_val_score = checkpoint["best_val_score"]
-            patience = checkpoint["patience"]
-            self.epoch = checkpoint["epoch"] + 1
-            self.optim.load_state_dict(checkpoint['optimizer'])
-            self.scheduler.load_state_dict(checkpoint['scheduler'])
+            logger.info("Loading checkpoint")
+            checkpoint = self.load_checkpoint(os.path.join(self.checkpoint_path, "last_model.pth"))
+            logger.info("Checkpoint load successfully")
+            # best_val_score = checkpoint["best_val_score"]
+            # patience = checkpoint["patience"]
+            # self.epoch = checkpoint["epoch"] + 1
+            # self.optim.load_state_dict(checkpoint['optimizer'])
+            # self.scheduler.load_state_dict(checkpoint['scheduler'])
         else:
             best_val_score = .0
             patience = 0
 
         while True:
             self.train()
-            self.evaluate_loss(self.dev_dataloader)
+            # self.evaluate_loss(self.dev_dataloader)
 
             # val scores
-            scores = self.evaluate_metrics(self.dev_dict_dataloader)
+            scores = self.evaluate_metrics(self.test_dict_dataloader)
+            logger.info(scores)
             logger.info("Validation scores %s", scores)
             val_score = scores[self.score]
 

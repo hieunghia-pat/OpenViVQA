@@ -44,8 +44,9 @@ class TrainingMMF(OpenEndedTask):
     def __init__(self, config):
         super().__init__(config)
 
-        self.loss_fn = BCEWithMaskLogitsLoss(ignore_index=self.vocab.padding_idx)
-        #self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
+        self.loss_fn = nn.CrossEntropyLoss(ignore_index=self.vocab.padding_idx)
+        # self.loss_fn = BCEWithMaskLogitsLoss(ignore_index=self.vocab.padding_idx)
+        # self.loss_fn = NLLLoss(ignore_index=self.vocab.padding_idx)
 
     def evaluate_loss(self, dataloader):
         self.model.eval()
